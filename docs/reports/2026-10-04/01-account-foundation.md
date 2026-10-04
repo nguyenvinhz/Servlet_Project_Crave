@@ -2,7 +2,7 @@
 
 - Người thực hiện: Nguyễn Quang Vinh
 - Ngày: 2026-10-04
-- Branch: feature/vinh/account-foundation
+- Branch: feature/account-foundation
 - Task/Issue: Ngày 1 — tài khoản, xác thực, hồ sơ và địa chỉ
 - Commit dự kiến: `feat(account): dựng nền tài khoản ngày 1`
 

@@ -27,16 +27,14 @@ https://github.com/nguyenvinhz/Servlet_Project_Crave.git
 9. Không force-push nhánh dùng chung hoặc nhánh đang được review.
 10. Không merge khi build/test thất bại hoặc còn conflict.
 
-## 3. Tên viết tắt của thành viên
+## 3. Danh tính người thực hiện
 
-| Thành viên | Tên dùng trong branch/report |
-|---|---|
-| Nguyễn Quang Vinh | vinh |
-| Nguyễn Minh Huân | huan |
-| Ung Văn Trí | tri |
-| Nguyễn Đức Phát | phat |
+Không đưa tên thật hoặc tên viết tắt của thành viên vào tên branch, tên report hay
+tên source file. Branch và file chỉ mô tả chức năng hoặc phạm vi kỹ thuật.
 
-Không dùng dấu tiếng Việt, khoảng trắng hoặc ký tự đặc biệt trong tên branch và tên file.
+Danh tính người thực hiện được lưu bằng Git author và trường `Người thực hiện`
+trong nội dung report. Không dùng dấu tiếng Việt, khoảng trắng hoặc ký tự đặc biệt
+trong tên branch và tên file.
 
 ## 4. Quy tắc đặt tên
 
@@ -45,7 +43,7 @@ Không dùng dấu tiếng Việt, khoảng trắng hoặc ký tự đặc biệ
 Định dạng:
 
 ~~~text
-<loai>/<ten-thanh-vien>/<mo-ta-ngan>
+<loai>/<mo-ta-ngan>
 ~~~
 
 Loại branch được phép:
@@ -63,12 +61,12 @@ Loại branch được phép:
 Ví dụ:
 
 ~~~text
-feature/vinh/auth-login
-feature/huan/menu-management
-feature/tri/cart-voucher
-feature/phat/order-payment
-fix/tri/cart-total
-docs/vinh/github-rules
+feature/auth-login
+feature/menu-management
+feature/cart-voucher
+feature/order-payment
+fix/cart-total
+docs/github-rules
 ~~~
 
 Không dùng tên branch mơ hồ:
@@ -180,7 +178,7 @@ Nếu git pull --ff-only báo lỗi, dừng lại và kiểm tra lịch sử; kh
 Ví dụ Nguyễn Quang Vinh làm đăng nhập:
 
 ~~~powershell
-git switch -c feature/vinh/auth-login
+git switch -c feature/auth-login
 git branch --show-current
 ~~~
 
@@ -189,8 +187,8 @@ Branch mới phải được tạo từ main vừa cập nhật.
 ### 6.4. Tiếp tục branch đã có
 
 ~~~powershell
-git switch feature/vinh/auth-login
-git pull --ff-only origin feature/vinh/auth-login
+git switch feature/auth-login
+git pull --ff-only origin feature/auth-login
 git fetch origin --prune
 git merge origin/main
 ~~~
@@ -296,16 +294,16 @@ Closes #24
 Mỗi commit công việc do thành viên chủ động tạo phải kèm một báo cáo tại:
 
 ~~~text
-docs/reports/YYYY-MM-DD/<ten-thanh-vien>/<so-thu-tu>-<task>.md
+docs/reports/YYYY-MM-DD/<so-thu-tu>-<task>.md
 ~~~
 
 Ví dụ:
 
 ~~~text
-docs/reports/2026-10-02/vinh/01-auth-login.md
-docs/reports/2026-10-02/huan/02-menu-filter.md
-docs/reports/2026-10-02/tri/01-cart-voucher.md
-docs/reports/2026-10-02/phat/03-order-status.md
+docs/reports/2026-10-02/01-auth-login.md
+docs/reports/2026-10-02/02-menu-filter.md
+docs/reports/2026-10-02/03-cart-voucher.md
+docs/reports/2026-10-02/04-order-status.md
 ~~~
 
 Quy tắc:
@@ -322,8 +320,8 @@ Quy tắc:
 Có thể tạo bằng IDE hoặc PowerShell:
 
 ~~~powershell
-New-Item -ItemType Directory -Force "docs/reports/2026-10-02/vinh"
-New-Item -ItemType File "docs/reports/2026-10-02/vinh/01-auth-login.md"
+New-Item -ItemType Directory -Force "docs/reports/2026-10-02"
+New-Item -ItemType File "docs/reports/2026-10-02/01-auth-login.md"
 ~~~
 
 Thay ngày, tên thành viên, số thứ tự và task cho đúng công việc thực tế.
@@ -417,7 +415,7 @@ Tạo report theo mục 9 và điền đúng kết quả thực tế.
 ~~~powershell
 git add backend/src/main/java/com/foodordering/servlet
 git add frontend/auth
-git add docs/reports/2026-10-02/vinh/01-auth-login.md
+git add docs/reports/2026-10-02/01-auth-login.md
 ~~~
 
 Có thể dùng chế độ chọn từng phần:
@@ -454,7 +452,7 @@ git status
 Lần push đầu tiên:
 
 ~~~powershell
-git push -u origin feature/vinh/auth-login
+git push -u origin feature/auth-login
 ~~~
 
 Các lần tiếp theo:
@@ -605,7 +603,7 @@ Quy ước comment review:
 Không tạo PR mới. Tiếp tục sửa trên cùng branch:
 
 ~~~powershell
-git switch feature/vinh/auth-login
+git switch feature/auth-login
 git status
 ~~~
 
@@ -627,7 +625,7 @@ Pull Request sẽ tự cập nhật. Mỗi commit sửa review vẫn cần repor
 
 ~~~powershell
 git fetch origin --prune
-git switch feature/vinh/auth-login
+git switch feature/auth-login
 git merge origin/main
 git status
 ~~~
@@ -663,7 +661,7 @@ Không chọn toàn bộ ours hoặc theirs một cách máy móc. Không xóa c
 git switch main
 git fetch origin --prune
 git pull --ff-only origin main
-git branch -d feature/vinh/auth-login
+git branch -d feature/auth-login
 ~~~
 
 Nếu GitHub chưa tự xóa remote branch, xóa bằng giao diện GitHub sau khi chắc chắn PR đã merge.
