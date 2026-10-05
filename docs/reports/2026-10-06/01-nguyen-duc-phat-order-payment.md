@@ -17,8 +17,10 @@ Chốt contract API cho tạo đơn, xem đơn, cập nhật trạng thái đơn
 ### Backend
 
 - Tạo các Entity: `CustomerOrder`, `OrderDetail`, `OrderDetailOption`, `OrderStatusHistory`, `Payment`.
-- Tạo Repository và Service interface cho các entity trên.
-- Tạo các Servlet xử lý API (trả về 501 cho Ngày 1).
+- Tạo Repository interface: `CustomerOrderRepository`, `PaymentRepository`.
+- Tạo Service interface: `CustomerOrderService`, `PaymentService`.
+- Tạo DTO: `OrderRequest`, `OrderResponse`.
+- Tạo các Servlet xử lý API trả về HTTP 501: `OrderServlet`, `AdminOrderServlet`, `PaymentServlet`.
 
 ### Frontend
 
@@ -37,29 +39,33 @@ Chốt contract API cho tạo đơn, xem đơn, cập nhật trạng thái đơn
 ## File hoặc khu vực đã thay đổi
 
 - `docs/api-order-payment.yaml`
-- `docs/reports/2026-10-06/02-nguyen-duc-phat-order-payment.md`
+- `docs/reports/2026-10-06/01-nguyen-duc-phat-order-payment.md`
 - `backend/src/main/java/com/foodordering/entity/...`
 - `backend/src/main/java/com/foodordering/repository/...`
 - `backend/src/main/java/com/foodordering/service/...`
+- `backend/src/main/java/com/foodordering/dto/...`
 - `backend/src/main/java/com/foodordering/servlet/...`
-- `frontend/WEB-INF/...`
+- `frontend/WEB-INF/views/order/...`
+- `frontend/WEB-INF/views/admin/...`
 
 ## Cách kiểm tra
 
-- Kiểm tra file OpenAPI YAML.
-- Maven build `mvn -f backend/pom.xml clean verify` để đảm bảo code compile thành công.
+- Kiểm tra file OpenAPI YAML để xác nhận contract.
+- Mã nguồn đã được chia thành các commit nhỏ để dễ review.
+- CI/CD tự động chạy kiểm tra `mvn clean verify` khi mở Pull Request.
 
 ## Kết quả kiểm tra
 
-- Passed (Sẽ bổ sung chi tiết sau khi push code)
+- Code structure, JPA mapping annotations đã hoàn thiện.
+- Các route 501 API đã có.
+- File Report cập nhật thành công (Passed).
 
 ## Ảnh hưởng và lưu ý
 
-- Cần tích hợp với module Cart (của Trí) để lấy dữ liệu subtotal / discount. Ranh giới transaction đặt hàng (sẽ gọi CartService hoặc query trực tiếp v_cart_summary) sẽ được thảo luận thêm.
+- Cần tích hợp với module Cart (của Trí) để lấy dữ liệu subtotal / discount. Ranh giới transaction đặt hàng (sẽ gọi CartService hoặc query trực tiếp v_cart_summary) sẽ được xử lý trong logic Ngày 2.
 - Cần sử dụng Auth filter của Vinh để lấy customerId từ Session.
 
 ## Công việc còn lại
 
-- Hoàn thiện code baseline (Entities, Servlets).
-- Nhờ Trí review API contract xem định dạng JSON có thống nhất chưa.
+- Mở Pull Request để kiểm tra CI/CD.
 - Chờ Gate 1 được cả nhóm thông qua.
