@@ -1,0 +1,259 @@
+openapi: 3.0.3
+info:
+  title: Crave - Order & Payment API
+  version: 1.0.0
+  description: |
+    API quản lý đơn hàng và thanh toán.
+    Tích hợp với module Cart (của Trí) để lấy dữ liệu giỏ hàng, và module Auth (của Vinh) để lấy Customer.
+servers:
+  - url: /crave/api
+
+paths:
+  /orders:
+    post:
+      summary: Tạo đơn hàng mới từ giỏ hàng hiện tại (Checkout)
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrderRequest'
+      responses:
+        '201':
+          description: Tạo đơn hàng thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse_OrderResponse'
+        '400':
+          description: Lỗi dữ liệu đầu vào hoặc giỏ hàng trống / sai mã khuyến mãi
+        '401':
+          description: Chưa đăng nhập
+
+    get:
+      summary: Xem lịch sử đơn hàng của khách hàng hiện tại
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: Danh sách đơn hàng (sắp xếp giảm dần theo thời gian)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse_ListOrderResponse'
+        '401':
+          description: Chưa đăng nhập
+
+  /orders/{orderId}:
+    get:
+      summary: Xem chi tiết một đơn hàng
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: Thông tin chi tiết đơn hàng
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse_OrderDetailResponse'
+        '403':
+          description: Không có quyền truy cập đơn hàng của người khác
+        '404':
+          description: Không tìm thấy đơn hàng
+
+  /admin/orders/{orderId}/status:
+    patch:
+      summary: Cập nhật trạng thái đơn hàng (Dành cho Nhân viên)
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateOrderStatusRequest'
+      responses:
+        '200':
+          description: Cập nhật thành công
+        '400':
+          description: Trạng thái chuyển không hợp lệ
+        '403':
+          description: Không có quyền (Chỉ dành cho ADMIN / ORDER_STAFF)
+
+  /payments/{paymentId}/status:
+    patch:
+      summary: Cập nhật trạng thái thanh toán
+      parameters:
+        - name: paymentId
+          in: path
+          required: true
+          schema:
+            type: string
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePaymentStatusRequest'
+      responses:
+        '200':
+          description: Cập nhật thành công
+        '403':
+          description: Không có quyền truy cập
+
+components:
+  schemas:
+    CreateOrderRequest:
+      type: object
+      required:
+        - fulfillmentType
+        - receiverName
+        - receiverPhone
+        - paymentMethod
+      properties:
+        fulfillmentType:
+          type: string
+          enum: [DELIVERY, PICKUP]
+        receiverName:
+          type: string
+        receiverPhone:
+          type: string
+        deliveryAddress:
+          type: string
+          description: "Bắt buộc nếu fulfillmentType là DELIVERY"
+        customerNote:
+          type: string
+        promotionId:
+          type: string
+        paymentMethod:
+          type: string
+          enum: [CASH, BANK_TRANSFER, E_WALLET]
+
+    UpdateOrderStatusRequest:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum: [PENDING_CONFIRMATION, PREPARING, DELIVERING, COMPLETED, CANCELLED]
+        note:
+          type: string
+
+    UpdatePaymentStatusRequest:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum: [SUCCESS, FAILED, REFUNDED]
+        transactionRef:
+          type: string
+
+    # --- Responses ---
+    ApiResponse_OrderResponse:
+      type: object
+      properties:
+        success: { type: boolean }
+        message: { type: string }
+        data: { $ref: '#/components/schemas/OrderResponse' }
+
+    ApiResponse_ListOrderResponse:
+      type: object
+      properties:
+        success: { type: boolean }
+        message: { type: string }
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/OrderSummaryResponse' }
+
+    ApiResponse_OrderDetailResponse:
+      type: object
+      properties:
+        success: { type: boolean }
+        message: { type: string }
+        data: { $ref: '#/components/schemas/OrderResponse' }
+
+    OrderSummaryResponse:
+      type: object
+      properties:
+        orderId: { type: string }
+        orderedAt: { type: string, format: date-time }
+        fulfillmentType: { type: string }
+        totalAmount: { type: number }
+        status: { type: string }
+        paymentStatus: { type: string }
+
+    OrderResponse:
+      type: object
+      properties:
+        orderId: { type: string }
+        customerId: { type: string }
+        orderedAt: { type: string, format: date-time }
+        fulfillmentType: { type: string }
+        receiverName: { type: string }
+        receiverPhone: { type: string }
+        deliveryAddress: { type: string }
+        customerNote: { type: string }
+        subtotal: { type: number }
+        discountAmount: { type: number }
+        deliveryFee: { type: number }
+        totalAmount: { type: number }
+        status: { type: string }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/OrderItemResponse' }
+        payment:
+          type: object
+          properties:
+            paymentId: { type: string }
+            method: { type: string }
+            status: { type: string }
+            amount: { type: number }
+        history:
+          type: array
+          items:
+            type: object
+            properties:
+              status: { type: string }
+              changedAt: { type: string, format: date-time }
+              note: { type: string }
+
+    OrderItemResponse:
+      type: object
+      properties:
+        foodId: { type: string }
+        foodName: { type: string }
+        quantity: { type: integer }
+        unitPrice: { type: number }
+        lineTotal: { type: number }
+        options:
+          type: array
+          items:
+            type: object
+            properties:
+              optionName: { type: string }
+              extraPrice: { type: number }
+
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: JSESSIONID
