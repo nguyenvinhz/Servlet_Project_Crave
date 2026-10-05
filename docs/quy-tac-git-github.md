@@ -17,26 +17,24 @@ https://github.com/nguyenvinhz/Servlet_Project_Crave.git
 ## 2. Nguyên tắc bắt buộc
 
 1. Không code và không push trực tiếp lên main.
-2. Mỗi task dùng một branch riêng.
+2. Mỗi task dùng một branch riêng; toàn bộ commit của task chỉ thực hiện trên branch đó.
 3. Một Pull Request chỉ giải quyết một mục tiêu chính.
 4. Mỗi commit chỉ chứa một thay đổi logic có thể giải thích rõ.
 5. Trước mỗi buổi code phải đồng bộ repository.
 6. Trước commit phải xem lại diff và chạy kiểm tra phù hợp.
-7. Mỗi commit công việc phải có một file báo cáo Markdown đi kèm.
+7. Mỗi task/branch chỉ dùng một file báo cáo Markdown và cập nhật file đó qua các commit.
 8. Không commit credential, secret, file build hoặc dữ liệu cá nhân thật.
 9. Không force-push nhánh dùng chung hoặc nhánh đang được review.
 10. Không merge khi build/test thất bại hoặc còn conflict.
 
-## 3. Tên viết tắt của thành viên
+## 3. Danh tính người thực hiện
 
-| Thành viên | Tên dùng trong branch/report |
-|---|---|
-| Nguyễn Quang Vinh | vinh |
-| Nguyễn Minh Huân | huan |
-| Ung Văn Trí | tri |
-| Nguyễn Đức Phát | phat |
+Không đưa tên thật hoặc tên viết tắt của thành viên vào tên branch hay tên source
+file. Branch và source file chỉ mô tả chức năng hoặc phạm vi kỹ thuật.
 
-Không dùng dấu tiếng Việt, khoảng trắng hoặc ký tự đặc biệt trong tên branch và tên file.
+Tên file report phải có họ tên người thực hiện viết không dấu. Danh tính cũng được
+lưu bằng Git author và trường `Người thực hiện` trong nội dung report. Không dùng
+dấu tiếng Việt, khoảng trắng hoặc ký tự đặc biệt trong tên branch và tên file.
 
 ## 4. Quy tắc đặt tên
 
@@ -45,7 +43,7 @@ Không dùng dấu tiếng Việt, khoảng trắng hoặc ký tự đặc biệ
 Định dạng:
 
 ~~~text
-<loai>/<ten-thanh-vien>/<mo-ta-ngan>
+<loai>/<mo-ta-ngan>
 ~~~
 
 Loại branch được phép:
@@ -63,12 +61,12 @@ Loại branch được phép:
 Ví dụ:
 
 ~~~text
-feature/vinh/auth-login
-feature/huan/menu-management
-feature/tri/cart-voucher
-feature/phat/order-payment
-fix/tri/cart-total
-docs/vinh/github-rules
+feature/auth-login
+feature/menu-management
+feature/cart-voucher
+feature/order-payment
+fix/cart-total
+docs/github-rules
 ~~~
 
 Không dùng tên branch mơ hồ:
@@ -180,7 +178,7 @@ Nếu git pull --ff-only báo lỗi, dừng lại và kiểm tra lịch sử; kh
 Ví dụ Nguyễn Quang Vinh làm đăng nhập:
 
 ~~~powershell
-git switch -c feature/vinh/auth-login
+git switch -c feature/auth-login
 git branch --show-current
 ~~~
 
@@ -189,8 +187,8 @@ Branch mới phải được tạo từ main vừa cập nhật.
 ### 6.4. Tiếp tục branch đã có
 
 ~~~powershell
-git switch feature/vinh/auth-login
-git pull --ff-only origin feature/vinh/auth-login
+git switch feature/auth-login
+git pull --ff-only origin feature/auth-login
 git fetch origin --prune
 git merge origin/main
 ~~~
@@ -289,41 +287,44 @@ Bao toàn bộ thao tác tạo đơn trong một transaction.
 Closes #24
 ~~~
 
-## 9. Báo cáo Markdown cho mỗi commit
+## 9. Báo cáo Markdown cho mỗi task/branch
 
 ### 9.1. Vị trí và tên file
 
-Mỗi commit công việc do thành viên chủ động tạo phải kèm một báo cáo tại:
+Mỗi task/branch chỉ tạo một báo cáo tại:
 
 ~~~text
-docs/reports/YYYY-MM-DD/<ten-thanh-vien>/<so-thu-tu>-<task>.md
+docs/reports/YYYY-MM-DD/<so-thu-tu>-<ho-ten-thanh-vien>-<task>.md
 ~~~
 
 Ví dụ:
 
 ~~~text
-docs/reports/2026-10-02/vinh/01-auth-login.md
-docs/reports/2026-10-02/huan/02-menu-filter.md
-docs/reports/2026-10-02/tri/01-cart-voucher.md
-docs/reports/2026-10-02/phat/03-order-status.md
+docs/reports/2026-10-02/01-nguyen-quang-vinh-auth-login.md
+docs/reports/2026-10-02/02-nguyen-minh-huan-menu-filter.md
+docs/reports/2026-10-02/03-ung-van-tri-cart-voucher.md
+docs/reports/2026-10-02/04-nguyen-duc-phat-order-status.md
 ~~~
 
 Quy tắc:
 
 - Số thứ tự gồm hai chữ số: 01, 02, 03.
 - Tên file viết thường, không dấu, dùng dấu gạch nối.
-- Báo cáo phải nằm trong cùng commit với code mà nó mô tả.
+- Tên file phải có họ tên người thực hiện; không tạo thư mục riêng theo tên thành viên.
+- Báo cáo được tạo trong commit đầu tiên của branch và nằm cùng commit với code.
+- Các commit tiếp theo cập nhật chính file báo cáo đó; không tạo report mới.
+- Một branch không được có nhiều file báo cáo cho cùng một task.
 - Không ghi commit SHA vì SHA chỉ được tạo sau khi commit.
 - Không tạo commit riêng chỉ để báo cáo cho commit ngay trước đó.
-- Merge commit chỉ dùng để đồng bộ origin/main, merge commit do GitHub tạo, và commit chỉ sửa chính hệ thống report được miễn tạo report mới để tránh vòng lặp vô hạn.
+- Merge commit chỉ dùng để đồng bộ origin/main và merge commit do GitHub tạo không bắt buộc cập nhật report.
 
 ### 9.2. Cách tạo file báo cáo
 
 Có thể tạo bằng IDE hoặc PowerShell:
 
 ~~~powershell
-New-Item -ItemType Directory -Force "docs/reports/2026-10-02/vinh"
-New-Item -ItemType File "docs/reports/2026-10-02/vinh/01-auth-login.md"
+New-Item -ItemType Directory -Force "docs/reports/2026-10-02"
+New-Item -ItemType File "docs/reports/2026-10-02/01-nguyen-quang-vinh-auth-login.md"
 ~~~
 
 Thay ngày, tên thành viên, số thứ tự và task cho đúng công việc thực tế.
@@ -339,7 +340,7 @@ Sao chép mẫu sau vào file mới:
 - Ngày:
 - Branch:
 - Task/Issue:
-- Commit dự kiến:
+- Phạm vi báo cáo: Toàn bộ branch `<ten-branch>`
 
 ## Mục tiêu
 
@@ -417,7 +418,7 @@ Tạo report theo mục 9 và điền đúng kết quả thực tế.
 ~~~powershell
 git add backend/src/main/java/com/foodordering/servlet
 git add frontend/auth
-git add docs/reports/2026-10-02/vinh/01-auth-login.md
+git add docs/reports/2026-10-02/01-nguyen-quang-vinh-auth-login.md
 ~~~
 
 Có thể dùng chế độ chọn từng phần:
@@ -454,7 +455,7 @@ git status
 Lần push đầu tiên:
 
 ~~~powershell
-git push -u origin feature/vinh/auth-login
+git push -u origin feature/auth-login
 ~~~
 
 Các lần tiếp theo:
@@ -558,9 +559,9 @@ Mô tả vấn đề và kết quả mong muốn.
 - [ ] Integration test thành công
 - [ ] Đã test thủ công
 
-## Báo cáo commit
+## Báo cáo branch
 
-- Link đến docs/reports/...
+- Link đến file report duy nhất của branch tại docs/reports/...
 
 ## Ảnh giao diện
 
@@ -591,7 +592,7 @@ Thêm ảnh trước/sau nếu PR thay đổi UI.
 - Không merge khi checks fail, còn conflict hoặc còn comment BLOCKER.
 - Tác giả phải phản hồi từng comment và yêu cầu review lại sau khi sửa.
 - Reviewer kiểm tra cả logic, bảo mật, validation, UI, API, test và file report.
-- Dùng merge commit để giữ lịch sử commit và sự tương ứng với từng report.
+- Dùng merge commit để giữ lịch sử commit và sự tương ứng với report của branch.
 - Sau khi merge, xóa branch trên GitHub.
 
 Quy ước comment review:
@@ -605,7 +606,7 @@ Quy ước comment review:
 Không tạo PR mới. Tiếp tục sửa trên cùng branch:
 
 ~~~powershell
-git switch feature/vinh/auth-login
+git switch feature/auth-login
 git status
 ~~~
 
@@ -613,13 +614,14 @@ Sau khi sửa:
 
 ~~~powershell
 git add <cac-file-da-sua>
-git add docs/reports/<duong-dan-report-moi>.md
+git add docs/reports/<report-cua-branch>.md
 git diff --cached
 git commit -m "fix(auth): xử lý góp ý validation đăng nhập"
 git push
 ~~~
 
-Pull Request sẽ tự cập nhật. Mỗi commit sửa review vẫn cần report tương ứng.
+Pull Request sẽ tự cập nhật. Mỗi commit sửa review cập nhật report hiện có của
+branch, không tạo file report mới.
 
 ## 16. Cập nhật branch và xử lý conflict
 
@@ -627,7 +629,7 @@ Pull Request sẽ tự cập nhật. Mỗi commit sửa review vẫn cần repor
 
 ~~~powershell
 git fetch origin --prune
-git switch feature/vinh/auth-login
+git switch feature/auth-login
 git merge origin/main
 git status
 ~~~
@@ -663,7 +665,7 @@ Không chọn toàn bộ ours hoặc theirs một cách máy móc. Không xóa c
 git switch main
 git fetch origin --prune
 git pull --ff-only origin main
-git branch -d feature/vinh/auth-login
+git branch -d feature/auth-login
 ~~~
 
 Nếu GitHub chưa tự xóa remote branch, xóa bằng giao diện GitHub sau khi chắc chắn PR đã merge.

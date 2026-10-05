@@ -1,0 +1,19 @@
+<%@ taglib prefix="c" uri="jakarta.tags.core" %>
+<!doctype html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title><c:out value="${pageTitle}"/> · Crave</title>
+    <link rel="stylesheet" href="<c:url value='/assets/css/styles.css'/>">
+</head>
+<body>
+<header class="site-header">
+    <a class="brand" href="<c:url value='/auth/login'/>">Crave<span>.</span></a>
+    <nav aria-label="Điều hướng tài khoản">
+        <a href="<c:url value='/auth/login'/>">Đăng nhập</a>
+        <a href="<c:url value='/auth/register'/>">Đăng ký</a>
+        <a href="<c:url value='/customer/profile'/>">Hồ sơ</a>
+        <a href="<c:url value='/customer/addresses'/>">Địa chỉ</a>
+    </nav>
+</header>
