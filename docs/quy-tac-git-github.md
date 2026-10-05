@@ -17,24 +17,24 @@ https://github.com/nguyenvinhz/Servlet_Project_Crave.git
 ## 2. Nguyên tắc bắt buộc
 
 1. Không code và không push trực tiếp lên main.
-2. Mỗi task dùng một branch riêng.
+2. Mỗi task dùng một branch riêng; toàn bộ commit của task chỉ thực hiện trên branch đó.
 3. Một Pull Request chỉ giải quyết một mục tiêu chính.
 4. Mỗi commit chỉ chứa một thay đổi logic có thể giải thích rõ.
 5. Trước mỗi buổi code phải đồng bộ repository.
 6. Trước commit phải xem lại diff và chạy kiểm tra phù hợp.
-7. Mỗi commit công việc phải có một file báo cáo Markdown đi kèm.
+7. Mỗi task/branch chỉ dùng một file báo cáo Markdown và cập nhật file đó qua các commit.
 8. Không commit credential, secret, file build hoặc dữ liệu cá nhân thật.
 9. Không force-push nhánh dùng chung hoặc nhánh đang được review.
 10. Không merge khi build/test thất bại hoặc còn conflict.
 
 ## 3. Danh tính người thực hiện
 
-Không đưa tên thật hoặc tên viết tắt của thành viên vào tên branch, tên report hay
-tên source file. Branch và file chỉ mô tả chức năng hoặc phạm vi kỹ thuật.
+Không đưa tên thật hoặc tên viết tắt của thành viên vào tên branch hay tên source
+file. Branch và source file chỉ mô tả chức năng hoặc phạm vi kỹ thuật.
 
-Danh tính người thực hiện được lưu bằng Git author và trường `Người thực hiện`
-trong nội dung report. Không dùng dấu tiếng Việt, khoảng trắng hoặc ký tự đặc biệt
-trong tên branch và tên file.
+Tên file report phải có họ tên người thực hiện viết không dấu. Danh tính cũng được
+lưu bằng Git author và trường `Người thực hiện` trong nội dung report. Không dùng
+dấu tiếng Việt, khoảng trắng hoặc ký tự đặc biệt trong tên branch và tên file.
 
 ## 4. Quy tắc đặt tên
 
@@ -287,33 +287,36 @@ Bao toàn bộ thao tác tạo đơn trong một transaction.
 Closes #24
 ~~~
 
-## 9. Báo cáo Markdown cho mỗi commit
+## 9. Báo cáo Markdown cho mỗi task/branch
 
 ### 9.1. Vị trí và tên file
 
-Mỗi commit công việc do thành viên chủ động tạo phải kèm một báo cáo tại:
+Mỗi task/branch chỉ tạo một báo cáo tại:
 
 ~~~text
-docs/reports/YYYY-MM-DD/<so-thu-tu>-<task>.md
+docs/reports/YYYY-MM-DD/<so-thu-tu>-<ho-ten-thanh-vien>-<task>.md
 ~~~
 
 Ví dụ:
 
 ~~~text
-docs/reports/2026-10-02/01-auth-login.md
-docs/reports/2026-10-02/02-menu-filter.md
-docs/reports/2026-10-02/03-cart-voucher.md
-docs/reports/2026-10-02/04-order-status.md
+docs/reports/2026-10-02/01-nguyen-quang-vinh-auth-login.md
+docs/reports/2026-10-02/02-nguyen-minh-huan-menu-filter.md
+docs/reports/2026-10-02/03-ung-van-tri-cart-voucher.md
+docs/reports/2026-10-02/04-nguyen-duc-phat-order-status.md
 ~~~
 
 Quy tắc:
 
 - Số thứ tự gồm hai chữ số: 01, 02, 03.
 - Tên file viết thường, không dấu, dùng dấu gạch nối.
-- Báo cáo phải nằm trong cùng commit với code mà nó mô tả.
+- Tên file phải có họ tên người thực hiện; không tạo thư mục riêng theo tên thành viên.
+- Báo cáo được tạo trong commit đầu tiên của branch và nằm cùng commit với code.
+- Các commit tiếp theo cập nhật chính file báo cáo đó; không tạo report mới.
+- Một branch không được có nhiều file báo cáo cho cùng một task.
 - Không ghi commit SHA vì SHA chỉ được tạo sau khi commit.
 - Không tạo commit riêng chỉ để báo cáo cho commit ngay trước đó.
-- Merge commit chỉ dùng để đồng bộ origin/main, merge commit do GitHub tạo, và commit chỉ sửa chính hệ thống report được miễn tạo report mới để tránh vòng lặp vô hạn.
+- Merge commit chỉ dùng để đồng bộ origin/main và merge commit do GitHub tạo không bắt buộc cập nhật report.
 
 ### 9.2. Cách tạo file báo cáo
 
@@ -321,7 +324,7 @@ Có thể tạo bằng IDE hoặc PowerShell:
 
 ~~~powershell
 New-Item -ItemType Directory -Force "docs/reports/2026-10-02"
-New-Item -ItemType File "docs/reports/2026-10-02/01-auth-login.md"
+New-Item -ItemType File "docs/reports/2026-10-02/01-nguyen-quang-vinh-auth-login.md"
 ~~~
 
 Thay ngày, tên thành viên, số thứ tự và task cho đúng công việc thực tế.
@@ -337,7 +340,7 @@ Sao chép mẫu sau vào file mới:
 - Ngày:
 - Branch:
 - Task/Issue:
-- Commit dự kiến:
+- Phạm vi báo cáo: Toàn bộ branch `<ten-branch>`
 
 ## Mục tiêu
 
@@ -415,7 +418,7 @@ Tạo report theo mục 9 và điền đúng kết quả thực tế.
 ~~~powershell
 git add backend/src/main/java/com/foodordering/servlet
 git add frontend/auth
-git add docs/reports/2026-10-02/01-auth-login.md
+git add docs/reports/2026-10-02/01-nguyen-quang-vinh-auth-login.md
 ~~~
 
 Có thể dùng chế độ chọn từng phần:
@@ -556,9 +559,9 @@ Mô tả vấn đề và kết quả mong muốn.
 - [ ] Integration test thành công
 - [ ] Đã test thủ công
 
-## Báo cáo commit
+## Báo cáo branch
 
-- Link đến docs/reports/...
+- Link đến file report duy nhất của branch tại docs/reports/...
 
 ## Ảnh giao diện
 
@@ -589,7 +592,7 @@ Thêm ảnh trước/sau nếu PR thay đổi UI.
 - Không merge khi checks fail, còn conflict hoặc còn comment BLOCKER.
 - Tác giả phải phản hồi từng comment và yêu cầu review lại sau khi sửa.
 - Reviewer kiểm tra cả logic, bảo mật, validation, UI, API, test và file report.
-- Dùng merge commit để giữ lịch sử commit và sự tương ứng với từng report.
+- Dùng merge commit để giữ lịch sử commit và sự tương ứng với report của branch.
 - Sau khi merge, xóa branch trên GitHub.
 
 Quy ước comment review:
@@ -611,13 +614,14 @@ Sau khi sửa:
 
 ~~~powershell
 git add <cac-file-da-sua>
-git add docs/reports/<duong-dan-report-moi>.md
+git add docs/reports/<report-cua-branch>.md
 git diff --cached
 git commit -m "fix(auth): xử lý góp ý validation đăng nhập"
 git push
 ~~~
 
-Pull Request sẽ tự cập nhật. Mỗi commit sửa review vẫn cần report tương ứng.
+Pull Request sẽ tự cập nhật. Mỗi commit sửa review cập nhật report hiện có của
+branch, không tạo file report mới.
 
 ## 16. Cập nhật branch và xử lý conflict
 

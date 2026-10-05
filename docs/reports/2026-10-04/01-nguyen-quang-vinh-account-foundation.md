@@ -4,7 +4,7 @@
 - Ngày: 2026-10-04
 - Branch: feature/account-foundation
 - Task/Issue: Ngày 1 — tài khoản, xác thực, hồ sơ và địa chỉ
-- Commit dự kiến: `feat(account): dựng nền tài khoản ngày 1`
+- Phạm vi báo cáo: Toàn bộ thay đổi của branch `feature/account-foundation`
 
 ## Mục tiêu
 
@@ -41,6 +41,12 @@ User, Customer, Address; tạo khung giao diện và route API cho đăng nhập
 - Không đưa credential thật vào source; ứng dụng đọc `DB_URL`, `DB_USER`,
   `DB_PASSWORD` từ môi trường.
 
+### Quy ước Git và báo cáo
+
+- Branch được đặt theo chức năng, không chèn tên thành viên.
+- Báo cáo nằm trực tiếp trong thư mục ngày và có tên người thực hiện trong tên file.
+- Toàn bộ branch sử dụng một báo cáo duy nhất; các commit sau tiếp tục cập nhật file này.
+
 ## File hoặc khu vực đã thay đổi
 
 - `backend/pom.xml`
@@ -57,6 +63,8 @@ User, Customer, Address; tạo khung giao diện và route API cho đăng nhập
 - `frontend/WEB-INF`
 - `frontend/assets/css/styles.css`
 - `docs/api-auth-profile-address.yaml`
+- `docs/quy-tac-git-github.md`
+- `docs/reports/2026-10-04/01-nguyen-quang-vinh-account-foundation.md`
 - `.env.example`, `.gitignore`, `compose.yaml`, `README.md`
 
 ## Cách kiểm tra
