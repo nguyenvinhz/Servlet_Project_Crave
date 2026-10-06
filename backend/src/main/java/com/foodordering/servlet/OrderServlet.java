@@ -30,8 +30,9 @@ public class OrderServlet extends HttpServlet {
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
         try {
-            // TODO: Lấy customerId từ auth session (hiện tại hardcode để test)
-            String customerId = "C001";
+            // Lấy customerId từ Auth Filter (Ngày 3)
+            Object sessionUser = req.getSession().getAttribute("userId");
+            String customerId = sessionUser != null ? sessionUser.toString() : "C001";
             
             // Xử lý route chi tiết đơn hàng /api/orders/{id} hoặc danh sách
             String pathInfo = req.getPathInfo();
@@ -52,7 +53,9 @@ public class OrderServlet extends HttpServlet {
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
         try {
-            String customerId = "C001"; // TODO: Lấy từ session
+            Object sessionUser = req.getSession().getAttribute("userId");
+            String customerId = sessionUser != null ? sessionUser.toString() : "C001";
+            
             OrderRequest request = JsonUtils.readJson(req, OrderRequest.class);
             OrderResponse response = orderService.createOrder(customerId, request);
             

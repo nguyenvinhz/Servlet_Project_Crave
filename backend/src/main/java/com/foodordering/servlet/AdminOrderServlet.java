@@ -43,7 +43,8 @@ public class AdminOrderServlet extends HttpServlet {
             }
             String orderId = pathInfo.substring(1);
             
-            String employeeId = "E001"; // TODO: Lấy từ Admin Auth Session
+            Object sessionEmp = req.getSession().getAttribute("userId");
+            String employeeId = sessionEmp != null ? sessionEmp.toString() : "E001";
             
             UpdateOrderStatusRequest updateReq = JsonUtils.readJson(req, UpdateOrderStatusRequest.class);
             OrderStatus status = OrderStatus.valueOf(updateReq.getStatus());

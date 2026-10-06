@@ -161,7 +161,7 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
     }
 
     @Override
-    public void updateOrderStatus(String orderId, OrderStatus status, String employeeId, String note) {
+    public void updateOrderStatus(String orderId, OrderStatus newStatus, String employeeId, String note) {
         EntityManager em = DatabaseConfig.getEntityManagerFactory().createEntityManager();
         EntityTransaction tx = em.getTransaction();
         try {
@@ -169,14 +169,30 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
             CustomerOrder order = em.find(CustomerOrder.class, orderId);
             if (order == null) throw new RuntimeException("Đơn hàng không tồn tại");
 
-            order.setStatus(status);
+            OrderStatus currentStatus = order.getStatus();
+            
+            // Logic chặn chuyển trạng thái sai
+            if (currentStatus == OrderStatus.COMPLETED || currentStatus == OrderStatus.CANCELLED) {
+                throw new RuntimeException("Không thể cập nhật đơn hàng đã " + currentStatus);
+            }
+            if (currentStatus == OrderStatus.PENDING_CONFIRMATION && newStatus != OrderStatus.PREPARING && newStatus != OrderStatus.CANCELLED) {
+                throw new RuntimeException("Trạng thái tiếp theo phải là Đang chuẩn bị hoặc Hủy");
+            }
+            if (currentStatus == OrderStatus.PREPARING && newStatus != OrderStatus.DELIVERING && newStatus != OrderStatus.CANCELLED) {
+                throw new RuntimeException("Trạng thái tiếp theo phải là Đang giao hoặc Hủy");
+            }
+            if (currentStatus == OrderStatus.DELIVERING && newStatus != OrderStatus.COMPLETED && newStatus != OrderStatus.CANCELLED) {
+                throw new RuntimeException("Trạng thái tiếp theo phải là Hoàn tất hoặc Hủy");
+            }
+
+            order.setStatus(newStatus);
             order.setAssignedEmployeeId(employeeId);
             em.merge(order);
 
             OrderStatusHistory history = new OrderStatusHistory();
             history.setId(generateId(10));
             history.setOrder(order);
-            history.setStatus(status);
+            history.setStatus(newStatus);
             history.setChangedByEmployeeId(employeeId);
             history.setNote(note);
             em.persist(history);
