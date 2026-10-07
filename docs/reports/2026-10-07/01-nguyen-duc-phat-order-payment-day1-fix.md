@@ -38,6 +38,26 @@ Báo cáo này liệt kê chi tiết các sửa đổi đối với phần nền
 - **Vấn đề:** `docs/api-order-payment.yaml` dùng trường `message` trong wrapper response thay vì `error` theo chuẩn của project.
 - **Khắc phục:** Đã sửa lại định dạng response trong YAML để map chính xác với cấu trúc `ApiError` của `ApiResponse`.
 
+## 3. Vòng sửa lỗi 2 (Bổ sung sau Feedback PR #4)
+
+### 3.1. Đồng bộ Contract (OpenAPI vs DTO)
+- Đổi trường `details` thành `fieldErrors` trong OpenAPI YAML để khớp với class `ApiError`.
+- Bổ sung các field còn thiếu (`payment`, `history`) vào class `OrderResponse`.
+- Bổ sung schema JSON cho các lỗi 400, 401, 403, 404 trong OpenAPI.
+- Tạo `OrderSummaryResponse` làm payload rút gọn cho danh sách đơn hàng.
+
+### 3.2. Cụ thể hóa Hợp đồng Giao dịch (Transaction Contract)
+- Thêm tài liệu Javadoc vào Interface `CustomerOrderService.createOrder()`.
+- Chốt rõ 7 bước atomic phải diễn ra trong 1 transaction, điều kiện rollback và yêu cầu truyền context `EntityManager`.
+
+### 3.3. Cập nhật Khung Giao diện (JSP Skeleton)
+- **checkout.jsp:** Xóa form HTML thường, thay bằng giao diện chuẩn gửi data qua JSON (Fetch API) có chứa `fulfillmentType`, `paymentMethod`.
+- **admin-orders.jsp:** Tạo khung bảng danh sách đơn hàng và UI cập nhật trạng thái đơn (kèm ghi chú) qua JSON (PATCH request).
+
+### 3.4. Dọn dẹp & Unit Test
+- Xóa các trailing whitespace và blank line dư thừa để vượt qua `git diff --check`.
+- Thêm các helper method (`addOrderDetail`, `addStatusHistory`) vào `CustomerOrder` để đồng bộ owning side.
+- Thêm `OrderResponseSerializationTest` để test quá trình parse Jackson, chống drift contract.
 ### 2.6. Khác
 - Đã đính chính lại file Báo cáo Ngày 1 (`docs/reports/2026-10-06/01-nguyen-duc-phat-order-payment.md`) để xác nhận Ranh giới Transaction (Transaction boundary) được bao bọc trực tiếp trong Service Interface `CustomerOrderService`, không chờ dời sang Ngày 2 nữa.
 
