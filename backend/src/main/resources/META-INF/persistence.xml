@@ -7,6 +7,7 @@
         <provider>org.hibernate.jpa.HibernatePersistenceProvider</provider>
         <class>com.foodordering.entity.User</class>
         <class>com.foodordering.entity.Customer</class>
+        <class>com.foodordering.entity.Employee</class>
         <class>com.foodordering.entity.Address</class>
         <class>com.foodordering.entity.CustomerOrder</class>
         <class>com.foodordering.entity.OrderDetail</class>

@@ -12,7 +12,7 @@ SET NAMES utf8mb4;
 -- login namespace, so email and phone are unique across both account types.
 CREATE TABLE user_account (
     user_id         VARCHAR(10)     NOT NULL,
-    account_type    ENUM('CUSTOMER','EMPLOYEE') NOT NULL,
+    account_type    VARCHAR(20)     NOT NULL,
     full_name       VARCHAR(100)    NOT NULL,
     email           VARCHAR(100)    NOT NULL,
     phone           VARCHAR(15)     NOT NULL,
@@ -22,33 +22,37 @@ CREATE TABLE user_account (
                                     ON UPDATE CURRENT_TIMESTAMP,
     CONSTRAINT pk_user_account PRIMARY KEY (user_id),
     CONSTRAINT uq_user_account_email UNIQUE (email),
-    CONSTRAINT uq_user_account_phone UNIQUE (phone)
+    CONSTRAINT uq_user_account_phone UNIQUE (phone),
+    CONSTRAINT ck_user_account_type CHECK (account_type IN ('CUSTOMER', 'EMPLOYEE'))
 ) ENGINE=InnoDB;
 
 CREATE TABLE customer (
     customer_id     VARCHAR(10)     NOT NULL,
-    status          ENUM('ACTIVE','LOCKED') NOT NULL DEFAULT 'ACTIVE',
+    status          VARCHAR(20)     NOT NULL DEFAULT 'ACTIVE',
     registered_at   DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT pk_customer PRIMARY KEY (customer_id),
     CONSTRAINT fk_customer_account FOREIGN KEY (customer_id)
-        REFERENCES user_account(user_id) ON UPDATE CASCADE ON DELETE CASCADE
+        REFERENCES user_account(user_id) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT ck_customer_status CHECK (status IN ('ACTIVE', 'LOCKED'))
 ) ENGINE=InnoDB;
 
 CREATE TABLE employee (
     employee_id     VARCHAR(10)     NOT NULL,
-    role            ENUM(
+    role            VARCHAR(30)     NOT NULL,
+    address         VARCHAR(255)    NULL,
+    hire_date       DATE            NOT NULL,
+    status          VARCHAR(20)     NOT NULL DEFAULT 'WORKING',
+    CONSTRAINT pk_employee PRIMARY KEY (employee_id),
+    CONSTRAINT fk_employee_account FOREIGN KEY (employee_id)
+        REFERENCES user_account(user_id) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT ck_employee_role CHECK (role IN (
                         'ADMIN',
                         'MENU_MANAGER',
                         'ORDER_STAFF',
                         'PROMOTION_MANAGER',
                         'HR_MANAGER'
-                    ) NOT NULL,
-    address         VARCHAR(255)    NULL,
-    hire_date       DATE            NOT NULL,
-    status          ENUM('WORKING','ON_LEAVE') NOT NULL DEFAULT 'WORKING',
-    CONSTRAINT pk_employee PRIMARY KEY (employee_id),
-    CONSTRAINT fk_employee_account FOREIGN KEY (employee_id)
-        REFERENCES user_account(user_id) ON UPDATE CASCADE ON DELETE CASCADE
+                    )),
+    CONSTRAINT ck_employee_status CHECK (status IN ('WORKING', 'ON_LEAVE'))
 ) ENGINE=InnoDB;
 
 CREATE TABLE category (
