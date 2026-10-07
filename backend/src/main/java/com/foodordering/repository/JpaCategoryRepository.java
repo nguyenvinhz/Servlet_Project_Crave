@@ -145,20 +145,6 @@ public class JpaCategoryRepository implements CategoryRepository {
 
     @Override
     public String generateNextId() {
-        try (EntityManager em = emf.createEntityManager()) {
-            List<String> ids = em.createQuery("SELECT c.id FROM Category c WHERE c.id LIKE 'DM%' ORDER BY c.id DESC", String.class)
-                    .setMaxResults(1)
-                    .getResultList();
-            if (ids.isEmpty()) {
-                return "DM01";
-            }
-            String lastId = ids.get(0);
-            try {
-                int num = Integer.parseInt(lastId.substring(2));
-                return String.format("DM%02d", num + 1);
-            } catch (NumberFormatException e) {
-                return "DM" + System.currentTimeMillis() % 10000;
-            }
-        }
+        return "DM" + java.util.UUID.randomUUID().toString().substring(0, 8).toUpperCase();
     }
 }

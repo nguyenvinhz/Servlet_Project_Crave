@@ -120,6 +120,25 @@ class MenuServiceTest {
         assertEquals(2, detailAll.options().size());
     }
 
+    @Test
+    void deleteCategoryRejectsIfFoodsExist() {
+        Category cat = new Category("DM01", "Trà", "Các loại trà");
+        categoryRepo.save(cat);
+        Food food = new Food("MA01", cat, "Trà đào", BigDecimal.valueOf(30000), null, "Thơm ngon", FoodStatus.AVAILABLE);
+        foodRepo.save(food);
+
+        assertThrows(IllegalStateException.class, () -> menuService.deleteCategory("DM01"));
+    }
+
+    @Test
+    void deleteCategorySucceedsIfNoFoodsExist() {
+        Category cat = new Category("DM01", "Trà", "Các loại trà");
+        categoryRepo.save(cat);
+
+        menuService.deleteCategory("DM01");
+        assertFalse(categoryRepo.existsById("DM01"));
+    }
+
     // =========================================================
     // Fake In-Memory Repositories for testing without database
     // =========================================================

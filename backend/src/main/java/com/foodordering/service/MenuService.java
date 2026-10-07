@@ -61,6 +61,16 @@ public class MenuService {
         return MenuMapper.toCategoryResponse(category, count);
     }
 
+    public void deleteCategory(String id) {
+        if (!categoryRepository.existsById(id)) {
+            throw new ResourceNotFoundException("Không tìm thấy danh mục với mã: " + id);
+        }
+        if (foodRepository.countByCategoryId(id) > 0) {
+            throw new IllegalStateException("Không thể xóa danh mục đang có món ăn.");
+        }
+        categoryRepository.deleteById(id);
+    }
+
     // ==========================================
     // Food Operations (Read)
     // ==========================================

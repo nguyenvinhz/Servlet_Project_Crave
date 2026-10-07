@@ -4,13 +4,29 @@
 
 <main class="page-container">
     <div class="product-detail-wrapper" id="productDetail">
-        <p class="eyebrow">Chi tiết món ăn</p>
-        <h1 id="foodName">Đang tải thông tin món ăn...</h1>
-        <p class="price" id="foodPrice"></p>
-        <p class="description" id="foodDesc"></p>
+        <p class="eyebrow">Chi tiết món ăn: ${food.categoryName}</p>
+        <h1 id="foodName">${food.name}</h1>
+        <div class="product-image">
+            <img src="${not empty food.imageUrl ? food.imageUrl : pageContext.request.contextPath.concat('/assets/images/placeholder.jpg')}" alt="${food.name}" style="max-width: 400px; border-radius: 8px;">
+        </div>
+        <p class="price" id="foodPrice">Giá cơ bản: ${food.price} VNĐ</p>
+        <p class="description" id="foodDesc">${food.description}</p>
 
         <section class="food-options" id="foodOptions">
-            <!-- Tùy chọn món: Size, Topping, Lượng đường, Lượng đá -->
+            <h3>Tùy chọn</h3>
+            <c:if test="${empty food.options}">
+                <p>Không có tùy chọn nào cho món này.</p>
+            </c:if>
+            <c:if test="${not empty food.options}">
+                <ul>
+                <c:forEach var="option" items="${food.options}">
+                    <li>
+                        <strong>${option.type}</strong>: ${option.name} 
+                        <span class="price">(+${option.price} VNĐ)</span>
+                    </li>
+                </c:forEach>
+                </ul>
+            </c:if>
         </section>
     </div>
 </main>

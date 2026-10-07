@@ -208,20 +208,6 @@ public class JpaFoodRepository implements FoodRepository {
 
     @Override
     public String generateNextId() {
-        try (EntityManager em = emf.createEntityManager()) {
-            List<String> ids = em.createQuery("SELECT f.id FROM Food f WHERE f.id LIKE 'MA%' ORDER BY f.id DESC", String.class)
-                    .setMaxResults(1)
-                    .getResultList();
-            if (ids.isEmpty()) {
-                return "MA01";
-            }
-            String lastId = ids.get(0);
-            try {
-                int num = Integer.parseInt(lastId.substring(2));
-                return String.format("MA%02d", num + 1);
-            } catch (NumberFormatException e) {
-                return "MA" + System.currentTimeMillis() % 10000;
-            }
-        }
+        return "MA" + java.util.UUID.randomUUID().toString().substring(0, 8).toUpperCase();
     }
 }

@@ -150,20 +150,6 @@ public class JpaFoodOptionRepository implements FoodOptionRepository {
 
     @Override
     public String generateNextId() {
-        try (EntityManager em = emf.createEntityManager()) {
-            List<String> ids = em.createQuery("SELECT o.id FROM FoodOption o WHERE o.id LIKE 'TC%' ORDER BY o.id DESC", String.class)
-                    .setMaxResults(1)
-                    .getResultList();
-            if (ids.isEmpty()) {
-                return "TC01";
-            }
-            String lastId = ids.get(0);
-            try {
-                int num = Integer.parseInt(lastId.substring(2));
-                return String.format("TC%02d", num + 1);
-            } catch (NumberFormatException e) {
-                return "TC" + System.currentTimeMillis() % 10000;
-            }
-        }
+        return "TC" + java.util.UUID.randomUUID().toString().substring(0, 8).toUpperCase();
     }
 }

@@ -10,11 +10,21 @@
     </header>
 
     <div class="menu-categories" id="categoryTabs">
-        <!-- Render danh mục -->
+        <a href="${pageContext.request.contextPath}/menu" class="btn ${empty currentCategoryId ? 'btn-primary' : 'btn-outline'}">Tất cả</a>
+        <c:forEach var="category" items="${categories}">
+            <a href="${pageContext.request.contextPath}/menu?categoryId=${category.id}" class="btn ${currentCategoryId == category.id ? 'btn-primary' : 'btn-outline'}">${category.name}</a>
+        </c:forEach>
     </div>
 
     <section class="menu-grid" id="foodGrid">
-        <!-- Danh sách món ăn -->
+        <c:forEach var="food" items="${foods}">
+            <div class="food-card">
+                <img src="${not empty food.imageUrl ? food.imageUrl : pageContext.request.contextPath.concat('/assets/images/placeholder.jpg')}" alt="${food.name}">
+                <h3>${food.name}</h3>
+                <p class="price">${food.price} VNĐ</p>
+                <a href="${pageContext.request.contextPath}/menu/detail?id=${food.id}" class="btn btn-primary">Chi tiết</a>
+            </div>
+        </c:forEach>
     </section>
 </main>
 

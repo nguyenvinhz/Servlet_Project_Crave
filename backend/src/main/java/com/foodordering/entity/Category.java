@@ -32,7 +32,7 @@ public class Category {
     @Column(name = "updated_at", nullable = false, insertable = false, updatable = false)
     private LocalDateTime updatedAt;
 
-    @OneToMany(mappedBy = "category", cascade = CascadeType.ALL)
+    @OneToMany(mappedBy = "category")
     private List<Food> foods = new ArrayList<>();
 
     protected Category() {
@@ -87,6 +87,5 @@ public class Category {
 
     public void removeFood(Food food) {
         foods.remove(food);
-        food.setCategory(null);
     }
 }
