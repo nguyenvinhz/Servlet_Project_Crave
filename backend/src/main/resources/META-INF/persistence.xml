@@ -8,6 +8,11 @@
         <class>com.foodordering.entity.User</class>
         <class>com.foodordering.entity.Customer</class>
         <class>com.foodordering.entity.Address</class>
+        <class>com.foodordering.entity.CustomerOrder</class>
+        <class>com.foodordering.entity.OrderDetail</class>
+        <class>com.foodordering.entity.OrderDetailOption</class>
+        <class>com.foodordering.entity.OrderStatusHistory</class>
+        <class>com.foodordering.entity.Payment</class>
         <exclude-unlisted-classes>true</exclude-unlisted-classes>
         <properties>
             <property name="hibernate.hbm2ddl.auto" value="validate"/>

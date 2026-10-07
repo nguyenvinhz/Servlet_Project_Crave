@@ -1,16 +1,14 @@
 package com.foodordering.servlet;
 
-import com.foodordering.dto.ApiResponse;
-import com.foodordering.utils.JsonUtils;
+import com.foodordering.api.BaseApiServlet;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
-import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 
 @WebServlet(name = "AdminOrderServlet", urlPatterns = "/api/admin/orders/*")
-public class AdminOrderServlet extends HttpServlet {
+public class AdminOrderServlet extends BaseApiServlet {
 
     @Override
     protected void service(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
@@ -22,7 +20,7 @@ public class AdminOrderServlet extends HttpServlet {
     }
 
     protected void doPatch(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-        resp.setStatus(HttpServletResponse.SC_NOT_IMPLEMENTED);
-        JsonUtils.writeJson(resp, ApiResponse.error("Chức năng cập nhật trạng thái đơn sẽ được triển khai trong Ngày 2"));
+        notImplemented(resp, "Chức năng cập nhật trạng thái đơn");
     }
 }
+

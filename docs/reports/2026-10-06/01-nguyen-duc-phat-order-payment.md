@@ -62,7 +62,7 @@ Chốt contract API cho tạo đơn, xem đơn, cập nhật trạng thái đơn
 
 ## Ảnh hưởng và lưu ý
 
-- Cần tích hợp với module Cart (của Trí) để lấy dữ liệu subtotal / discount. Ranh giới transaction đặt hàng (sẽ gọi CartService hoặc query trực tiếp v_cart_summary) sẽ được xử lý trong logic Ngày 2.
+- Cần tích hợp với module Cart (của Trí) để lấy dữ liệu subtotal / discount. Ranh giới transaction đặt hàng đã được chốt (bao bọc tại CustomerOrderService.createOrder).
 - Cần sử dụng Auth filter của Vinh để lấy customerId từ Session.
 
 ## Công việc còn lại
