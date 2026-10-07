@@ -21,8 +21,8 @@
                 <ul>
                 <c:forEach var="option" items="${food.options}">
                     <li>
-                        <strong>${option.type}</strong>: ${option.name} 
-                        <span class="price">(+${option.price} VNĐ)</span>
+                        <strong>${option.optionType}</strong>: ${option.name}
+                        <span class="price">(+${option.extraPrice} VNĐ)</span>
                     </li>
                 </c:forEach>
                 </ul>
