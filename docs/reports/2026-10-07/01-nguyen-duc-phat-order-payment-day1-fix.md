@@ -12,7 +12,7 @@ Báo cáo này liệt kê chi tiết các sửa đổi đối với phần nền
 
 ### 2.1. Lỗi biên dịch (Compile Errors)
 - **Vấn đề:** 11 lỗi biên dịch liên quan đến `JsonUtils` và `ApiResponse.error(...)`.
-- **Khắc phục:** 
+- **Khắc phục:**
   - Các Servlet (`OrderServlet`, `AdminOrderServlet`, `PaymentServlet`) đã được đổi sang kế thừa `BaseApiServlet`.
   - Loại bỏ các import rác không tồn tại.
   - Sử dụng hàm `notImplemented(resp, "...")` chuẩn của `BaseApiServlet` để trả về HTTP 501.
@@ -23,7 +23,7 @@ Báo cáo này liệt kê chi tiết các sửa đổi đối với phần nền
 
 ### 2.3. DTO OrderResponse
 - **Vấn đề:** `OrderResponse` chỉ có 1 getter/setter, thiếu các field để giao tiếp với Frontend.
-- **Khắc phục:** 
+- **Khắc phục:**
   - Sinh toàn bộ Getter/Setter cho các trường dữ liệu hiện có.
   - Bổ sung thêm trường `List<OrderItemResponse> items` (và class lồng lồng `OrderItemResponse`) để mapping chuẩn xác với hợp đồng OpenAPI.
 

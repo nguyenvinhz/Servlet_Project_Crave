@@ -8,7 +8,7 @@
 
 ## Mục tiêu
 
-Dựng nền cho Order, Order Detail, Order Status History và Payment. 
+Dựng nền cho Order, Order Detail, Order Status History và Payment.
 Tạo khung giao diện checkout, danh sách/chi tiết đơn, và admin xử lý đơn.
 Chốt contract API cho tạo đơn, xem đơn, cập nhật trạng thái đơn, và thanh toán.
 

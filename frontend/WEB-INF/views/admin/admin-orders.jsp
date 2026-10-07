@@ -44,10 +44,10 @@
             <option value="COMPLETED">Hoàn tất</option>
             <option value="CANCELLED">Đã hủy</option>
         </select><br/>
-        
+
         <label>Ghi chú:</label>
         <input type="text" id="statusNote" /><br/>
-        
+
         <button onclick="updateOrderStatus()">Xác nhận (JSON)</button>
     </div>
 
