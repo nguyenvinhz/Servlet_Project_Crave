@@ -21,6 +21,8 @@ public class OrderResponse {
     private BigDecimal totalAmount;
     private OrderStatus status;
     private List<OrderItemResponse> items;
+    private PaymentSummary payment;
+    private List<StatusHistoryEntry> history;
 
     public OrderResponse() {}
 
@@ -66,11 +68,27 @@ public class OrderResponse {
     public List<OrderItemResponse> getItems() { return items; }
     public void setItems(List<OrderItemResponse> items) { this.items = items; }
 
+    public PaymentSummary getPayment() { return payment; }
+    public void setPayment(PaymentSummary payment) { this.payment = payment; }
+
+    public List<StatusHistoryEntry> getHistory() { return history; }
+    public void setHistory(List<StatusHistoryEntry> history) { this.history = history; }
+
     public static class OrderItemResponse {
+        private String foodId;
+        private String foodName;
         private String foodNameSnapshot;
         private int quantity;
         private BigDecimal unitPrice;
+        private BigDecimal lineTotal;
         private String note;
+        private List<OptionSnapshot> options;
+
+        public String getFoodId() { return foodId; }
+        public void setFoodId(String foodId) { this.foodId = foodId; }
+
+        public String getFoodName() { return foodName; }
+        public void setFoodName(String foodName) { this.foodName = foodName; }
 
         public String getFoodNameSnapshot() { return foodNameSnapshot; }
         public void setFoodNameSnapshot(String foodNameSnapshot) { this.foodNameSnapshot = foodNameSnapshot; }
@@ -80,6 +98,57 @@ public class OrderResponse {
 
         public BigDecimal getUnitPrice() { return unitPrice; }
         public void setUnitPrice(BigDecimal unitPrice) { this.unitPrice = unitPrice; }
+
+        public BigDecimal getLineTotal() { return lineTotal; }
+        public void setLineTotal(BigDecimal lineTotal) { this.lineTotal = lineTotal; }
+
+        public String getNote() { return note; }
+        public void setNote(String note) { this.note = note; }
+
+        public List<OptionSnapshot> getOptions() { return options; }
+        public void setOptions(List<OptionSnapshot> options) { this.options = options; }
+    }
+
+    public static class OptionSnapshot {
+        private String optionName;
+        private BigDecimal extraPrice;
+
+        public String getOptionName() { return optionName; }
+        public void setOptionName(String optionName) { this.optionName = optionName; }
+
+        public BigDecimal getExtraPrice() { return extraPrice; }
+        public void setExtraPrice(BigDecimal extraPrice) { this.extraPrice = extraPrice; }
+    }
+
+    public static class PaymentSummary {
+        private String paymentId;
+        private String method;
+        private String status;
+        private BigDecimal amount;
+
+        public String getPaymentId() { return paymentId; }
+        public void setPaymentId(String paymentId) { this.paymentId = paymentId; }
+
+        public String getMethod() { return method; }
+        public void setMethod(String method) { this.method = method; }
+
+        public String getStatus() { return status; }
+        public void setStatus(String status) { this.status = status; }
+
+        public BigDecimal getAmount() { return amount; }
+        public void setAmount(BigDecimal amount) { this.amount = amount; }
+    }
+
+    public static class StatusHistoryEntry {
+        private String status;
+        private LocalDateTime changedAt;
+        private String note;
+
+        public String getStatus() { return status; }
+        public void setStatus(String status) { this.status = status; }
+
+        public LocalDateTime getChangedAt() { return changedAt; }
+        public void setChangedAt(LocalDateTime changedAt) { this.changedAt = changedAt; }
 
         public String getNote() { return note; }
         public void setNote(String note) { this.note = note; }
