@@ -107,11 +107,12 @@ CREATE TABLE delivery_address (
     address_line        VARCHAR(255)    NOT NULL,
     note                VARCHAR(255)    NULL,
     is_default          TINYINT(1)      NOT NULL DEFAULT 0,
-    -- MySQL allows multiple NULL values in a UNIQUE index. This generated
-    -- value therefore enforces at most one default address per customer.
+    -- MySQL allows multiple NULL values in a UNIQUE index. Keep this column
+    -- VIRTUAL so customer_id can still use cascading foreign-key actions;
+    -- STORED generated columns prohibit CASCADE on their base columns.
     default_customer_id VARCHAR(10) GENERATED ALWAYS AS (
                             CASE WHEN is_default = 1 THEN customer_id ELSE NULL END
-                        ) STORED,
+                        ) VIRTUAL,
     created_at          DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP
                                         ON UPDATE CURRENT_TIMESTAMP,
