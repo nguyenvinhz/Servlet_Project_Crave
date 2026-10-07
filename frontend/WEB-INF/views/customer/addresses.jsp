@@ -37,7 +37,7 @@
                 <p class="eyebrow">Địa chỉ mới</p>
                 <h2>Thêm địa chỉ</h2>
             </div>
-            <form action="<c:url value='/api/addresses'/>" method="post">
+            <form id="addressForm" action="<c:url value='/api/addresses'/>" method="post" data-method="POST">
                 <label for="addressLine">Địa chỉ đầy đủ</label>
                 <textarea id="addressLine" name="addressLine" rows="3" maxlength="255"
                           placeholder="Số nhà, tên đường, phường/xã, quận/huyện, tỉnh/thành" required></textarea>

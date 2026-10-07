@@ -17,7 +17,7 @@
             <c:out value="${error}"/>
         </div>
 
-        <form action="<c:url value='/api/auth/register'/>" method="post">
+        <form id="registerForm" action="<c:url value='/api/auth/register'/>" method="post" data-method="POST">
             <label for="fullName">Họ và tên</label>
             <input id="fullName" name="fullName" type="text" autocomplete="name"
                    maxlength="100" placeholder="Nguyễn Văn An" required>
