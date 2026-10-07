@@ -39,4 +39,18 @@ public abstract class BaseApiServlet extends HttpServlet {
         writeJson(response, HttpServletResponse.SC_BAD_REQUEST,
                 ApiResponse.failure(new ApiError("INVALID_REQUEST", message, Map.of())));
     }
+
+    protected <T> T readJson(jakarta.servlet.http.HttpServletRequest request, Class<T> clazz) throws IOException {
+        return JsonProvider.objectMapper().readValue(request.getInputStream(), clazz);
+    }
+
+    protected void handleError(HttpServletResponse response, Exception e) throws IOException {
+        if (e instanceof com.foodordering.exception.AppException appEx) {
+            writeJson(response, appEx.getStatusCode(),
+                    ApiResponse.failure(new ApiError(appEx.getErrorCode(), appEx.getMessage(), appEx.getDetails())));
+        } else {
+            writeJson(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
+                    ApiResponse.failure(new ApiError("INTERNAL_SERVER_ERROR", e.getMessage() != null ? e.getMessage() : "Đã xảy ra lỗi hệ thống.", Map.of())));
+        }
+    }
 }
