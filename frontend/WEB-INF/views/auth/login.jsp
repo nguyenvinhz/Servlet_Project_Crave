@@ -17,7 +17,7 @@
             <c:out value="${error}"/>
         </div>
 
-        <form action="<c:url value='/api/auth/login'/>" method="post">
+        <form id="loginForm" action="<c:url value='/api/auth/login'/>" method="post" data-method="POST">
             <label for="email">Email</label>
             <input id="email" name="email" type="email" autocomplete="email"
                    maxlength="100" placeholder="ban@example.com" required>

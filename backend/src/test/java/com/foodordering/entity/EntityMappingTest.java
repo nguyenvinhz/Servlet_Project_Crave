@@ -15,12 +15,14 @@ class EntityMappingTest {
     void entitiesMapToExistingSchemaTables() {
         assertEquals("user_account", User.class.getAnnotation(Table.class).name());
         assertEquals("customer", Customer.class.getAnnotation(Table.class).name());
+        assertEquals("employee", Employee.class.getAnnotation(Table.class).name());
         assertEquals("delivery_address", Address.class.getAnnotation(Table.class).name());
         assertEquals("category", Category.class.getAnnotation(Table.class).name());
         assertEquals("food", Food.class.getAnnotation(Table.class).name());
         assertEquals("food_option", FoodOption.class.getAnnotation(Table.class).name());
         assertEquals(InheritanceType.JOINED, User.class.getAnnotation(Inheritance.class).strategy());
         assertEquals("CUSTOMER", Customer.class.getAnnotation(DiscriminatorValue.class).value());
+        assertEquals("EMPLOYEE", Employee.class.getAnnotation(DiscriminatorValue.class).value());
     }
 
     @Test
