@@ -24,7 +24,7 @@
             <c:out value="${message}"/>
         </div>
 
-        <form action="<c:url value='/api/profile'/>" method="post">
+        <form id="profileForm" action="<c:url value='/api/profile'/>" method="post" data-method="PUT">
             <label for="fullName">Họ và tên</label>
             <input id="fullName" name="fullName" type="text" autocomplete="name"
                    maxlength="100" placeholder="Họ và tên" required>
