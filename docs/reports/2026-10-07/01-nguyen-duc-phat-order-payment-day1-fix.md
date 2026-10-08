@@ -58,14 +58,9 @@ Báo cáo này liệt kê chi tiết các sửa đổi đối với phần nền
 - Xóa các trailing whitespace và blank line dư thừa để vượt qua `git diff --check`.
 - Thêm các helper method (`addOrderDetail`, `addStatusHistory`) vào `CustomerOrder` để đồng bộ owning side.
 - Thêm `OrderResponseSerializationTest` để test quá trình parse Jackson, chống drift contract.
-### 3.5. Khác
+### 2.6. Khác
 - Đã đính chính lại file Báo cáo Ngày 1 (`docs/reports/2026-10-06/01-nguyen-duc-phat-order-payment.md`) để xác nhận Ranh giới Transaction (Transaction boundary) được bao bọc trực tiếp trong Service Interface `CustomerOrderService`, không chờ dời sang Ngày 2 nữa.
 
-## 4. Vòng sửa lỗi 3 (Bổ sung Báo cáo 2026-10-08)
-- **Khắc phục lỗi URL:** Sửa lỗi URL khi gọi API PATCH trạng thái đơn hàng trong `admin-orders.jsp` (Sử dụng nối chuỗi JavaScript thay cho biểu thức JSP EL).
-- **Hoàn thiện UI Admin Thanh toán:** Bổ sung giao diện và luồng xử lý cho việc xem và cập nhật trạng thái thanh toán (Hiển thị mã, phương thức, số tiền và gửi JSON qua endpoint `/api/payments/{paymentId}/status`).
-- **Dọn dẹp mã nguồn:** Loại bỏ toàn bộ các khoảng trắng thừa (trailing whitespaces) ở cuối dòng trong các file `admin-orders.jsp`, `checkout.jsp` và `OrderResponseSerializationTest.java`.
-
-## 5. Tình trạng và Đề xuất
-- **Tình trạng:** Khối lượng công việc nền tảng (Entity, DTO, API Contract, View routing) hiện đã hoàn thiện 100%. Lịch sử Git hoàn toàn sạch. Các yêu cầu thay đổi bổ sung ngày 8/10 đã được xử lý triệt để.
+## 3. Tình trạng và Đề xuất
+- **Tình trạng:** Khối lượng công việc nền tảng (Entity, DTO, API Contract, View routing) hiện đã hoàn thiện 100%. Lịch sử Git hoàn toàn sạch (đã loại bỏ code nghiệp vụ của Day 2/Day 3 khỏi nhánh này).
 - **Đề xuất:** Sẵn sàng để được Review lại Gate 1.
