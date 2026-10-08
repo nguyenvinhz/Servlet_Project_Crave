@@ -30,7 +30,7 @@ public class IdGenerator {
     }
 
     public static String generateCartItemId() {
-        return generateId("CT", 6);
+        return generateId("CTGH", 4);
     }
 
     public static String generatePromotionId() {

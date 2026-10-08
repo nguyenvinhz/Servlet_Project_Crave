@@ -2,41 +2,31 @@ package com.foodordering.dto;
 
 import java.math.BigDecimal;
 
-/**
- * DTO trả về kết quả kiểm tra và tính toán giảm giá của voucher.
- */
 public class PromotionValidationResultDto {
     private boolean valid;
     private String message;
     private PromotionDto promotion;
-    private BigDecimal originalSubtotal;
-    private BigDecimal discountAmount;
-    private BigDecimal finalSubtotal;
+    private BigDecimal originalSubtotal = BigDecimal.ZERO;
+    private BigDecimal discountAmount = BigDecimal.ZERO;
+    private BigDecimal finalSubtotal = BigDecimal.ZERO;
     private String errorCode;
 
     public PromotionValidationResultDto() {
-        this.originalSubtotal = BigDecimal.ZERO;
-        this.discountAmount = BigDecimal.ZERO;
-        this.finalSubtotal = BigDecimal.ZERO;
     }
 
-    public static PromotionValidationResultDto valid(PromotionDto promotion, BigDecimal originalSubtotal, BigDecimal discountAmount) {
-        PromotionValidationResultDto res = new PromotionValidationResultDto();
-        res.setValid(true);
-        res.setMessage("Áp dụng mã khuyến mãi thành công");
-        res.setPromotion(promotion);
-        res.setOriginalSubtotal(originalSubtotal);
-        res.setDiscountAmount(discountAmount);
-        res.setFinalSubtotal(originalSubtotal.subtract(discountAmount).max(BigDecimal.ZERO));
-        return res;
+    public PromotionValidationResultDto(boolean valid, String message, String errorCode) {
+        this.valid = valid;
+        this.message = message;
+        this.errorCode = errorCode;
     }
 
-    public static PromotionValidationResultDto invalid(String message, String errorCode) {
-        PromotionValidationResultDto res = new PromotionValidationResultDto();
-        res.setValid(false);
-        res.setMessage(message);
-        res.setErrorCode(errorCode);
-        return res;
+    public PromotionValidationResultDto(boolean valid, String message, PromotionDto promotion, BigDecimal originalSubtotal, BigDecimal discountAmount, BigDecimal finalSubtotal) {
+        this.valid = valid;
+        this.message = message;
+        this.promotion = promotion;
+        this.originalSubtotal = originalSubtotal != null ? originalSubtotal : BigDecimal.ZERO;
+        this.discountAmount = discountAmount != null ? discountAmount : BigDecimal.ZERO;
+        this.finalSubtotal = finalSubtotal != null ? finalSubtotal : BigDecimal.ZERO;
     }
 
     public boolean isValid() {

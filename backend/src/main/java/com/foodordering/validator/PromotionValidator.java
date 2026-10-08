@@ -1,5 +1,6 @@
 package com.foodordering.validator;
 
+import com.foodordering.entity.CustomerOrder;
 import com.foodordering.entity.Promotion;
 import com.foodordering.enums.ErrorCode;
 import com.foodordering.enums.PromotionStatus;
@@ -9,20 +10,16 @@ import com.foodordering.exception.PromotionValidationException;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
-/**
- * Kiểm tra tính hợp lệ và điều kiện áp dụng của mã khuyến mãi.
- */
 public class PromotionValidator {
 
-    private PromotionValidator() {
-    }
+    private PromotionValidator() {}
 
+    /**
+     * Kiểm tra định dạng mã khuyến mãi.
+     */
     public static void validatePromotionCode(String code) {
         if (code == null || code.trim().isEmpty()) {
             throw new BadRequestException(ErrorCode.BAD_REQUEST, "Mã khuyến mãi không được để trống");
-        }
-        if (code.trim().length() > 30) {
-            throw new BadRequestException(ErrorCode.BAD_REQUEST, "Mã khuyến mãi không được vượt quá 30 ký tự");
         }
     }
 
@@ -30,12 +27,12 @@ public class PromotionValidator {
      * Kiểm tra các điều kiện áp dụng mã khuyến mãi:
      * 1. Mã tồn tại
      * 2. Trạng thái ACTIVE
-     * 3. Thời gian nằm trong khoảng [startAt, endAt]
+     * 3. Thời gian orderTime nằm trong khoảng [startAt, endAt]
      * 4. Giá trị đơn hàng (subtotal) >= minimumOrderValue
      */
     public static void validateApplicable(Promotion promotion, BigDecimal subtotal, LocalDateTime orderTime) {
         if (promotion == null) {
-            throw new PromotionValidationException(ErrorCode.PROMOTION_NOT_FOUND, "Mã khuyến mãi không tồn tại trong hệ thống");
+            throw new PromotionValidationException(ErrorCode.PROMOTION_NOT_FOUND, "Không tìm thấy mã khuyến mãi");
         }
 
         if (promotion.getStatus() != PromotionStatus.ACTIVE) {
@@ -54,11 +51,22 @@ public class PromotionValidator {
 
         BigDecimal currentSubtotal = subtotal != null ? subtotal : BigDecimal.ZERO;
         BigDecimal minOrder = promotion.getMinimumOrderValue() != null ? promotion.getMinimumOrderValue() : BigDecimal.ZERO;
-
         if (currentSubtotal.compareTo(minOrder) < 0) {
             throw new PromotionValidationException(ErrorCode.PROMOTION_MIN_ORDER_NOT_MET,
                     String.format("Mã chỉ áp dụng cho đơn hàng từ %,.0f VNĐ (Đơn hiện tại: %,.0f VNĐ)",
                             minOrder.doubleValue(), currentSubtotal.doubleValue()));
         }
+    }
+
+    /**
+     * Xác thực tính hợp lệ của mã khuyến mãi dựa trên thông tin CustomerOrder của khách hàng
+     * (lấy orderTime và subtotal trực tiếp từ CustomerOrder entity).
+     */
+    public static void validateApplicableForOrder(Promotion promotion, CustomerOrder order) {
+        if (order == null) {
+            validateApplicable(promotion, BigDecimal.ZERO, LocalDateTime.now());
+            return;
+        }
+        validateApplicable(promotion, order.getSubtotal(), order.getOrderTime());
     }
 }

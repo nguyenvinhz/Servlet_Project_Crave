@@ -3,75 +3,71 @@ package com.foodordering.service;
 import com.foodordering.dto.AddToCartRequest;
 import com.foodordering.dto.CartDto;
 import com.foodordering.dto.CartItemDto;
+import com.foodordering.dto.CartItemOptionDto;
 import com.foodordering.dto.UpdateCartItemRequest;
 import com.foodordering.entity.Cart;
 import com.foodordering.entity.CartItem;
 import com.foodordering.enums.ErrorCode;
 import com.foodordering.exception.BadRequestException;
 import com.foodordering.exception.ResourceNotFoundException;
+import com.foodordering.mapper.CartItemMapper;
+import com.foodordering.mapper.CartMapper;
 import com.foodordering.repository.CartItemRepository;
 import com.foodordering.repository.CartRepository;
 import com.foodordering.validator.CartValidator;
 
 import java.math.BigDecimal;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-/**
- * Service xử lý nghiệp vụ giỏ hàng (Cart vertical slice do Ung Văn Trí phụ trách).
- * Tuyệt đối tuân thủ nguyên tắc không tin cậy dữ liệu giá hoặc tổng tiền từ client.
- */
 public class CartService {
 
     private final CartRepository cartRepository;
     private final CartItemRepository cartItemRepository;
+    private final CartMapper cartMapper;
+    private final CartItemMapper cartItemMapper;
 
     public CartService() {
         this.cartRepository = new CartRepository();
         this.cartItemRepository = new CartItemRepository();
+        this.cartMapper = new CartMapper();
+        this.cartItemMapper = new CartItemMapper();
     }
 
     public CartService(CartRepository cartRepository, CartItemRepository cartItemRepository) {
         this.cartRepository = cartRepository;
         this.cartItemRepository = cartItemRepository;
+        this.cartMapper = new CartMapper();
+        this.cartItemMapper = new CartItemMapper();
+    }
+
+    public CartService(CartRepository cartRepository, CartItemRepository cartItemRepository,
+                       CartMapper cartMapper, CartItemMapper cartItemMapper) {
+        this.cartRepository = cartRepository;
+        this.cartItemRepository = cartItemRepository;
+        this.cartMapper = cartMapper != null ? cartMapper : new CartMapper();
+        this.cartItemMapper = cartItemMapper != null ? cartItemMapper : new CartItemMapper();
     }
 
     /**
-     * Lấy thông tin giỏ hàng hiện tại của khách hàng.
-     * Nếu khách hàng chưa có giỏ hàng, hệ thống sẽ tự động khởi tạo giỏ hàng mới.
+     * Lấy hoặc tạo giỏ hàng cho khách hàng, chuyển đổi Entity sang DTO qua CartMapper.
      */
     public CartDto getOrCreateCart(String customerId) {
-        CartValidator.validateCustomerId(customerId);
         Cart cart = cartRepository.findByCustomerId(customerId);
         if (cart == null) {
             cart = cartRepository.createCart(customerId);
         }
-
-        List<CartItemDto> items = cartItemRepository.findItemsByCartId(cart.getCartId());
-        CartDto cartDto = new CartDto(cart.getCartId(), customerId);
-        cartDto.setItems(items);
+        List<CartItem> items = cartItemRepository.findItemsByCartId(cart.getCartId());
+        CartDto cartDto = cartMapper.toDto(cart, items);
+        calculateCartTotals(cartDto);
         return cartDto;
     }
 
-    /**
-     * Thêm món vào giỏ hàng:
-     * - Kiểm tra món có đang phục vụ (AVAILABLE) không.
-     * - Kiểm tra các tùy chọn đính kèm có thuộc về món đó và đang ACTIVE không.
-     * - Nếu món và danh sách tùy chọn hoàn toàn trùng khớp với món đã có trong giỏ, tiến hành cộng dồn số lượng.
-     * - Ngược lại, tạo một mục món mới.
-     */
     public CartDto addItem(String customerId, AddToCartRequest request) {
-        CartValidator.validateCustomerId(customerId);
-        CartValidator.validateAddToCart(request);
-
-        // 1. Kiểm tra trạng thái món ăn trong DB
         boolean foodAvailable = cartItemRepository.isFoodAvailable(request.getFoodId());
         if (!foodAvailable) {
             throw new BadRequestException(ErrorCode.FOOD_NOT_AVAILABLE, "Món ăn hiện không khả dụng hoặc đã ngừng phục vụ");
         }
-
-        // 2. Kiểm tra các tùy chọn (options) có hợp lệ không
         List<String> rawOptions = request.getOptionIds() != null ? request.getOptionIds() : Collections.emptyList();
         if (!rawOptions.isEmpty()) {
             List<String> validOptions = cartItemRepository.getValidOptionIdsForFood(request.getFoodId(), rawOptions);
@@ -109,19 +105,11 @@ public class CartService {
         return getOrCreateCart(customerId);
     }
 
-    /**
-     * Cập nhật số lượng hoặc ghi chú của món trong giỏ hàng.
-     * Nếu số lượng mới bằng 0, mục món sẽ tự động bị xóa khỏi giỏ.
-     */
     public CartDto updateItem(String customerId, UpdateCartItemRequest request) {
-        CartValidator.validateCustomerId(customerId);
-        CartValidator.validateUpdateCartItem(request);
-
         Cart cart = cartRepository.findByCustomerId(customerId);
         if (cart == null) {
             throw new ResourceNotFoundException(ErrorCode.CART_NOT_FOUND, "Không tìm thấy giỏ hàng của bạn");
         }
-
         CartItem item = cartItemRepository.findById(request.getCartItemId());
         if (item == null || !cart.getCartId().equals(item.getCartId())) {
             throw new ResourceNotFoundException(ErrorCode.CART_ITEM_NOT_FOUND, "Món không tồn tại trong giỏ hàng của bạn");
@@ -178,5 +166,45 @@ public class CartService {
     public BigDecimal getVerifiedSubtotal(String customerId) {
         CartDto cart = getOrCreateCart(customerId);
         return cart.getSubtotal();
+    }
+
+    /**
+     * Tính toán optionTotal, unitPrice và lineTotal cho một mục món ăn.
+     */
+    public void calculateItemTotals(CartItemDto item) {
+        if (item == null) return;
+        BigDecimal sumOption = BigDecimal.ZERO;
+        if (item.getOptions() != null) {
+            for (CartItemOptionDto opt : item.getOptions()) {
+                if (opt.getExtraPrice() != null) {
+                    sumOption = sumOption.add(opt.getExtraPrice());
+                }
+            }
+        }
+        item.setOptionTotal(sumOption);
+        BigDecimal base = item.getBasePrice() != null ? item.getBasePrice() : BigDecimal.ZERO;
+        BigDecimal unitPrice = base.add(sumOption);
+        item.setUnitPrice(unitPrice);
+        item.setLineTotal(unitPrice.multiply(BigDecimal.valueOf(Math.max(0, item.getQuantity()))));
+    }
+
+    /**
+     * Tính toán totalItems và subtotal cho toàn bộ giỏ hàng.
+     */
+    public void calculateCartTotals(CartDto cart) {
+        if (cart == null) return;
+        int count = 0;
+        BigDecimal sum = BigDecimal.ZERO;
+        if (cart.getItems() != null) {
+            for (CartItemDto item : cart.getItems()) {
+                calculateItemTotals(item);
+                count += item.getQuantity();
+                if (item.getLineTotal() != null) {
+                    sum = sum.add(item.getLineTotal());
+                }
+            }
+        }
+        cart.setTotalItems(count);
+        cart.setSubtotal(sum);
     }
 }

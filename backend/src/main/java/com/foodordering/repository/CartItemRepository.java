@@ -1,305 +1,212 @@
 package com.foodordering.repository;
 
 import com.foodordering.config.DatabaseConfig;
-import com.foodordering.dto.CartItemDto;
-import com.foodordering.dto.CartItemOptionDto;
+import com.foodordering.entity.Cart;
 import com.foodordering.entity.CartItem;
+import com.foodordering.entity.CartItemOption;
+import com.foodordering.entity.Food;
+import com.foodordering.entity.FoodOption;
+import com.foodordering.enums.FoodStatus;
 import com.foodordering.utils.IdGenerator;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.EntityTransaction;
 
-import java.math.BigDecimal;
-import java.sql.*;
-import java.util.*;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 /**
- * Repository xử lý các thao tác cơ sở dữ liệu đối với bảng cart_item và cart_item_option.
+ * Repository xử lý các thao tác dữ liệu đối với bảng cart_item và cart_item_option sử dụng JPA (non-Spring Boot).
+ * Tuân thủ nguyên tắc tầng Repository: chỉ trả về Entity, không phụ thuộc hay trả về DTO.
  */
 public class CartItemRepository {
 
     /**
-     * Lấy toàn bộ danh sách món ăn trong giỏ hàng kèm theo tùy chọn và thông tin món ăn.
+     * Lấy danh sách Entity CartItem trong giỏ kèm Food và các CartItemOption liên quan.
      */
-    public List<CartItemDto> findItemsByCartId(String cartId) {
-        List<CartItemDto> items = new ArrayList<>();
-        String sql = "SELECT ci.cart_item_id, ci.cart_id, ci.food_id, ci.quantity, ci.note, " +
-                     "       f.name AS food_name, f.image_url, f.price AS base_price " +
-                     "FROM cart_item ci " +
-                     "JOIN food f ON f.food_id = ci.food_id " +
-                     "WHERE ci.cart_id = ? " +
-                     "ORDER BY ci.created_at ASC";
-
-        Connection conn = null;
-        PreparedStatement ps = null;
-        ResultSet rs = null;
+    public List<CartItem> findItemsByCartId(String cartId) {
+        if (cartId == null) return Collections.emptyList();
+        EntityManager em = DatabaseConfig.getEntityManager();
+        if (em == null) return Collections.emptyList();
         try {
-            conn = DatabaseConfig.getConnection();
-            ps = conn.prepareStatement(sql);
-            ps.setString(1, cartId);
-            rs = ps.executeQuery();
-            while (rs.next()) {
-                CartItemDto item = new CartItemDto();
-                item.setCartItemId(rs.getString("cart_item_id"));
-                item.setCartId(rs.getString("cart_id"));
-                item.setFoodId(rs.getString("food_id"));
-                item.setFoodName(rs.getString("food_name"));
-                item.setImageUrl(rs.getString("image_url"));
-                item.setBasePrice(rs.getBigDecimal("base_price"));
-                item.setQuantity(rs.getInt("quantity"));
-                item.setNote(rs.getString("note"));
+            String jpql = "SELECT DISTINCT ci FROM CartItem ci LEFT JOIN FETCH ci.food f WHERE ci.cart.cartId = :cartId ORDER BY ci.createdAt ASC";
+            List<CartItem> items = em.createQuery(jpql, CartItem.class)
+                    .setParameter("cartId", cartId)
+                    .getResultList();
 
-                // Lấy danh sách options cho item này
-                item.setOptions(findOptionsByCartItemId(conn, item.getCartItemId()));
-                item.calculateTotals();
-                items.add(item);
+            for (CartItem ci : items) {
+                List<CartItemOption> options = findOptionsByCartItemId(em, ci.getCartItemId());
+                ci.setItemOptions(options);
             }
             return items;
-        } catch (SQLException e) {
-            throw new RuntimeException("Lỗi khi lấy danh sách món trong giỏ hàng: " + e.getMessage(), e);
+        } catch (Exception e) {
+            throw new RuntimeException("Lỗi JPA khi lấy danh sách món trong giỏ: " + e.getMessage(), e);
         } finally {
-            DatabaseConfig.closeQuietly(rs);
-            DatabaseConfig.closeQuietly(ps);
-            DatabaseConfig.closeQuietly(conn);
+            em.close();
         }
     }
 
     /**
-     * Lấy các tùy chọn đã chọn cho một mục giỏ hàng.
+     * Lấy danh sách Entity CartItemOption theo cartItemId (sử dụng cùng EntityManager).
      */
-    public List<CartItemOptionDto> findOptionsByCartItemId(Connection conn, String cartItemId) throws SQLException {
-        List<CartItemOptionDto> options = new ArrayList<>();
-        String sql = "SELECT fo.option_id, fo.name, fo.option_type, fo.extra_price " +
-                     "FROM cart_item_option cio " +
-                     "JOIN food_option fo ON fo.option_id = cio.option_id " +
-                     "WHERE cio.cart_item_id = ?";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, cartItemId);
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) {
-                    CartItemOptionDto opt = new CartItemOptionDto();
-                    opt.setOptionId(rs.getString("option_id"));
-                    opt.setName(rs.getString("name"));
-                    opt.setOptionType(rs.getString("option_type"));
-                    opt.setExtraPrice(rs.getBigDecimal("extra_price"));
-                    options.add(opt);
-                }
-            }
+    public List<CartItemOption> findOptionsByCartItemId(EntityManager em, String cartItemId) {
+        if (cartItemId == null || em == null) return Collections.emptyList();
+        try {
+            String jpql = "SELECT cio FROM CartItemOption cio LEFT JOIN FETCH cio.option fo WHERE cio.cartItem.cartItemId = :cartItemId";
+            return em.createQuery(jpql, CartItemOption.class)
+                    .setParameter("cartItemId", cartItemId)
+                    .getResultList();
+        } catch (Exception e) {
+            return Collections.emptyList();
         }
-        return options;
+    }
+
+    /**
+     * Lấy danh sách Entity CartItemOption theo cartItemId (mở EntityManager mới).
+     */
+    public List<CartItemOption> findOptionsByCartItemId(String cartItemId) {
+        if (cartItemId == null) return Collections.emptyList();
+        EntityManager em = DatabaseConfig.getEntityManager();
+        if (em == null) return Collections.emptyList();
+        try {
+            return findOptionsByCartItemId(em, cartItemId);
+        } finally {
+            em.close();
+        }
     }
 
     /**
      * Tìm món trong giỏ theo ID.
      */
     public CartItem findById(String cartItemId) {
-        String sql = "SELECT cart_item_id, cart_id, food_id, quantity, note, created_at, updated_at " +
-                     "FROM cart_item WHERE cart_item_id = ?";
-        Connection conn = null;
-        PreparedStatement ps = null;
-        ResultSet rs = null;
+        if (cartItemId == null) return null;
+        EntityManager em = DatabaseConfig.getEntityManager();
+        if (em == null) return null;
         try {
-            conn = DatabaseConfig.getConnection();
-            ps = conn.prepareStatement(sql);
-            ps.setString(1, cartItemId);
-            rs = ps.executeQuery();
-            if (rs.next()) {
-                CartItem item = new CartItem();
-                item.setCartItemId(rs.getString("cart_item_id"));
-                item.setCartId(rs.getString("cart_id"));
-                item.setFoodId(rs.getString("food_id"));
-                item.setQuantity(rs.getInt("quantity"));
-                item.setNote(rs.getString("note"));
-                Timestamp c = rs.getTimestamp("created_at");
-                if (c != null) item.setCreatedAt(c.toLocalDateTime());
-                Timestamp u = rs.getTimestamp("updated_at");
-                if (u != null) item.setUpdatedAt(u.toLocalDateTime());
-                return item;
-            }
-            return null;
-        } catch (SQLException e) {
-            throw new RuntimeException("Lỗi khi tìm cart item: " + e.getMessage(), e);
+            return em.find(CartItem.class, cartItemId);
+        } catch (Exception e) {
+            throw new RuntimeException("Lỗi JPA khi tìm cart item: " + e.getMessage(), e);
         } finally {
-            DatabaseConfig.closeQuietly(rs);
-            DatabaseConfig.closeQuietly(ps);
-            DatabaseConfig.closeQuietly(conn);
+            em.close();
         }
     }
 
     /**
-     * Kiểm tra món ăn có tồn tại và đang AVAILABLE hay không.
+     * Kiểm tra món ăn có tồn tại và đang AVAILABLE hay không qua Food entity.
      */
     public boolean isFoodAvailable(String foodId) {
-        String sql = "SELECT status FROM food WHERE food_id = ?";
-        Connection conn = null;
-        PreparedStatement ps = null;
-        ResultSet rs = null;
+        if (foodId == null) return false;
+        EntityManager em = DatabaseConfig.getEntityManager();
+        if (em == null) return true; // Trong test/offline mode
         try {
-            conn = DatabaseConfig.getConnection();
-            ps = conn.prepareStatement(sql);
-            ps.setString(1, foodId);
-            rs = ps.executeQuery();
-            if (rs.next()) {
-                return "AVAILABLE".equalsIgnoreCase(rs.getString("status"));
-            }
+            Food food = em.find(Food.class, foodId);
+            return food != null && food.getStatus() == FoodStatus.AVAILABLE;
+        } catch (Exception e) {
             return false;
-        } catch (SQLException e) {
-            throw new RuntimeException("Lỗi kiểm tra trạng thái món ăn: " + e.getMessage(), e);
         } finally {
-            DatabaseConfig.closeQuietly(rs);
-            DatabaseConfig.closeQuietly(ps);
-            DatabaseConfig.closeQuietly(conn);
+            em.close();
         }
     }
 
     /**
      * Xác thực các option có thuộc món ăn foodId và đang ACTIVE hay không.
-     * Trả về danh sách các option hợp lệ.
      */
     public List<String> getValidOptionIdsForFood(String foodId, List<String> optionIds) {
         if (optionIds == null || optionIds.isEmpty()) {
             return Collections.emptyList();
         }
-        List<String> validIds = new ArrayList<>();
-        StringBuilder sql = new StringBuilder("SELECT option_id FROM food_option WHERE food_id = ? AND status = 'ACTIVE' AND option_id IN (");
-        for (int i = 0; i < optionIds.size(); i++) {
-            if (i > 0) sql.append(",");
-            sql.append("?");
-        }
-        sql.append(")");
-
-        Connection conn = null;
-        PreparedStatement ps = null;
-        ResultSet rs = null;
+        EntityManager em = DatabaseConfig.getEntityManager();
+        if (em == null) return optionIds;
         try {
-            conn = DatabaseConfig.getConnection();
-            ps = conn.prepareStatement(sql.toString());
-            ps.setString(1, foodId);
-            for (int i = 0; i < optionIds.size(); i++) {
-                ps.setString(i + 2, optionIds.get(i));
-            }
-            rs = ps.executeQuery();
-            while (rs.next()) {
-                validIds.add(rs.getString("option_id"));
-            }
-            return validIds;
-        } catch (SQLException e) {
-            throw new RuntimeException("Lỗi kiểm tra tùy chọn món: " + e.getMessage(), e);
+            String jpql = "SELECT fo.optionId FROM FoodOption fo WHERE fo.food.foodId = :foodId AND fo.status = 'ACTIVE' AND fo.optionId IN (:optionIds)";
+            return em.createQuery(jpql, String.class)
+                    .setParameter("foodId", foodId)
+                    .setParameter("optionIds", optionIds)
+                    .getResultList();
+        } catch (Exception e) {
+            return Collections.emptyList();
         } finally {
-            DatabaseConfig.closeQuietly(rs);
-            DatabaseConfig.closeQuietly(ps);
-            DatabaseConfig.closeQuietly(conn);
+            em.close();
         }
     }
 
     /**
-     * Tìm món đã có trong giỏ có cùng foodId và tập hợp optionIds y hệt nhau.
-     * Nếu tìm thấy, hệ thống sẽ cộng dồn số lượng thay vì tạo dòng mới.
+     * Tìm món đã có trong giỏ có cùng foodId và tập hợp optionIds y hệt nhau để cộng dồn số lượng.
      */
     public CartItem findDuplicateItem(String cartId, String foodId, List<String> newOptionIds) {
-        String sql = "SELECT cart_item_id, quantity, note FROM cart_item WHERE cart_id = ? AND food_id = ?";
-        Connection conn = null;
-        PreparedStatement ps = null;
-        ResultSet rs = null;
+        if (cartId == null || foodId == null) return null;
+        EntityManager em = DatabaseConfig.getEntityManager();
+        if (em == null) return null;
         try {
-            conn = DatabaseConfig.getConnection();
-            ps = conn.prepareStatement(sql);
-            ps.setString(1, cartId);
-            ps.setString(2, foodId);
-            rs = ps.executeQuery();
+            List<CartItem> items = em.createQuery("SELECT ci FROM CartItem ci WHERE ci.cart.cartId = :cartId AND ci.food.foodId = :foodId", CartItem.class)
+                    .setParameter("cartId", cartId)
+                    .setParameter("foodId", foodId)
+                    .getResultList();
 
             Set<String> targetSet = new HashSet<>(newOptionIds != null ? newOptionIds : Collections.emptyList());
 
-            while (rs.next()) {
-                String existingItemId = rs.getString("cart_item_id");
-                Set<String> existingOptions = getOptionIdsForItem(conn, existingItemId);
+            for (CartItem item : items) {
+                Set<String> existingOptions = getOptionIdsForItem(em, item.getCartItemId());
                 if (existingOptions.equals(targetSet)) {
-                    CartItem duplicate = new CartItem();
-                    duplicate.setCartItemId(existingItemId);
-                    duplicate.setCartId(cartId);
-                    duplicate.setFoodId(foodId);
-                    duplicate.setQuantity(rs.getInt("quantity"));
-                    duplicate.setNote(rs.getString("note"));
-                    return duplicate;
+                    return item;
                 }
             }
             return null;
-        } catch (SQLException e) {
-            throw new RuntimeException("Lỗi khi tìm món trùng trong giỏ: " + e.getMessage(), e);
+        } catch (Exception e) {
+            return null;
         } finally {
-            DatabaseConfig.closeQuietly(rs);
-            DatabaseConfig.closeQuietly(ps);
-            DatabaseConfig.closeQuietly(conn);
+            em.close();
         }
     }
 
-    private Set<String> getOptionIdsForItem(Connection conn, String cartItemId) throws SQLException {
+    private Set<String> getOptionIdsForItem(EntityManager em, String cartItemId) {
         Set<String> set = new HashSet<>();
-        String sql = "SELECT option_id FROM cart_item_option WHERE cart_item_id = ?";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, cartItemId);
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) {
-                    set.add(rs.getString("option_id"));
-                }
-            }
+        try {
+            String jpql = "SELECT cio.option.optionId FROM CartItemOption cio WHERE cio.cartItem.cartItemId = :cartItemId";
+            List<String> list = em.createQuery(jpql, String.class)
+                    .setParameter("cartItemId", cartItemId)
+                    .getResultList();
+            set.addAll(list);
+        } catch (Exception ignored) {
         }
         return set;
     }
 
     /**
-     * Thêm món mới vào giỏ hàng và lưu các options trong một transaction duy nhất.
+     * Thêm món mới vào giỏ hàng và lưu các options trong một JPA transaction duy nhất.
      */
     public void insertItemWithOptions(CartItem item, List<String> optionIds) {
-        String insertItemSql = "INSERT INTO cart_item (cart_item_id, cart_id, food_id, quantity, note, created_at, updated_at) " +
-                               "VALUES (?, ?, ?, ?, ?, NOW(), NOW())";
-        String insertOptSql = "INSERT INTO cart_item_option (cart_item_id, option_id) VALUES (?, ?)";
-
-        Connection conn = null;
-        PreparedStatement psItem = null;
-        PreparedStatement psOpt = null;
+        EntityManager em = DatabaseConfig.getEntityManager();
+        if (em == null) return;
+        EntityTransaction tx = em.getTransaction();
         try {
-            conn = DatabaseConfig.getConnection();
-            conn.setAutoCommit(false);
-
+            tx.begin();
             if (item.getCartItemId() == null || item.getCartItemId().trim().isEmpty()) {
-                item.setCartItemId(getNextCartItemId(conn));
+                item.setCartItemId(getNextCartItemId(em));
             }
 
-            psItem = conn.prepareStatement(insertItemSql);
-            psItem.setString(1, item.getCartItemId());
-            psItem.setString(2, item.getCartId());
-            psItem.setString(3, item.getFoodId());
-            psItem.setInt(4, item.getQuantity());
-            psItem.setString(5, item.getNote());
-            psItem.executeUpdate();
+            Cart cartRef = em.getReference(Cart.class, item.getCartId());
+            item.setCart(cartRef);
+
+            Food foodRef = em.getReference(Food.class, item.getFoodId());
+            item.setFood(foodRef);
+
+            em.persist(item);
 
             if (optionIds != null && !optionIds.isEmpty()) {
-                psOpt = conn.prepareStatement(insertOptSql);
                 for (String optId : optionIds) {
-                    psOpt.setString(1, item.getCartItemId());
-                    psOpt.setString(2, optId);
-                    psOpt.addBatch();
-                }
-                psOpt.executeBatch();
-            }
-
-            conn.commit();
-        } catch (SQLException e) {
-            if (conn != null) {
-                try {
-                    conn.rollback();
-                } catch (SQLException ignored) {
+                    FoodOption optionRef = em.getReference(FoodOption.class, optId);
+                    CartItemOption opt = new CartItemOption(item, optionRef);
+                    em.persist(opt);
                 }
             }
-            throw new RuntimeException("Lỗi khi thêm món vào giỏ hàng: " + e.getMessage(), e);
+            tx.commit();
+        } catch (Exception e) {
+            if (tx.isActive()) tx.rollback();
+            throw new RuntimeException("Lỗi JPA khi thêm món vào giỏ hàng: " + e.getMessage(), e);
         } finally {
-            DatabaseConfig.closeQuietly(psOpt);
-            DatabaseConfig.closeQuietly(psItem);
-            if (conn != null) {
-                try {
-                    conn.setAutoCommit(true);
-                } catch (SQLException ignored) {
-                }
-                DatabaseConfig.closeQuietly(conn);
-            }
+            em.close();
         }
     }
 
@@ -307,20 +214,21 @@ public class CartItemRepository {
      * Cập nhật số lượng món trong giỏ hàng.
      */
     public void updateQuantity(String cartItemId, int newQuantity) {
-        String sql = "UPDATE cart_item SET quantity = ?, updated_at = NOW() WHERE cart_item_id = ?";
-        Connection conn = null;
-        PreparedStatement ps = null;
+        EntityManager em = DatabaseConfig.getEntityManager();
+        if (em == null) return;
+        EntityTransaction tx = em.getTransaction();
         try {
-            conn = DatabaseConfig.getConnection();
-            ps = conn.prepareStatement(sql);
-            ps.setInt(1, newQuantity);
-            ps.setString(2, cartItemId);
-            ps.executeUpdate();
-        } catch (SQLException e) {
-            throw new RuntimeException("Lỗi khi cập nhật số lượng món: " + e.getMessage(), e);
+            tx.begin();
+            CartItem item = em.find(CartItem.class, cartItemId);
+            if (item != null) {
+                item.setQuantity(newQuantity);
+            }
+            tx.commit();
+        } catch (Exception e) {
+            if (tx.isActive()) tx.rollback();
+            throw new RuntimeException("Lỗi JPA khi cập nhật số lượng món: " + e.getMessage(), e);
         } finally {
-            DatabaseConfig.closeQuietly(ps);
-            DatabaseConfig.closeQuietly(conn);
+            em.close();
         }
     }
 
@@ -328,20 +236,21 @@ public class CartItemRepository {
      * Cập nhật ghi chú món trong giỏ hàng.
      */
     public void updateNote(String cartItemId, String note) {
-        String sql = "UPDATE cart_item SET note = ?, updated_at = NOW() WHERE cart_item_id = ?";
-        Connection conn = null;
-        PreparedStatement ps = null;
+        EntityManager em = DatabaseConfig.getEntityManager();
+        if (em == null) return;
+        EntityTransaction tx = em.getTransaction();
         try {
-            conn = DatabaseConfig.getConnection();
-            ps = conn.prepareStatement(sql);
-            ps.setString(1, note);
-            ps.setString(2, cartItemId);
-            ps.executeUpdate();
-        } catch (SQLException e) {
-            throw new RuntimeException("Lỗi khi cập nhật ghi chú món: " + e.getMessage(), e);
+            tx.begin();
+            CartItem item = em.find(CartItem.class, cartItemId);
+            if (item != null) {
+                item.setNote(note);
+            }
+            tx.commit();
+        } catch (Exception e) {
+            if (tx.isActive()) tx.rollback();
+            throw new RuntimeException("Lỗi JPA khi cập nhật ghi chú món: " + e.getMessage(), e);
         } finally {
-            DatabaseConfig.closeQuietly(ps);
-            DatabaseConfig.closeQuietly(conn);
+            em.close();
         }
     }
 
@@ -349,19 +258,21 @@ public class CartItemRepository {
      * Xóa một món khỏi giỏ hàng.
      */
     public void deleteItem(String cartItemId) {
-        String sql = "DELETE FROM cart_item WHERE cart_item_id = ?";
-        Connection conn = null;
-        PreparedStatement ps = null;
+        EntityManager em = DatabaseConfig.getEntityManager();
+        if (em == null) return;
+        EntityTransaction tx = em.getTransaction();
         try {
-            conn = DatabaseConfig.getConnection();
-            ps = conn.prepareStatement(sql);
-            ps.setString(1, cartItemId);
-            ps.executeUpdate();
-        } catch (SQLException e) {
-            throw new RuntimeException("Lỗi khi xóa món khỏi giỏ hàng: " + e.getMessage(), e);
+            tx.begin();
+            CartItem item = em.find(CartItem.class, cartItemId);
+            if (item != null) {
+                em.remove(item);
+            }
+            tx.commit();
+        } catch (Exception e) {
+            if (tx.isActive()) tx.rollback();
+            throw new RuntimeException("Lỗi JPA khi xóa món khỏi giỏ hàng: " + e.getMessage(), e);
         } finally {
-            DatabaseConfig.closeQuietly(ps);
-            DatabaseConfig.closeQuietly(conn);
+            em.close();
         }
     }
 
@@ -369,28 +280,30 @@ public class CartItemRepository {
      * Xóa toàn bộ món trong giỏ hàng của cartId.
      */
     public void clearCart(String cartId) {
-        String sql = "DELETE FROM cart_item WHERE cart_id = ?";
-        Connection conn = null;
-        PreparedStatement ps = null;
+        EntityManager em = DatabaseConfig.getEntityManager();
+        if (em == null) return;
+        EntityTransaction tx = em.getTransaction();
         try {
-            conn = DatabaseConfig.getConnection();
-            ps = conn.prepareStatement(sql);
-            ps.setString(1, cartId);
-            ps.executeUpdate();
-        } catch (SQLException e) {
-            throw new RuntimeException("Lỗi khi làm sạch giỏ hàng: " + e.getMessage(), e);
+            tx.begin();
+            em.createQuery("DELETE FROM CartItem ci WHERE ci.cart.cartId = :cartId")
+                    .setParameter("cartId", cartId)
+                    .executeUpdate();
+            tx.commit();
+        } catch (Exception e) {
+            if (tx.isActive()) tx.rollback();
+            throw new RuntimeException("Lỗi JPA khi làm sạch giỏ hàng: " + e.getMessage(), e);
         } finally {
-            DatabaseConfig.closeQuietly(ps);
-            DatabaseConfig.closeQuietly(conn);
+            em.close();
         }
     }
 
-    private String getNextCartItemId(Connection conn) throws SQLException {
-        String sql = "SELECT cart_item_id FROM cart_item ORDER BY cart_item_id DESC LIMIT 1";
-        try (Statement st = conn.createStatement();
-             ResultSet rs = st.executeQuery(sql)) {
-            if (rs.next()) {
-                String lastId = rs.getString("cart_item_id");
+    private String getNextCartItemId(EntityManager em) {
+        try {
+            List<String> lastIds = em.createQuery("SELECT ci.cartItemId FROM CartItem ci ORDER BY ci.cartItemId DESC", String.class)
+                    .setMaxResults(1)
+                    .getResultList();
+            if (!lastIds.isEmpty()) {
+                String lastId = lastIds.get(0);
                 if (lastId != null && lastId.startsWith("CTGH")) {
                     try {
                         int num = Integer.parseInt(lastId.substring(4));
@@ -399,6 +312,7 @@ public class CartItemRepository {
                     }
                 }
             }
+        } catch (Exception ignored) {
         }
         return IdGenerator.generateCartItemId();
     }

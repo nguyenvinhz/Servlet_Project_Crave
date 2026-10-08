@@ -2,11 +2,6 @@ package com.foodordering.dto;
 
 import java.math.BigDecimal;
 
-/**
- * DTO nhận yêu cầu kiểm tra mã voucher.
- * Subtotal là tùy chọn: Nếu client không gửi hoặc gửi sai, server sẽ tự động lấy
- * subtotal thực tế từ giỏ hàng hiện tại của customer.
- */
 public class ValidatePromotionRequest {
     private String code;
     private BigDecimal subtotal;

@@ -2,154 +2,108 @@ package com.foodordering.repository;
 
 import com.foodordering.config.DatabaseConfig;
 import com.foodordering.entity.Cart;
+import com.foodordering.entity.Customer;
 import com.foodordering.utils.IdGenerator;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.EntityTransaction;
 
 import java.math.BigDecimal;
-import java.sql.*;
 import java.time.LocalDateTime;
+import java.util.List;
 
-/**
- * Repository xử lý các thao tác cơ sở dữ liệu đối với bảng cart và view v_cart_summary.
- */
 public class CartRepository {
 
-    /**
-     * Tìm giỏ hàng theo mã khách hàng.
-     */
     public Cart findByCustomerId(String customerId) {
-        String sql = "SELECT cart_id, customer_id, created_at, updated_at FROM cart WHERE customer_id = ?";
-        Connection conn = null;
-        PreparedStatement ps = null;
-        ResultSet rs = null;
+        if (customerId == null) return null;
+        EntityManager em = DatabaseConfig.getEntityManager();
+        if (em == null) return null;
         try {
-            conn = DatabaseConfig.getConnection();
-            ps = conn.prepareStatement(sql);
-            ps.setString(1, customerId);
-            rs = ps.executeQuery();
-            if (rs.next()) {
-                return mapResultSetToCart(rs);
-            }
-            return null;
-        } catch (SQLException e) {
-            throw new RuntimeException("Lỗi khi tìm giỏ hàng theo customerId: " + e.getMessage(), e);
+            List<Cart> list = em.createQuery("SELECT c FROM Cart c WHERE c.customer.id = :customerId", Cart.class)
+                    .setParameter("customerId", customerId)
+                    .getResultList();
+            return list.isEmpty() ? null : list.get(0);
+        } catch (Exception e) {
+            throw new RuntimeException("Lỗi JPA khi tìm giỏ hàng theo customerId: " + e.getMessage(), e);
         } finally {
-            DatabaseConfig.closeQuietly(rs);
-            DatabaseConfig.closeQuietly(ps);
-            DatabaseConfig.closeQuietly(conn);
+            em.close();
         }
     }
 
-    /**
-     * Tìm giỏ hàng theo ID.
-     */
     public Cart findById(String cartId) {
-        String sql = "SELECT cart_id, customer_id, created_at, updated_at FROM cart WHERE cart_id = ?";
-        Connection conn = null;
-        PreparedStatement ps = null;
-        ResultSet rs = null;
+        if (cartId == null) return null;
+        EntityManager em = DatabaseConfig.getEntityManager();
+        if (em == null) return null;
         try {
-            conn = DatabaseConfig.getConnection();
-            ps = conn.prepareStatement(sql);
-            ps.setString(1, cartId);
-            rs = ps.executeQuery();
-            if (rs.next()) {
-                return mapResultSetToCart(rs);
-            }
-            return null;
-        } catch (SQLException e) {
-            throw new RuntimeException("Lỗi khi tìm giỏ hàng theo cartId: " + e.getMessage(), e);
+            return em.find(Cart.class, cartId);
+        } catch (Exception e) {
+            throw new RuntimeException("Lỗi JPA khi tìm giỏ hàng theo cartId: " + e.getMessage(), e);
         } finally {
-            DatabaseConfig.closeQuietly(rs);
-            DatabaseConfig.closeQuietly(ps);
-            DatabaseConfig.closeQuietly(conn);
+            em.close();
         }
     }
 
-    /**
-     * Tạo giỏ hàng mới cho khách hàng nếu chưa có.
-     */
     public Cart createCart(String customerId) {
-        String sql = "INSERT INTO cart (cart_id, customer_id, created_at, updated_at) VALUES (?, ?, NOW(), NOW())";
-        Connection conn = null;
-        PreparedStatement ps = null;
+        EntityManager em = DatabaseConfig.getEntityManager();
+        if (em == null) {
+            Cart fallback = new Cart();
+            fallback.setCartId(IdGenerator.generateCartId());
+            fallback.setCustomerId(customerId);
+            return fallback;
+        }
+        EntityTransaction tx = em.getTransaction();
         try {
-            conn = DatabaseConfig.getConnection();
-            String newCartId = getNextCartId(conn);
-            ps = conn.prepareStatement(sql);
-            ps.setString(1, newCartId);
-            ps.setString(2, customerId);
-            ps.executeUpdate();
-
+            tx.begin();
+            String newCartId = getNextCartId(em);
+            Customer customerRef = em.getReference(Customer.class, customerId);
             Cart cart = new Cart();
             cart.setCartId(newCartId);
-            cart.setCustomerId(customerId);
+            cart.setCustomer(customerRef);
             cart.setCreatedAt(LocalDateTime.now());
             cart.setUpdatedAt(LocalDateTime.now());
+            em.persist(cart);
+            tx.commit();
             return cart;
-        } catch (SQLException e) {
-            throw new RuntimeException("Lỗi khi tạo mới giỏ hàng: " + e.getMessage(), e);
+        } catch (Exception e) {
+            if (tx.isActive()) tx.rollback();
+            throw new RuntimeException("Lỗi JPA khi tạo mới giỏ hàng: " + e.getMessage(), e);
         } finally {
-            DatabaseConfig.closeQuietly(ps);
-            DatabaseConfig.closeQuietly(conn);
+            em.close();
         }
     }
 
-    /**
-     * Đọc tổng tạm tính (subtotal) của giỏ hàng từ view v_cart_summary trên server.
-     */
     public BigDecimal getCartSubtotal(String cartId) {
-        String sql = "SELECT subtotal FROM v_cart_summary WHERE cart_id = ?";
-        Connection conn = null;
-        PreparedStatement ps = null;
-        ResultSet rs = null;
+        if (cartId == null) return BigDecimal.ZERO;
+        EntityManager em = DatabaseConfig.getEntityManager();
+        if (em == null) return BigDecimal.ZERO;
         try {
-            conn = DatabaseConfig.getConnection();
-            ps = conn.prepareStatement(sql);
-            ps.setString(1, cartId);
-            rs = ps.executeQuery();
-            if (rs.next()) {
-                BigDecimal subtotal = rs.getBigDecimal("subtotal");
-                return subtotal != null ? subtotal : BigDecimal.ZERO;
+            List<?> results = em.createNativeQuery("SELECT subtotal FROM v_cart_summary WHERE cart_id = :cartId")
+                    .setParameter("cartId", cartId)
+                    .getResultList();
+            if (!results.isEmpty() && results.get(0) != null) {
+                return new BigDecimal(results.get(0).toString());
             }
             return BigDecimal.ZERO;
-        } catch (SQLException e) {
-            throw new RuntimeException("Lỗi khi lấy subtotal giỏ hàng: " + e.getMessage(), e);
+        } catch (Exception e) {
+            return BigDecimal.ZERO;
         } finally {
-            DatabaseConfig.closeQuietly(rs);
-            DatabaseConfig.closeQuietly(ps);
-            DatabaseConfig.closeQuietly(conn);
+            em.close();
         }
     }
 
-    /**
-     * Sinh ID giỏ hàng tuần tự dạng GH01, GH02... hoặc fallback ngẫu nhiên nếu trùng.
-     */
-    private String getNextCartId(Connection conn) throws SQLException {
-        String countSql = "SELECT cart_id FROM cart ORDER BY cart_id DESC LIMIT 1";
-        try (Statement st = conn.createStatement();
-             ResultSet rs = st.executeQuery(countSql)) {
-            if (rs.next()) {
-                String lastId = rs.getString("cart_id");
+    private String getNextCartId(EntityManager em) {
+        try {
+            List<String> lastIds = em.createQuery("SELECT c.cartId FROM Cart c ORDER BY c.cartId DESC", String.class)
+                    .setMaxResults(1)
+                    .getResultList();
+            if (!lastIds.isEmpty()) {
+                String lastId = lastIds.get(0);
                 if (lastId != null && lastId.startsWith("GH")) {
-                    try {
-                        int num = Integer.parseInt(lastId.substring(2));
-                        return String.format("GH%02d", num + 1);
-                    } catch (NumberFormatException ignored) {
-                    }
+                    int num = Integer.parseInt(lastId.substring(2)) + 1;
+                    return String.format("GH%02d", num);
                 }
             }
+        } catch (Exception ignored) {
         }
         return IdGenerator.generateCartId();
-    }
-
-    private Cart mapResultSetToCart(ResultSet rs) throws SQLException {
-        Cart cart = new Cart();
-        cart.setCartId(rs.getString("cart_id"));
-        cart.setCustomerId(rs.getString("customer_id"));
-        Timestamp created = rs.getTimestamp("created_at");
-        if (created != null) cart.setCreatedAt(created.toLocalDateTime());
-        Timestamp updated = rs.getTimestamp("updated_at");
-        if (updated != null) cart.setUpdatedAt(updated.toLocalDateTime());
-        return cart;
     }
 }

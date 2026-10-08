@@ -1,8 +1,5 @@
 package com.foodordering.dto;
 
-/**
- * DTO nhận dữ liệu yêu cầu cập nhật số lượng hoặc ghi chú của món trong giỏ hàng.
- */
 public class UpdateCartItemRequest {
     private String cartItemId;
     private int quantity;

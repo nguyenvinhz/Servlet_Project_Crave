@@ -2,25 +2,60 @@ package com.foodordering.entity;
 
 import com.foodordering.enums.DiscountType;
 import com.foodordering.enums.PromotionStatus;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
- * Entity đại diện cho bảng promotion trong cơ sở dữ liệu.
+ * Entity JPA đại diện cho bảng promotion trong cơ sở dữ liệu Crave.
  */
+@Entity
+@Table(name = "promotion")
 public class Promotion {
+
+    @Id
+    @Column(name = "promotion_id", length = 10, nullable = false)
     private String promotionId;
+
+    @Column(name = "code", length = 30, nullable = false, unique = true)
     private String code;
+
+    @Column(name = "name", length = 150, nullable = false)
     private String name;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "discount_type", nullable = false)
     private DiscountType discountType;
+
+    @Column(name = "discount_value", nullable = false)
     private BigDecimal discountValue;
-    private BigDecimal minimumOrderValue;
+
+    @Column(name = "minimum_order_value", nullable = false)
+    private BigDecimal minimumOrderValue = BigDecimal.ZERO;
+
+    @Column(name = "maximum_discount")
     private BigDecimal maximumDiscount;
+
+    @Column(name = "start_at", nullable = false)
     private LocalDateTime startAt;
+
+    @Column(name = "end_at", nullable = false)
     private LocalDateTime endAt;
-    private PromotionStatus status;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false)
+    private PromotionStatus status = PromotionStatus.ACTIVE;
+
+    @Column(name = "created_at", insertable = false, updatable = false)
     private LocalDateTime createdAt;
+
+    @Column(name = "updated_at", insertable = false, updatable = false)
     private LocalDateTime updatedAt;
 
     public Promotion() {

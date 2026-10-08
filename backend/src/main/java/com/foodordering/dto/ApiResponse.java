@@ -2,11 +2,6 @@ package com.foodordering.dto;
 
 import com.foodordering.enums.ErrorCode;
 
-/**
- * Định dạng phản hồi JSON chuẩn dùng chung cho toàn bộ API (Convention do Ung Văn Trí phụ trách).
- *
- * @param <T> Kiểu dữ liệu chứa trong trường data
- */
 public class ApiResponse<T> {
     private boolean success;
     private String message;
@@ -18,36 +13,30 @@ public class ApiResponse<T> {
         this.timestamp = System.currentTimeMillis();
     }
 
-    public ApiResponse(boolean success, String message, T data, String errorCode) {
+    public ApiResponse(boolean success, String message, T data) {
+        this(success, message, data, (Object) null);
+    }
+
+    public ApiResponse(boolean success, String message, T data, Object errorCode) {
         this.success = success;
         this.message = message;
         this.data = data;
-        this.errorCode = errorCode;
+        if (errorCode instanceof ErrorCode) {
+            this.errorCode = ((ErrorCode) errorCode).getCode();
+        } else if (errorCode != null) {
+            this.errorCode = errorCode.toString();
+        } else {
+            this.errorCode = null;
+        }
         this.timestamp = System.currentTimeMillis();
     }
 
-    public static <T> ApiResponse<T> success(T data) {
-        return new ApiResponse<>(true, "Thành công", data, null);
-    }
-
     public static <T> ApiResponse<T> success(String message, T data) {
-        return new ApiResponse<>(true, message, data, null);
+        return new ApiResponse<>(true, message, data);
     }
 
-    public static <T> ApiResponse<T> error(String message) {
-        return new ApiResponse<>(false, message, null, ErrorCode.BAD_REQUEST.getCode());
-    }
-
-    public static <T> ApiResponse<T> error(ErrorCode errorCode) {
-        return new ApiResponse<>(false, errorCode.getDefaultMessage(), null, errorCode.getCode());
-    }
-
-    public static <T> ApiResponse<T> error(ErrorCode errorCode, String customMessage) {
-        return new ApiResponse<>(false, customMessage, null, errorCode.getCode());
-    }
-
-    public static <T> ApiResponse<T> error(String errorCode, String customMessage) {
-        return new ApiResponse<>(false, customMessage, null, errorCode);
+    public static <T> ApiResponse<T> error(String message, Object errorCode) {
+        return new ApiResponse<>(false, message, null, errorCode);
     }
 
     public boolean isSuccess() {

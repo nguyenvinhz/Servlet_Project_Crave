@@ -5,8 +5,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * DTO đại diện cho một dòng món ăn trong giỏ hàng.
- * Đơn giá và thành tiền được tính toán hoàn toàn phía server.
+ * DTO đại diện cho một mục món ăn trong giỏ hàng (chỉ chứa các trường dữ liệu và phương thức get/set).
  */
 public class CartItemDto {
     private String cartItemId;
@@ -23,24 +22,6 @@ public class CartItemDto {
     private BigDecimal lineTotal = BigDecimal.ZERO;
 
     public CartItemDto() {
-    }
-
-    /**
-     * Tự động tính optionTotal, unitPrice và lineTotal phía server.
-     */
-    public void calculateTotals() {
-        BigDecimal sumOption = BigDecimal.ZERO;
-        if (options != null) {
-            for (CartItemOptionDto opt : options) {
-                if (opt.getExtraPrice() != null) {
-                    sumOption = sumOption.add(opt.getExtraPrice());
-                }
-            }
-        }
-        this.optionTotal = sumOption;
-        BigDecimal base = this.basePrice != null ? this.basePrice : BigDecimal.ZERO;
-        this.unitPrice = base.add(this.optionTotal);
-        this.lineTotal = this.unitPrice.multiply(BigDecimal.valueOf(Math.max(0, this.quantity)));
     }
 
     public String getCartItemId() {

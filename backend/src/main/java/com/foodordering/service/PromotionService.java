@@ -2,50 +2,85 @@ package com.foodordering.service;
 
 import com.foodordering.dto.PromotionDto;
 import com.foodordering.dto.PromotionValidationResultDto;
+import com.foodordering.dto.ValidatePromotionRequest;
+import com.foodordering.entity.CustomerOrder;
 import com.foodordering.entity.Promotion;
 import com.foodordering.enums.DiscountType;
 import com.foodordering.enums.ErrorCode;
 import com.foodordering.exception.PromotionValidationException;
+import com.foodordering.mapper.PromotionMapper;
 import com.foodordering.repository.PromotionRepository;
 import com.foodordering.validator.PromotionValidator;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Service xử lý nghiệp vụ khuyến mãi và kiểm tra voucher (Promotion slice do Ung Văn Trí phụ trách).
- */
 public class PromotionService {
 
     private final PromotionRepository promotionRepository;
     private final CartService cartService;
+    private final PromotionMapper promotionMapper;
 
     public PromotionService() {
         this.promotionRepository = new PromotionRepository();
         this.cartService = new CartService();
+        this.promotionMapper = new PromotionMapper();
     }
 
     public PromotionService(PromotionRepository promotionRepository, CartService cartService) {
         this.promotionRepository = promotionRepository;
         this.cartService = cartService;
+        this.promotionMapper = new PromotionMapper();
+    }
+
+    public PromotionService(PromotionRepository promotionRepository, CartService cartService, PromotionMapper promotionMapper) {
+        this.promotionRepository = promotionRepository;
+        this.cartService = cartService;
+        this.promotionMapper = promotionMapper != null ? promotionMapper : new PromotionMapper();
+    }
+
+    /**
+     * Nhận trực tiếp DTO ValidatePromotionRequest từ Servlet/Controller để xử lý xác thực voucher.
+     */
+    public PromotionValidationResultDto validatePromotion(ValidatePromotionRequest request, String customerId) {
+        if (request == null) {
+            return new PromotionValidationResultDto(false, "Dữ liệu yêu cầu không được để trống", ErrorCode.BAD_REQUEST.getCode());
+        }
+        return validatePromotion(request.getCode(), customerId, request.getSubtotal(), LocalDateTime.now());
+    }
+
+    /**
+     * Xác thực voucher cho một đơn hàng cụ thể của khách hàng bằng cách lấy orderTime từ CustomerOrder.
+     */
+    public PromotionValidationResultDto validatePromotionForOrder(String code, CustomerOrder order) {
+        if (order == null) {
+            return validatePromotion(code, null, null, LocalDateTime.now());
+        }
+        String customerId = order.getCustomer() != null ? order.getCustomer().getId() : order.getCustomerId();
+        BigDecimal subtotal = order.getSubtotal();
+        LocalDateTime orderTime = order.getOrderTime(); // Lấy orderTime của khách hàng từ CustomerOrder
+        return validatePromotion(code, customerId, subtotal, orderTime);
     }
 
     /**
      * Xác thực voucher và tính toán số tiền giảm giá một cách an toàn trên server:
      * - Nếu client không truyền subtotal hoặc truyền giá trị <= 0, lấy subtotal thật từ giỏ hàng hiện tại của customerId.
-     * - Kiểm tra hạn sử dụng, trạng thái kích hoạt, giá trị đơn tối thiểu.
+     * - Kiểm tra hạn sử dụng theo orderTime, trạng thái kích hoạt, giá trị đơn tối thiểu.
      * - Tính toán chính xác theo loại % (có trần maximum_discount) hoặc số tiền cố định.
      */
     public PromotionValidationResultDto validatePromotion(String code, String customerId, BigDecimal requestedSubtotal, LocalDateTime orderTime) {
-        PromotionValidator.validatePromotionCode(code);
+        try {
+            PromotionValidator.validatePromotionCode(code);
+        } catch (Exception e) {
+            return new PromotionValidationResultDto(false, e.getMessage(), ErrorCode.BAD_REQUEST.getCode());
+        }
 
-        // 1. Tìm thông tin mã khuyến mãi trong DB
+        // 1. Tìm thông tin mã khuyến mãi trong DB (Repository trả về Entity)
         Promotion promotion = promotionRepository.findByCode(code.trim().toUpperCase());
         if (promotion == null) {
-            return PromotionValidationResultDto.invalid("Mã khuyến mãi không tồn tại", ErrorCode.PROMOTION_NOT_FOUND.getCode());
+            return new PromotionValidationResultDto(false, "Mã khuyến mãi không tồn tại", ErrorCode.PROMOTION_NOT_FOUND.getCode());
         }
 
         // 2. Xác định subtotal đáng tin cậy
@@ -58,18 +93,22 @@ public class PromotionService {
             }
         }
 
-        // 3. Kiểm tra điều kiện áp dụng
+        LocalDateTime effectiveOrderTime = orderTime != null ? orderTime : LocalDateTime.now();
+
+        // 3. Kiểm tra điều kiện áp dụng với orderTime
         try {
-            PromotionValidator.validateApplicable(promotion, subtotal, orderTime);
+            PromotionValidator.validateApplicable(promotion, subtotal, effectiveOrderTime);
         } catch (PromotionValidationException e) {
-            return PromotionValidationResultDto.invalid(e.getMessage(), e.getErrorCode().getCode());
+            return new PromotionValidationResultDto(false, e.getMessage(), e.getErrorCode().getCode());
         }
 
         // 4. Tính toán số tiền được giảm
-        BigDecimal discountAmount = calculateDiscount(promotion, subtotal, orderTime);
+        BigDecimal discountAmount = calculateDiscount(promotion, subtotal, effectiveOrderTime);
+        BigDecimal finalSubtotal = subtotal.subtract(discountAmount).max(BigDecimal.ZERO);
 
-        PromotionDto dto = mapToDto(promotion);
-        return PromotionValidationResultDto.valid(dto, subtotal, discountAmount);
+        // Chuyển đổi Entity sang DTO qua mapper thủ công
+        PromotionDto dto = promotionMapper.toDto(promotion);
+        return new PromotionValidationResultDto(true, "Áp dụng mã khuyến mãi thành công", dto, subtotal, discountAmount, finalSubtotal);
     }
 
     /**
@@ -109,11 +148,7 @@ public class PromotionService {
      */
     public List<PromotionDto> getActivePromotions() {
         List<Promotion> promotions = promotionRepository.findAllActive(LocalDateTime.now());
-        List<PromotionDto> result = new ArrayList<>();
-        for (Promotion p : promotions) {
-            result.add(mapToDto(p));
-        }
-        return result;
+        return promotionMapper.toDtoList(promotions);
     }
 
     /**
@@ -121,30 +156,13 @@ public class PromotionService {
      */
     public PromotionDto getPromotionByCode(String code) {
         Promotion p = promotionRepository.findByCode(code);
-        return p != null ? mapToDto(p) : null;
+        return p != null ? promotionMapper.toDto(p) : null;
     }
 
+    /**
+     * Phương thức tiện ích chuyển đổi Entity sang DTO (delegate cho PromotionMapper).
+     */
     public PromotionDto mapToDto(Promotion p) {
-        if (p == null) return null;
-        PromotionDto dto = new PromotionDto();
-        dto.setPromotionId(p.getPromotionId());
-        dto.setCode(p.getCode());
-        dto.setName(p.getName());
-        dto.setDiscountType(p.getDiscountType());
-        dto.setDiscountValue(p.getDiscountValue());
-        dto.setMinimumOrderValue(p.getMinimumOrderValue());
-        dto.setMaximumDiscount(p.getMaximumDiscount());
-        dto.setStartAt(p.getStartAt());
-        dto.setEndAt(p.getEndAt());
-        dto.setStatus(p.getStatus());
-
-        if (p.getDiscountType() == DiscountType.PERCENT) {
-            String maxDesc = p.getMaximumDiscount() != null ? String.format(", tối đa %,.0f đ", p.getMaximumDiscount().doubleValue()) : "";
-            dto.setDescription(String.format("Giảm %s%% cho đơn từ %,.0f đ%s", p.getDiscountValue().toPlainString(), p.getMinimumOrderValue().doubleValue(), maxDesc));
-        } else {
-            dto.setDescription(String.format("Giảm %,.0f đ cho đơn từ %,.0f đ", p.getDiscountValue().doubleValue(), p.getMinimumOrderValue().doubleValue()));
-        }
-
-        return dto;
+        return promotionMapper.toDto(p);
     }
 }

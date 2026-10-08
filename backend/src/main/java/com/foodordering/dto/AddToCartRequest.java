@@ -3,17 +3,13 @@ package com.foodordering.dto;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * DTO nhận dữ liệu yêu cầu thêm món vào giỏ hàng.
- */
 public class AddToCartRequest {
     private String foodId;
     private int quantity = 1;
     private String note;
     private List<String> optionIds = new ArrayList<>();
 
-    public AddToCartRequest() {
-    }
+    public AddToCartRequest() {}
 
     public AddToCartRequest(String foodId, int quantity, String note, List<String> optionIds) {
         this.foodId = foodId;
