@@ -47,7 +47,7 @@ class OrderResponseSerializationTest {
         assertTrue(json.contains("\"items\""));
         assertTrue(json.contains("\"payment\""));
         assertTrue(json.contains("\"history\""));
-        
+
         // Verify item keys
         assertTrue(json.contains("\"foodId\""));
         assertTrue(json.contains("\"foodName\""));
@@ -58,7 +58,7 @@ class OrderResponseSerializationTest {
     void shouldSerializeApiErrorWithFieldErrors() throws Exception {
         ApiError error = new ApiError("400", "Bad Request", Map.of("email", "Invalid email"));
         String json = objectMapper.writeValueAsString(error);
-        
+
         // Must contain fieldErrors, NOT details
         assertTrue(json.contains("\"fieldErrors\""));
         assertTrue(!json.contains("\"details\""));

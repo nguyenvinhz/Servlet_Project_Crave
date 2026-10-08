@@ -12,7 +12,7 @@
             <h1>Checkout</h1>
             <div class="card checkout-section">
                 <h2>Delivery information</h2>
-                
+
                 <div class="field-grid">
                     <div>
                         <label for="receiverName">Người nhận</label>
@@ -76,7 +76,7 @@
                     <span>Total</span>
                     <span>12.42</span>
                 </div>
-                
+
                 <button class="btn-primary" onclick="submitOrder()">Place Order</button>
             </div>
         </aside>
