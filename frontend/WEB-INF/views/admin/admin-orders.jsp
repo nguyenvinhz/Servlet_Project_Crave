@@ -41,7 +41,7 @@
     <!-- Khung cập nhật trạng thái đơn hàng -->
     <div id="updateStatusSection" class="card" style="margin-top: 2rem; display: none;">
         <h3>Cập nhật đơn hàng: <span id="currentOrderId"></span></h3>
-        
+
         <div class="field-grid" style="margin-top: 1rem;">
             <div>
                 <label>Trạng thái mới:</label>
@@ -58,7 +58,7 @@
                 <input type="text" id="statusNote" placeholder="Lý do hủy hoặc ghi chú nội bộ" />
             </div>
         </div>
-        
+
         <button class="btn-primary" onclick="updateOrderStatus()">Xác nhận (JSON)</button>
     </div>
 </main>
@@ -84,7 +84,7 @@
             note: document.getElementById('statusNote').value
         };
 
-        fetch(`${pageContext.request.contextPath}/api/admin/orders/${currentOrderToUpdate}/status`, {
+        fetch(`${pageContext.request.contextPath}/api/admin/orders/` + currentOrderToUpdate + `/status`, {
             method: 'PATCH',
             headers: {
                 'Content-Type': 'application/json'
