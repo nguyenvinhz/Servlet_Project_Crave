@@ -25,6 +25,16 @@ Tiếp tục xử lý các phản hồi từ Reviewer sau lần review ngày 07/
 - **Vấn đề:** Cảnh báo "trailing whitespace" ở một số dòng do git kiểm tra.
 - **Khắc phục:** Loại bỏ triệt để các khoảng trắng thừa ở cuối dòng tại các file `admin-orders.jsp`, `checkout.jsp`, và `OrderResponseSerializationTest.java`.
 
+### 2.4. Đồng bộ DTO và OpenAPI (Contract Sync)
+- **Vấn đề:** Có sự chênh lệch thuộc tính giữa cấu trúc đối tượng trả về (`OrderResponse`) và tài liệu thiết kế API YAML.
+- **Khắc phục:** Bổ sung các trường `foodNameSnapshot` và `note` vào `OrderItemResponse` trong file `docs/api-order-payment.yaml` để đồng bộ 100% với codebase thực tế.
+
+### 2.5. Hoàn thiện Logic Entity (JPA)
+- **Vấn đề:** Các thực thể (Entity) liên kết 2 chiều cần các Helper Method để tự động cập nhật các reference qua lại trước khi lưu vào cơ sở dữ liệu.
+- **Khắc phục:** 
+  - Thêm phương thức `setPaymentHelper(Payment payment)` vào `CustomerOrder.java` để đảm bảo giữ liên kết `Order - Payment`.
+  - Thêm phương thức `addOption(OrderDetailOption option)` vào `OrderDetail.java` để liên kết `OrderDetail - Option`.
+
 ## 3. Tình trạng và Đề xuất
-- Các yêu cầu bắt buộc giải quyết cho Gate 1 trong đợt review mới nhất đã được hoàn thành.
+- Toàn bộ các yêu cầu bắt buộc giải quyết cho Gate 1 và các góp ý bổ sung trong đợt review ngày 8/10 đều đã được hoàn thành.
 - Sẵn sàng chuyển sang các mục tiêu tối ưu hóa thêm hoặc chờ review lần cuối.

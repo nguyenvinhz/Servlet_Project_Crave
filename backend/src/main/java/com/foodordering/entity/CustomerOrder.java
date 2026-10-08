@@ -136,4 +136,11 @@ public class CustomerOrder {
         this.statusHistories.add(history);
         history.setOrder(this);
     }
+
+    public void setPaymentHelper(Payment payment) {
+        this.payment = payment;
+        if (payment != null) {
+            payment.setOrder(this);
+        }
+    }
 }
