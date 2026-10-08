@@ -8,6 +8,7 @@ import jakarta.persistence.Table;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 @Entity
@@ -16,7 +17,7 @@ public class Category {
 
     @Id
     @Column(name = "category_id", length = 10, nullable = false)
-    private String categoryId;
+    private String id;
 
     @Column(name = "name", length = 100, nullable = false, unique = true)
     private String name;
@@ -24,29 +25,43 @@ public class Category {
     @Column(name = "description", length = 255)
     private String description;
 
-    @OneToMany(mappedBy = "category")
-    private List<Food> foods = new ArrayList<>();
-
-    @Column(name = "created_at", insertable = false, updatable = false)
+    @Column(name = "created_at", nullable = false, insertable = false, updatable = false)
     private LocalDateTime createdAt;
 
-    @Column(name = "updated_at", insertable = false, updatable = false)
+    @Column(name = "updated_at", nullable = false, insertable = false, updatable = false)
     private LocalDateTime updatedAt;
+
+    @OneToMany(mappedBy = "category")
+    private List<Food> foods = new ArrayList<>();
 
     public Category() {
     }
 
-    public Category(String categoryId, String name) {
-        this.categoryId = categoryId;
+    public Category(String id, String name) {
+        this.id = id;
         this.name = name;
     }
 
+    public Category(String id, String name, String description) {
+        this.id = id;
+        this.name = name;
+        this.description = description;
+    }
+
+    public String getId() {
+        return id;
+    }
+
+    public void setId(String id) {
+        this.id = id;
+    }
+
     public String getCategoryId() {
-        return categoryId;
+        return id;
     }
 
     public void setCategoryId(String categoryId) {
-        this.categoryId = categoryId;
+        this.id = categoryId;
     }
 
     public String getName() {
@@ -65,19 +80,24 @@ public class Category {
         this.description = description;
     }
 
-    public List<Food> getFoods() {
-        return foods;
-    }
-
-    public void setFoods(List<Food> foods) {
-        this.foods = foods != null ? foods : new ArrayList<>();
-    }
-
     public LocalDateTime getCreatedAt() {
         return createdAt;
     }
 
     public LocalDateTime getUpdatedAt() {
         return updatedAt;
+    }
+
+    public List<Food> getFoods() {
+        return Collections.unmodifiableList(foods);
+    }
+
+    public void addFood(Food food) {
+        foods.add(food);
+        food.setCategory(this);
+    }
+
+    public void removeFood(Food food) {
+        foods.remove(food);
     }
 }

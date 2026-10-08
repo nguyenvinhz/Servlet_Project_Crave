@@ -16,6 +16,7 @@ import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 @Entity
@@ -24,16 +25,16 @@ public class Food {
 
     @Id
     @Column(name = "food_id", length = 10, nullable = false)
-    private String foodId;
+    private String id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "category_id", nullable = false)
     private Category category;
 
     @Column(name = "name", length = 150, nullable = false)
     private String name;
 
-    @Column(name = "price", nullable = false)
+    @Column(name = "price", precision = 12, scale = 0, nullable = false)
     private BigDecimal price;
 
     @Column(name = "image_url", length = 512)
@@ -46,34 +47,58 @@ public class Food {
     @Column(name = "status", nullable = false)
     private FoodStatus status = FoodStatus.AVAILABLE;
 
-    @OneToMany(mappedBy = "food", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<FoodOption> options = new ArrayList<>();
-
-    @Column(name = "created_at", insertable = false, updatable = false)
+    @Column(name = "created_at", nullable = false, insertable = false, updatable = false)
     private LocalDateTime createdAt;
 
-    @Column(name = "updated_at", insertable = false, updatable = false)
+    @Column(name = "updated_at", nullable = false, insertable = false, updatable = false)
     private LocalDateTime updatedAt;
+
+    @OneToMany(mappedBy = "food", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<FoodOption> options = new ArrayList<>();
 
     public Food() {
     }
 
-    public Food(String foodId) {
-        this.foodId = foodId;
+    public Food(String id) {
+        this.id = id;
     }
 
-    public Food(String foodId, String name, BigDecimal price) {
-        this.foodId = foodId;
+    public Food(String id, String name, BigDecimal price) {
+        this.id = id;
         this.name = name;
         this.price = price;
     }
 
+    public Food(String id, Category category, String name, BigDecimal price, String imageUrl, String description) {
+        this.id = id;
+        this.category = category;
+        this.name = name;
+        this.price = price;
+        this.imageUrl = imageUrl;
+        this.description = description;
+        this.status = FoodStatus.AVAILABLE;
+    }
+
+    public Food(String id, Category category, String name, BigDecimal price, String imageUrl, String description,
+                FoodStatus status) {
+        this(id, category, name, price, imageUrl, description);
+        this.status = status != null ? status : FoodStatus.AVAILABLE;
+    }
+
+    public String getId() {
+        return id;
+    }
+
+    public void setId(String id) {
+        this.id = id;
+    }
+
     public String getFoodId() {
-        return foodId;
+        return id;
     }
 
     public void setFoodId(String foodId) {
-        this.foodId = foodId;
+        this.id = foodId;
     }
 
     public Category getCategory() {
@@ -128,19 +153,29 @@ public class Food {
         this.status = status;
     }
 
-    public List<FoodOption> getOptions() {
-        return options;
-    }
-
-    public void setOptions(List<FoodOption> options) {
-        this.options = options != null ? options : new ArrayList<>();
-    }
-
     public LocalDateTime getCreatedAt() {
         return createdAt;
     }
 
     public LocalDateTime getUpdatedAt() {
         return updatedAt;
+    }
+
+    public List<FoodOption> getOptions() {
+        return Collections.unmodifiableList(options);
+    }
+
+    public void setOptions(List<FoodOption> options) {
+        this.options = options != null ? new ArrayList<>(options) : new ArrayList<>();
+    }
+
+    public void addOption(FoodOption option) {
+        options.add(option);
+        option.setFood(this);
+    }
+
+    public void removeOption(FoodOption option) {
+        options.remove(option);
+        option.setFood(null);
     }
 }

@@ -1,15 +1,20 @@
 package com.foodordering.entity;
 
 import com.foodordering.enums.CustomerStatus;
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.DiscriminatorValue;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.PrimaryKeyJoinColumn;
 import jakarta.persistence.Table;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 @Entity
 @Table(name = "customer")
@@ -18,11 +23,14 @@ import java.time.LocalDateTime;
 public class Customer extends User {
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false)
+    @Column(name = "status", length = 20, nullable = false)
     private CustomerStatus status = CustomerStatus.ACTIVE;
 
     @Column(name = "registered_at", nullable = false, insertable = false, updatable = false)
     private LocalDateTime registeredAt;
+
+    @OneToMany(mappedBy = "customer", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Address> addresses = new ArrayList<>();
 
     public Customer() {
     }
@@ -47,7 +55,17 @@ public class Customer extends User {
         return registeredAt;
     }
 
-    public void setRegisteredAt(LocalDateTime registeredAt) {
-        this.registeredAt = registeredAt;
+    public List<Address> getAddresses() {
+        return Collections.unmodifiableList(addresses);
+    }
+
+    public void addAddress(Address address) {
+        addresses.add(address);
+        address.setCustomer(this);
+    }
+
+    public void removeAddress(Address address) {
+        addresses.remove(address);
+        address.setCustomer(null);
     }
 }

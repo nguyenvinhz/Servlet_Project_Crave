@@ -2,80 +2,55 @@ package com.foodordering.dto;
 
 import com.foodordering.enums.ErrorCode;
 
-public class ApiResponse<T> {
-    private boolean success;
-    private String message;
-    private T data;
-    private String errorCode;
-    private long timestamp;
+import java.util.Map;
 
-    public ApiResponse() {
-        this.timestamp = System.currentTimeMillis();
-    }
-
-    public ApiResponse(boolean success, String message, T data) {
-        this(success, message, data, (Object) null);
-    }
+public record ApiResponse<T>(boolean success, T data, ApiError error) {
 
     public ApiResponse(boolean success, String message, T data, Object errorCode) {
-        this.success = success;
-        this.message = message;
-        this.data = data;
-        if (errorCode instanceof ErrorCode) {
-            this.errorCode = ((ErrorCode) errorCode).getCode();
-        } else if (errorCode != null) {
-            this.errorCode = errorCode.toString();
-        } else {
-            this.errorCode = null;
-        }
-        this.timestamp = System.currentTimeMillis();
+        this(
+                success,
+                data,
+                !success ? new ApiError(
+                        errorCode instanceof ErrorCode ? ((ErrorCode) errorCode).getCode() : (errorCode != null ? errorCode.toString() : "ERROR"),
+                        message,
+                        Map.of()
+                ) : null
+        );
+    }
+
+    public static <T> ApiResponse<T> success(T data) {
+        return new ApiResponse<>(true, data, null);
     }
 
     public static <T> ApiResponse<T> success(String message, T data) {
-        return new ApiResponse<>(true, message, data);
+        return new ApiResponse<>(true, data, null);
     }
 
     public static <T> ApiResponse<T> error(String message, Object errorCode) {
         return new ApiResponse<>(false, message, null, errorCode);
     }
 
+    public static ApiResponse<Void> failure(ApiError error) {
+        return new ApiResponse<>(false, (Void) null, error);
+    }
+
+    public String message() {
+        return error != null ? error.message() : null;
+    }
+
+    public String errorCode() {
+        return error != null ? error.code() : null;
+    }
+
     public boolean isSuccess() {
         return success;
-    }
-
-    public void setSuccess(boolean success) {
-        this.success = success;
-    }
-
-    public String getMessage() {
-        return message;
-    }
-
-    public void setMessage(String message) {
-        this.message = message;
     }
 
     public T getData() {
         return data;
     }
 
-    public void setData(T data) {
-        this.data = data;
-    }
-
-    public String getErrorCode() {
-        return errorCode;
-    }
-
-    public void setErrorCode(String errorCode) {
-        this.errorCode = errorCode;
-    }
-
-    public long getTimestamp() {
-        return timestamp;
-    }
-
-    public void setTimestamp(long timestamp) {
-        this.timestamp = timestamp;
+    public ApiError getError() {
+        return error;
     }
 }

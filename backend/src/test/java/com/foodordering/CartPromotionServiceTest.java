@@ -4,8 +4,8 @@ import com.foodordering.dto.*;
 import com.foodordering.entity.*;
 import com.foodordering.enums.DiscountType;
 import com.foodordering.enums.ErrorCode;
-import com.foodordering.enums.FoodOptionType;
 import com.foodordering.enums.FoodStatus;
+import com.foodordering.enums.OptionType;
 import com.foodordering.enums.PromotionStatus;
 import com.foodordering.exception.PromotionValidationException;
 import com.foodordering.mapper.CartItemMapper;
@@ -164,13 +164,11 @@ public class CartPromotionServiceTest {
     }
 
     private static void testJsonUtilsApiResponse() {
-        System.out.println("-> Test 7: Định dạng chuẩn JSON ApiResponse theo convention của Ung Văn Trí");
-        ApiResponse<String> resp = ApiResponse.success("Dữ liệu test", "OK");
+        System.out.println("-> Test 7: Định dạng chuẩn JSON ApiResponse");
+        ApiResponse<String> resp = ApiResponse.success("OK");
         String json = JsonUtils.toJson(resp);
         assert json.contains("\"success\":true") : "JSON thiếu trường success";
-        assert json.contains("\"message\":\"Dữ liệu test\"") : "JSON sai message";
         assert json.contains("\"data\":\"OK\"") : "JSON sai data";
-        assert json.contains("\"timestamp\":") : "JSON thiếu timestamp";
         System.out.println("   [PASSED] JSON ApiResponse sinh ra chuẩn xác: " + json);
     }
 
@@ -202,7 +200,7 @@ public class CartPromotionServiceTest {
 
         CartItem item = new CartItem("CTGH01", cart, food, 2, "Không hành");
 
-        FoodOption option = new FoodOption("OPT01", "Thêm trứng", FoodOptionType.TOPPING, new BigDecimal("7000"));
+        FoodOption option = new FoodOption("OPT01", "Thêm trứng", OptionType.TOPPING, new BigDecimal("7000"));
         CartItemOption itemOption = new CartItemOption(item, option);
         item.setItemOptions(List.of(itemOption));
 

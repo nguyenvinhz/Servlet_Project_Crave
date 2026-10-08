@@ -11,44 +11,48 @@ SET NAMES utf8mb4;
 -- Base table for the abstract User class. Customer and employee share one
 -- login namespace, so email and phone are unique across both account types.
 CREATE TABLE user_account (
-                              user_id         VARCHAR(10)     NOT NULL,
-                              account_type    ENUM('CUSTOMER','EMPLOYEE') NOT NULL,
-                              full_name       VARCHAR(100)    NOT NULL,
-                              email           VARCHAR(100)    NOT NULL,
-                              phone           VARCHAR(15)     NOT NULL,
-                              password_hash   VARCHAR(255)    NOT NULL,
-                              created_at      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                              updated_at      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP
-                                  ON UPDATE CURRENT_TIMESTAMP,
-                              CONSTRAINT pk_user_account PRIMARY KEY (user_id),
-                              CONSTRAINT uq_user_account_email UNIQUE (email),
-                              CONSTRAINT uq_user_account_phone UNIQUE (phone)
+    user_id         VARCHAR(10)     NOT NULL,
+    account_type    VARCHAR(20)     NOT NULL,
+    full_name       VARCHAR(100)    NOT NULL,
+    email           VARCHAR(100)    NOT NULL,
+    phone           VARCHAR(15)     NOT NULL,
+    password_hash   VARCHAR(255)    NOT NULL,
+    created_at      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP
+                                    ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT pk_user_account PRIMARY KEY (user_id),
+    CONSTRAINT uq_user_account_email UNIQUE (email),
+    CONSTRAINT uq_user_account_phone UNIQUE (phone),
+    CONSTRAINT ck_user_account_type CHECK (account_type IN ('CUSTOMER', 'EMPLOYEE'))
 ) ENGINE=InnoDB;
 
 CREATE TABLE customer (
-                          customer_id     VARCHAR(10)     NOT NULL,
-                          status          ENUM('ACTIVE','LOCKED') NOT NULL DEFAULT 'ACTIVE',
-                          registered_at   DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                          CONSTRAINT pk_customer PRIMARY KEY (customer_id),
-                          CONSTRAINT fk_customer_account FOREIGN KEY (customer_id)
-                              REFERENCES user_account(user_id) ON UPDATE CASCADE ON DELETE CASCADE
+    customer_id     VARCHAR(10)     NOT NULL,
+    status          VARCHAR(20)     NOT NULL DEFAULT 'ACTIVE',
+    registered_at   DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT pk_customer PRIMARY KEY (customer_id),
+    CONSTRAINT fk_customer_account FOREIGN KEY (customer_id)
+        REFERENCES user_account(user_id) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT ck_customer_status CHECK (status IN ('ACTIVE', 'LOCKED'))
 ) ENGINE=InnoDB;
 
 CREATE TABLE employee (
-                          employee_id     VARCHAR(10)     NOT NULL,
-                          role            ENUM(
+    employee_id     VARCHAR(10)     NOT NULL,
+    role            VARCHAR(30)     NOT NULL,
+    address         VARCHAR(255)    NULL,
+    hire_date       DATE            NOT NULL,
+    status          VARCHAR(20)     NOT NULL DEFAULT 'WORKING',
+    CONSTRAINT pk_employee PRIMARY KEY (employee_id),
+    CONSTRAINT fk_employee_account FOREIGN KEY (employee_id)
+        REFERENCES user_account(user_id) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT ck_employee_role CHECK (role IN (
                         'ADMIN',
                         'MENU_MANAGER',
                         'ORDER_STAFF',
                         'PROMOTION_MANAGER',
                         'HR_MANAGER'
-                    ) NOT NULL,
-                          address         VARCHAR(255)    NULL,
-                          hire_date       DATE            NOT NULL,
-                          status          ENUM('WORKING','ON_LEAVE') NOT NULL DEFAULT 'WORKING',
-                          CONSTRAINT pk_employee PRIMARY KEY (employee_id),
-                          CONSTRAINT fk_employee_account FOREIGN KEY (employee_id)
-                              REFERENCES user_account(user_id) ON UPDATE CASCADE ON DELETE CASCADE
+                    )),
+    CONSTRAINT ck_employee_status CHECK (status IN ('WORKING', 'ON_LEAVE'))
 ) ENGINE=InnoDB;
 
 CREATE TABLE category (
@@ -98,26 +102,26 @@ CREATE TABLE food_option (
 ) ENGINE=InnoDB;
 
 CREATE TABLE delivery_address (
-                                  address_id          VARCHAR(10)     NOT NULL,
-                                  customer_id         VARCHAR(10)     NOT NULL,
-                                  address_line        VARCHAR(255)    NOT NULL,
-                                  note                VARCHAR(255)    NULL,
-                                  is_default          TINYINT(1)      NOT NULL DEFAULT 0,
+    address_id          VARCHAR(10)     NOT NULL,
+    customer_id         VARCHAR(10)     NOT NULL,
+    address_line        VARCHAR(255)    NOT NULL,
+    note                VARCHAR(255)    NULL,
+    is_default          TINYINT(1)      NOT NULL DEFAULT 0,
     -- MySQL allows multiple NULL values in a UNIQUE index. Keep this column
     -- VIRTUAL so customer_id can still use cascading foreign-key actions;
     -- STORED generated columns prohibit CASCADE on their base columns.
-                                  default_customer_id VARCHAR(10) GENERATED ALWAYS AS (
-                                      CASE WHEN is_default = 1 THEN customer_id ELSE NULL END
-                                      ) VIRTUAL,
-                                  created_at          DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                                  updated_at          DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP
-                                      ON UPDATE CURRENT_TIMESTAMP,
-                                  CONSTRAINT pk_delivery_address PRIMARY KEY (address_id),
-                                  CONSTRAINT uq_delivery_address_default UNIQUE (default_customer_id),
-                                  CONSTRAINT fk_delivery_address_customer FOREIGN KEY (customer_id)
-                                      REFERENCES customer(customer_id) ON UPDATE CASCADE ON DELETE CASCADE,
-                                  CONSTRAINT ck_delivery_address_is_default CHECK (is_default IN (0, 1)),
-                                  CONSTRAINT ck_delivery_address_line CHECK (TRIM(address_line) <> '')
+    default_customer_id VARCHAR(10) GENERATED ALWAYS AS (
+                            CASE WHEN is_default = 1 THEN customer_id ELSE NULL END
+                        ) VIRTUAL,
+    created_at          DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP
+                                        ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT pk_delivery_address PRIMARY KEY (address_id),
+    CONSTRAINT uq_delivery_address_default UNIQUE (default_customer_id),
+    CONSTRAINT fk_delivery_address_customer FOREIGN KEY (customer_id)
+        REFERENCES customer(customer_id) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT ck_delivery_address_is_default CHECK (is_default IN (0, 1)),
+    CONSTRAINT ck_delivery_address_line CHECK (TRIM(address_line) <> '')
 ) ENGINE=InnoDB;
 
 CREATE TABLE promotion (

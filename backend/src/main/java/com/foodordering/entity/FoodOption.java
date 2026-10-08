@@ -1,6 +1,7 @@
 package com.foodordering.entity;
 
-import com.foodordering.enums.FoodOptionType;
+import com.foodordering.enums.OptionStatus;
+import com.foodordering.enums.OptionType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -10,64 +11,86 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "food_option", uniqueConstraints = {
-        @UniqueConstraint(columnNames = {"food_id", "option_type", "name"})
-})
+@Table(name = "food_option")
 public class FoodOption {
 
     @Id
     @Column(name = "option_id", length = 10, nullable = false)
-    private String optionId;
+    private String id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "food_id", nullable = false)
     private Food food;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "option_type", nullable = false)
-    private FoodOptionType optionType;
+    private OptionType optionType;
 
     @Column(name = "name", length = 100, nullable = false)
     private String name;
 
-    @Column(name = "extra_price", nullable = false)
+    @Column(name = "extra_price", precision = 12, scale = 0, nullable = false)
     private BigDecimal extraPrice = BigDecimal.ZERO;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
-    private String status = "ACTIVE";
+    private OptionStatus status = OptionStatus.ACTIVE;
 
-    @Column(name = "created_at", insertable = false, updatable = false)
+    @Column(name = "created_at", nullable = false, insertable = false, updatable = false)
     private LocalDateTime createdAt;
 
-    @Column(name = "updated_at", insertable = false, updatable = false)
+    @Column(name = "updated_at", nullable = false, insertable = false, updatable = false)
     private LocalDateTime updatedAt;
 
     public FoodOption() {
     }
 
-    public FoodOption(String optionId) {
-        this.optionId = optionId;
+    public FoodOption(String id) {
+        this.id = id;
     }
 
-    public FoodOption(String optionId, String name, FoodOptionType optionType, BigDecimal extraPrice) {
-        this.optionId = optionId;
+    public FoodOption(String id, String name, OptionType optionType, BigDecimal extraPrice) {
+        this.id = id;
         this.name = name;
         this.optionType = optionType;
-        this.extraPrice = extraPrice;
+        this.extraPrice = extraPrice != null ? extraPrice : BigDecimal.ZERO;
+        this.status = OptionStatus.ACTIVE;
+    }
+
+    public FoodOption(String id, Food food, OptionType optionType, String name, BigDecimal extraPrice) {
+        this.id = id;
+        this.food = food;
+        this.optionType = optionType;
+        this.name = name;
+        this.extraPrice = extraPrice != null ? extraPrice : BigDecimal.ZERO;
+        this.status = OptionStatus.ACTIVE;
+    }
+
+    public FoodOption(String id, Food food, OptionType optionType, String name, BigDecimal extraPrice,
+                      OptionStatus status) {
+        this(id, food, optionType, name, extraPrice);
+        this.status = status != null ? status : OptionStatus.ACTIVE;
+    }
+
+    public String getId() {
+        return id;
+    }
+
+    public void setId(String id) {
+        this.id = id;
     }
 
     public String getOptionId() {
-        return optionId;
+        return id;
     }
 
     public void setOptionId(String optionId) {
-        this.optionId = optionId;
+        this.id = optionId;
     }
 
     public Food getFood() {
@@ -78,11 +101,11 @@ public class FoodOption {
         this.food = food;
     }
 
-    public FoodOptionType getOptionType() {
+    public OptionType getOptionType() {
         return optionType;
     }
 
-    public void setOptionType(FoodOptionType optionType) {
+    public void setOptionType(OptionType optionType) {
         this.optionType = optionType;
     }
 
@@ -102,11 +125,11 @@ public class FoodOption {
         this.extraPrice = extraPrice != null ? extraPrice : BigDecimal.ZERO;
     }
 
-    public String getStatus() {
+    public OptionStatus getStatus() {
         return status;
     }
 
-    public void setStatus(String status) {
+    public void setStatus(OptionStatus status) {
         this.status = status;
     }
 

@@ -1,0 +1,510 @@
+openapi: 3.0.3
+info:
+  title: Crave Account API
+  version: 1.0.0-day1
+  description: |
+    Contract for authentication, customer profile, and delivery addresses.
+    The routes exist on Day 1 and return the standard NOT_IMPLEMENTED response
+    until their business logic is completed on Day 2.
+servers:
+  - url: /crave
+    description: Default Tomcat context
+tags:
+  - name: System
+  - name: Authentication
+  - name: Profile
+  - name: Addresses
+paths:
+  /api/health:
+    get:
+      tags: [System]
+      summary: Check application and database health
+      responses:
+        "200":
+          description: Application and database are available
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthEnvelope"
+        "503":
+          $ref: "#/components/responses/DatabaseUnavailable"
+
+  /api/auth/login:
+    post:
+      tags: [Authentication]
+      summary: Start a customer or employee session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Login succeeded; the session id is returned in an HttpOnly cookie
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+              example: JSESSIONID=abc123; Path=/crave; HttpOnly; SameSite=Lax
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProfileEnvelope"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "501":
+          $ref: "#/components/responses/NotImplemented"
+
+  /api/auth/register:
+    post:
+      tags: [Authentication]
+      summary: Register a customer account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+      responses:
+        "201":
+          description: Customer account created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProfileEnvelope"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "409":
+          description: Email or phone already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "501":
+          $ref: "#/components/responses/NotImplemented"
+
+  /api/profile:
+    get:
+      tags: [Profile]
+      summary: Get the signed-in user's profile
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Current profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProfileEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "501":
+          $ref: "#/components/responses/NotImplemented"
+    put:
+      tags: [Profile]
+      summary: Update the signed-in customer's profile
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProfileUpdateRequest"
+      responses:
+        "200":
+          description: Updated profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProfileEnvelope"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          description: Email or phone already belongs to another account
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "501":
+          $ref: "#/components/responses/NotImplemented"
+
+  /api/addresses:
+    get:
+      tags: [Addresses]
+      summary: List the signed-in customer's addresses
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Address list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AddressListEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "501":
+          $ref: "#/components/responses/NotImplemented"
+    post:
+      tags: [Addresses]
+      summary: Create a delivery address
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddressWriteRequest"
+      responses:
+        "201":
+          description: Address created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AddressEnvelope"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "501":
+          $ref: "#/components/responses/NotImplemented"
+
+  /api/addresses/{addressId}:
+    parameters:
+      - $ref: "#/components/parameters/AddressId"
+    get:
+      tags: [Addresses]
+      summary: Get one address owned by the signed-in customer
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Address detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AddressEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "501":
+          $ref: "#/components/responses/NotImplemented"
+    put:
+      tags: [Addresses]
+      summary: Update an address owned by the signed-in customer
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddressWriteRequest"
+      responses:
+        "200":
+          description: Address updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AddressEnvelope"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "501":
+          $ref: "#/components/responses/NotImplemented"
+    delete:
+      tags: [Addresses]
+      summary: Delete an address owned by the signed-in customer
+      security:
+        - cookieAuth: []
+      responses:
+        "204":
+          description: Address deleted; no response body
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: The address cannot currently be deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "501":
+          $ref: "#/components/responses/NotImplemented"
+
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: JSESSIONID
+
+  parameters:
+    AddressId:
+      name: addressId
+      in: path
+      required: true
+      schema:
+        type: string
+        maxLength: 10
+      example: DC01
+
+  responses:
+    ValidationError:
+      description: One or more request fields are invalid
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+          example:
+            success: false
+            data: null
+            error:
+              code: VALIDATION_ERROR
+              message: Dữ liệu không hợp lệ.
+              fieldErrors:
+                email: Email không đúng định dạng.
+    Unauthorized:
+      description: No valid authenticated session
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    NotFound:
+      description: Resource does not exist or is not owned by this customer
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    NotImplemented:
+      description: Day 1 route scaffold; business logic is scheduled for Day 2
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+          example:
+            success: false
+            data: null
+            error:
+              code: NOT_IMPLEMENTED
+              message: This operation is contracted but will be implemented on Day 2.
+              fieldErrors: {}
+    DatabaseUnavailable:
+      description: Application is running, but its database is unavailable
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+
+  schemas:
+    LoginRequest:
+      type: object
+      required: [email, password]
+      additionalProperties: false
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 100
+        password:
+          type: string
+          format: password
+          minLength: 8
+          maxLength: 72
+        rememberMe:
+          type: boolean
+          default: false
+
+    RegisterRequest:
+      type: object
+      required: [fullName, email, phone, password, confirmPassword]
+      additionalProperties: false
+      properties:
+        fullName:
+          type: string
+          minLength: 2
+          maxLength: 100
+        email:
+          type: string
+          format: email
+          maxLength: 100
+        phone:
+          type: string
+          pattern: "^[0-9+]{9,15}$"
+        password:
+          type: string
+          format: password
+          minLength: 8
+          maxLength: 72
+        confirmPassword:
+          type: string
+          format: password
+          minLength: 8
+          maxLength: 72
+
+    ProfileUpdateRequest:
+      type: object
+      required: [fullName, email, phone]
+      additionalProperties: false
+      properties:
+        fullName:
+          type: string
+          minLength: 2
+          maxLength: 100
+        email:
+          type: string
+          format: email
+          maxLength: 100
+        phone:
+          type: string
+          pattern: "^[0-9+]{9,15}$"
+
+    AddressWriteRequest:
+      type: object
+      required: [addressLine, isDefault]
+      additionalProperties: false
+      properties:
+        addressLine:
+          type: string
+          minLength: 1
+          maxLength: 255
+        note:
+          type: string
+          maxLength: 255
+          nullable: true
+        isDefault:
+          type: boolean
+
+    Profile:
+      type: object
+      required: [id, accountType, fullName, email, phone]
+      properties:
+        id:
+          type: string
+          example: KH01
+        accountType:
+          type: string
+          enum: [CUSTOMER, EMPLOYEE]
+        fullName:
+          type: string
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+
+    Address:
+      type: object
+      required: [id, addressLine, isDefault, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          example: DC01
+        addressLine:
+          type: string
+        note:
+          type: string
+          nullable: true
+        isDefault:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    ApiError:
+      type: object
+      required: [code, message, fieldErrors]
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        fieldErrors:
+          type: object
+          additionalProperties:
+            type: string
+
+    ErrorEnvelope:
+      type: object
+      required: [success, data, error]
+      properties:
+        success:
+          type: boolean
+          enum: [false]
+        data:
+          nullable: true
+        error:
+          $ref: "#/components/schemas/ApiError"
+
+    ProfileEnvelope:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          enum: [true]
+        data:
+          $ref: "#/components/schemas/Profile"
+        error:
+          nullable: true
+
+    AddressEnvelope:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          enum: [true]
+        data:
+          $ref: "#/components/schemas/Address"
+        error:
+          nullable: true
+
+    AddressListEnvelope:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          enum: [true]
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Address"
+        error:
+          nullable: true
+
+    HealthEnvelope:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          enum: [true]
+        data:
+          type: object
+          required: [application, database]
+          properties:
+            application:
+              type: string
+              enum: [UP]
+            database:
+              type: string
+              enum: [UP]
+        error:
+          nullable: true
