@@ -31,7 +31,8 @@
                     <td>150000</td>
                     <td><span class="order-status-badge badge-pending">PENDING_CONFIRMATION</span></td>
                     <td>
-                        <button class="admin-action-btn" onclick="showUpdateStatusModal('ORD-12345')">Cập nhật</button>
+                        <button class="admin-action-btn" onclick="showUpdateStatusModal('ORD-12345')">Trạng thái đơn</button>
+                        <button class="admin-action-btn" onclick="showUpdatePaymentModal('ORD-12345', 'PAY-999', 'CASH', '150000', 'PENDING')">Thanh toán</button>
                     </td>
                 </tr>
             </tbody>
@@ -60,6 +61,28 @@
         </div>
 
         <button class="btn-primary" onclick="updateOrderStatus()">Xác nhận (JSON)</button>
+    </div>
+
+    <!-- Khung cập nhật thanh toán -->
+    <div id="updatePaymentSection" class="card" style="margin-top: 2rem; display: none;">
+        <h3>Thông tin thanh toán của đơn hàng: <span id="paymentOrderId"></span></h3>
+        <p>Mã thanh toán: <strong id="paymentIdDisplay"></strong></p>
+        <p>Phương thức: <strong id="paymentMethodDisplay"></strong></p>
+        <p>Số tiền: <strong id="paymentAmountDisplay"></strong></p>
+        <p>Trạng thái hiện tại: <strong id="paymentStatusDisplay"></strong></p>
+
+        <div class="field-grid" style="margin-top: 1rem;">
+            <div>
+                <label>Trạng thái thanh toán mới:</label>
+                <select id="newPaymentStatus">
+                    <option value="PENDING">Chờ thanh toán</option>
+                    <option value="SUCCESS">Thành công</option>
+                    <option value="FAILED">Thất bại</option>
+                </select>
+            </div>
+        </div>
+
+        <button class="btn-primary" onclick="updatePaymentStatus()">Cập nhật thanh toán (JSON)</button>
     </div>
 </main>
 
@@ -96,6 +119,46 @@
                 document.getElementById('updateStatusSection').style.display = 'none';
             } else {
                 alert('Cập nhật thất bại.');
+            }
+        }).catch(err => console.error('Error:', err));
+    }
+
+    let currentPaymentToUpdate = '';
+
+    function showUpdatePaymentModal(orderId, paymentId, method, amount, status) {
+        currentPaymentToUpdate = paymentId;
+        document.getElementById('paymentOrderId').innerText = orderId;
+        document.getElementById('paymentIdDisplay').innerText = paymentId;
+        document.getElementById('paymentMethodDisplay').innerText = method;
+        document.getElementById('paymentAmountDisplay').innerText = amount;
+        document.getElementById('paymentStatusDisplay').innerText = status;
+        
+        document.getElementById('updatePaymentSection').style.display = 'block';
+        document.getElementById('updatePaymentSection').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function updatePaymentStatus() {
+        if (!currentPaymentToUpdate) {
+            alert('Vui lòng chọn thanh toán cần cập nhật');
+            return;
+        }
+
+        const data = {
+            status: document.getElementById('newPaymentStatus').value
+        };
+
+        fetch(`${pageContext.request.contextPath}/api/payments/` + currentPaymentToUpdate + `/status`, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        }).then(res => {
+            if (res.ok) {
+                alert('Cập nhật thanh toán thành công!');
+                document.getElementById('updatePaymentSection').style.display = 'none';
+            } else {
+                alert('Cập nhật thanh toán thất bại.');
             }
         }).catch(err => console.error('Error:', err));
     }
