@@ -12,6 +12,7 @@ import java.util.List;
 
 import com.foodordering.dto.OrderRequest;
 import com.foodordering.dto.OrderResponse;
+import com.foodordering.dto.OrderSummaryResponse;
 import com.foodordering.service.CustomerOrderService;
 import com.foodordering.service.CustomerOrderServiceImpl;
 import com.foodordering.repository.CustomerOrderRepositoryImpl;
@@ -45,9 +46,14 @@ public class OrderServlet extends HttpServlet {
             if (pathInfo != null && pathInfo.length() > 1) {
                 String orderId = pathInfo.substring(1);
                 OrderResponse order = orderService.getOrderById(orderId);
+                if (!order.getCustomerId().equals(customerId)) {
+                    resp.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                    JsonUtils.writeJson(resp, ApiResponse.error("Bạn không có quyền xem đơn hàng này"));
+                    return;
+                }
                 JsonUtils.writeJson(resp, ApiResponse.success(order));
             } else {
-                List<OrderResponse> orders = orderService.getOrdersByCustomer(customerId);
+                List<OrderSummaryResponse> orders = orderService.getOrdersByCustomer(customerId);
                 JsonUtils.writeJson(resp, ApiResponse.success(orders));
             }
         } catch (Exception e) {

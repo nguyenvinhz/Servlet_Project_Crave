@@ -89,6 +89,31 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiResponse_Error'
 
+  /admin/orders:
+    get:
+      summary: Lấy danh sách tất cả đơn hàng (Dành cho Admin)
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: Danh sách đơn hàng cho admin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse_ListOrderResponse'
+        '401':
+          description: Chưa đăng nhập
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse_Error'
+        '403':
+          description: Không có quyền (Chỉ dành cho ADMIN)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse_Error'
+
   /admin/orders/{orderId}/status:
     patch:
       summary: Cập nhật trạng thái đơn hàng (Dành cho Nhân viên)

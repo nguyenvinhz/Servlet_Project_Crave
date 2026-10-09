@@ -34,6 +34,18 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
 
     @Override
     public OrderResponse createOrder(String customerId, OrderRequest request) {
+        if (request.getReceiverName() == null || request.getReceiverName().trim().isEmpty()) {
+            throw new IllegalArgumentException("Tên người nhận không được để trống");
+        }
+        if (request.getReceiverPhone() == null || request.getReceiverPhone().trim().isEmpty()) {
+            throw new IllegalArgumentException("Số điện thoại không được để trống");
+        }
+        if (com.foodordering.enums.FulfillmentType.DELIVERY.equals(request.getFulfillmentType())) {
+            if (request.getDeliveryAddress() == null || request.getDeliveryAddress().trim().isEmpty()) {
+                throw new IllegalArgumentException("Địa chỉ giao hàng không được để trống khi chọn giao tận nơi");
+            }
+        }
+
         EntityManager em = DatabaseConfig.getEntityManagerFactory().createEntityManager();
         EntityTransaction tx = em.getTransaction();
         try {
@@ -176,6 +188,19 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
             tx.begin();
             CustomerOrder order = em.find(CustomerOrder.class, orderId);
             if (order == null) throw new RuntimeException("Đơn hàng không tồn tại");
+
+            OrderStatus currentStatus = order.getStatus();
+            boolean isValidTransition = false;
+            if (currentStatus == OrderStatus.PENDING_CONFIRMATION) {
+                isValidTransition = (status == OrderStatus.PREPARING || status == OrderStatus.CANCELLED);
+            } else if (currentStatus == OrderStatus.PREPARING) {
+                isValidTransition = (status == OrderStatus.DELIVERING || status == OrderStatus.CANCELLED);
+            } else if (currentStatus == OrderStatus.DELIVERING) {
+                isValidTransition = (status == OrderStatus.COMPLETED);
+            }
+            if (!isValidTransition && currentStatus != status) {
+                throw new IllegalArgumentException("Không thể chuyển trạng thái từ " + currentStatus + " sang " + status);
+            }
 
             order.setStatus(status);
             order.setAssignedEmployeeId(employeeId);
