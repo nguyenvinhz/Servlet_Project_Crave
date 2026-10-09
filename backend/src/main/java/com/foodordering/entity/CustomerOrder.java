@@ -2,49 +2,39 @@ package com.foodordering.entity;
 
 import com.foodordering.enums.FulfillmentType;
 import com.foodordering.enums.OrderStatus;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.Table;
-import jakarta.persistence.Transient;
-
+import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
-/**
- * Entity JPA đại diện cho bảng customer_order trong cơ sở dữ liệu Crave.
- * Chứa trường ordered_at (orderTime) để phục vụ việc xác thực thời gian đặt hàng của khách hàng với hạn của promotion.
- */
 @Entity
 @Table(name = "customer_order")
 public class CustomerOrder {
 
     @Id
     @Column(name = "order_id", length = 10, nullable = false)
-    private String orderId;
+    private String id;
 
+    // Mapping tới Customer của Vinh
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "customer_id", nullable = false)
     private Customer customer;
 
+    // Mapping ID nhân viên (Vinh có thể chưa tạo Employee, dùng ID tạm)
     @Column(name = "assigned_employee_id", length = 10)
     private String assignedEmployeeId;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "promotion_id")
-    private Promotion promotion;
+    // Mapping ID Promotion (Trí chưa tạo, dùng ID tạm)
+    @Column(name = "promotion_id", length = 10)
+    private String promotionId;
 
-    @Column(name = "ordered_at", nullable = false)
-    private LocalDateTime orderedAt = LocalDateTime.now();
+    @Column(name = "ordered_at", nullable = false, updatable = false)
+    private LocalDateTime orderedAt;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "fulfillment_type", nullable = false)
-    private FulfillmentType fulfillmentType = FulfillmentType.DELIVERY;
+    private FulfillmentType fulfillmentType;
 
     @Column(name = "receiver_name", length = 100, nullable = false)
     private String receiverName;
@@ -52,239 +42,125 @@ public class CustomerOrder {
     @Column(name = "receiver_phone", length = 15, nullable = false)
     private String receiverPhone;
 
-    @Column(name = "delivery_address", length = 255)
+    @Column(name = "delivery_address")
     private String deliveryAddress;
 
-    @Column(name = "customer_note", length = 255)
+    @Column(name = "customer_note")
     private String customerNote;
 
     @Column(name = "subtotal", nullable = false)
-    private BigDecimal subtotal = BigDecimal.ZERO;
+    private BigDecimal subtotal;
 
     @Column(name = "discount_amount", nullable = false)
-    private BigDecimal discountAmount = BigDecimal.ZERO;
+    private BigDecimal discountAmount;
 
     @Column(name = "delivery_fee", nullable = false)
-    private BigDecimal deliveryFee = BigDecimal.ZERO;
+    private BigDecimal deliveryFee;
 
+    // Generated column by DB, insertable = false, updatable = false
     @Column(name = "total_amount", insertable = false, updatable = false)
     private BigDecimal totalAmount;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
-    private OrderStatus status = OrderStatus.PENDING_CONFIRMATION;
+    private OrderStatus status;
 
     @Column(name = "updated_at", insertable = false, updatable = false)
     private LocalDateTime updatedAt;
 
-    @Transient
-    private String customerId;
+    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<OrderDetail> orderDetails = new ArrayList<>();
 
-    @Transient
-    private String promotionId;
+    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<OrderStatusHistory> statusHistories = new ArrayList<>();
 
-    public CustomerOrder() {
-    }
+    @OneToOne(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Payment payment;
+
+    public CustomerOrder() {}
 
     public CustomerOrder(String orderId) {
-        this.orderId = orderId;
+        this.id = orderId;
     }
 
     public CustomerOrder(String orderId, Customer customer, LocalDateTime orderedAt) {
-        this.orderId = orderId;
+        this(orderId);
         this.customer = customer;
         this.orderedAt = orderedAt != null ? orderedAt : LocalDateTime.now();
-        if (customer != null) {
-            this.customerId = customer.getId();
-        }
     }
 
     public CustomerOrder(String orderId, Customer customer, BigDecimal subtotal, LocalDateTime orderedAt) {
-        this.orderId = orderId;
-        this.customer = customer;
-        this.subtotal = subtotal;
-        this.orderedAt = orderedAt != null ? orderedAt : LocalDateTime.now();
-        if (customer != null) {
-            this.customerId = customer.getId();
-        }
-    }
-
-    public String getOrderId() {
-        return orderId;
-    }
-
-    public void setOrderId(String orderId) {
-        this.orderId = orderId;
-    }
-
-    public Customer getCustomer() {
-        return customer;
-    }
-
-    public void setCustomer(Customer customer) {
-        this.customer = customer;
-        if (customer != null) {
-            this.customerId = customer.getId();
-        }
-    }
-
-    public String getCustomerId() {
-        if (customer != null) {
-            return customer.getId();
-        }
-        return customerId;
-    }
-
-    public void setCustomerId(String customerId) {
-        this.customerId = customerId;
-        if (customer == null && customerId != null) {
-            this.customer = new Customer(customerId);
-        }
-    }
-
-    public String getAssignedEmployeeId() {
-        return assignedEmployeeId;
-    }
-
-    public void setAssignedEmployeeId(String assignedEmployeeId) {
-        this.assignedEmployeeId = assignedEmployeeId;
-    }
-
-    public Promotion getPromotion() {
-        return promotion;
-    }
-
-    public void setPromotion(Promotion promotion) {
-        this.promotion = promotion;
-        if (promotion != null) {
-            this.promotionId = promotion.getPromotionId();
-        }
-    }
-
-    public String getPromotionId() {
-        if (promotion != null) {
-            return promotion.getPromotionId();
-        }
-        return promotionId;
-    }
-
-    public void setPromotionId(String promotionId) {
-        this.promotionId = promotionId;
-    }
-
-    public LocalDateTime getOrderedAt() {
-        return orderedAt;
-    }
-
-    public void setOrderedAt(LocalDateTime orderedAt) {
-        this.orderedAt = orderedAt;
-    }
-
-    /**
-     * Alias getter cho orderedAt theo tên gọi orderTime của nghiệp vụ.
-     */
-    public LocalDateTime getOrderTime() {
-        return orderedAt;
-    }
-
-    /**
-     * Alias setter cho orderedAt theo tên gọi orderTime của nghiệp vụ.
-     */
-    public void setOrderTime(LocalDateTime orderTime) {
-        this.orderedAt = orderTime;
-    }
-
-    public FulfillmentType getFulfillmentType() {
-        return fulfillmentType;
-    }
-
-    public void setFulfillmentType(FulfillmentType fulfillmentType) {
-        this.fulfillmentType = fulfillmentType;
-    }
-
-    public String getReceiverName() {
-        return receiverName;
-    }
-
-    public void setReceiverName(String receiverName) {
-        this.receiverName = receiverName;
-    }
-
-    public String getReceiverPhone() {
-        return receiverPhone;
-    }
-
-    public void setReceiverPhone(String receiverPhone) {
-        this.receiverPhone = receiverPhone;
-    }
-
-    public String getDeliveryAddress() {
-        return deliveryAddress;
-    }
-
-    public void setDeliveryAddress(String deliveryAddress) {
-        this.deliveryAddress = deliveryAddress;
-    }
-
-    public String getCustomerNote() {
-        return customerNote;
-    }
-
-    public void setCustomerNote(String customerNote) {
-        this.customerNote = customerNote;
-    }
-
-    public BigDecimal getSubtotal() {
-        return subtotal;
-    }
-
-    public void setSubtotal(BigDecimal subtotal) {
+        this(orderId, customer, orderedAt);
         this.subtotal = subtotal != null ? subtotal : BigDecimal.ZERO;
     }
 
-    public BigDecimal getDiscountAmount() {
-        return discountAmount;
+    @PrePersist
+    protected void onCreate() {
+        if (orderedAt == null) orderedAt = LocalDateTime.now();
+        if (status == null) status = OrderStatus.PENDING_CONFIRMATION;
+        if (subtotal == null) subtotal = BigDecimal.ZERO;
+        if (discountAmount == null) discountAmount = BigDecimal.ZERO;
+        if (deliveryFee == null) deliveryFee = BigDecimal.ZERO;
     }
 
-    public void setDiscountAmount(BigDecimal discountAmount) {
-        this.discountAmount = discountAmount != null ? discountAmount : BigDecimal.ZERO;
+    public String getId() { return id; }
+    public String getOrderId() { return id; }
+    public void setOrderId(String orderId) { this.id = orderId; }
+    public String getCustomerId() { return customer != null ? customer.getId() : null; }
+    public LocalDateTime getOrderTime() { return orderedAt; }
+    public void setOrderTime(LocalDateTime orderTime) { this.orderedAt = orderTime; }
+    public void setId(String id) { this.id = id; }
+    public Customer getCustomer() { return customer; }
+    public void setCustomer(Customer customer) { this.customer = customer; }
+    public String getAssignedEmployeeId() { return assignedEmployeeId; }
+    public void setAssignedEmployeeId(String assignedEmployeeId) { this.assignedEmployeeId = assignedEmployeeId; }
+    public String getPromotionId() { return promotionId; }
+    public void setPromotionId(String promotionId) { this.promotionId = promotionId; }
+    public LocalDateTime getOrderedAt() { return orderedAt; }
+    public void setOrderedAt(LocalDateTime orderedAt) { this.orderedAt = orderedAt; }
+    public FulfillmentType getFulfillmentType() { return fulfillmentType; }
+    public void setFulfillmentType(FulfillmentType fulfillmentType) { this.fulfillmentType = fulfillmentType; }
+    public String getReceiverName() { return receiverName; }
+    public void setReceiverName(String receiverName) { this.receiverName = receiverName; }
+    public String getReceiverPhone() { return receiverPhone; }
+    public void setReceiverPhone(String receiverPhone) { this.receiverPhone = receiverPhone; }
+    public String getDeliveryAddress() { return deliveryAddress; }
+    public void setDeliveryAddress(String deliveryAddress) { this.deliveryAddress = deliveryAddress; }
+    public String getCustomerNote() { return customerNote; }
+    public void setCustomerNote(String customerNote) { this.customerNote = customerNote; }
+    public BigDecimal getSubtotal() { return subtotal; }
+    public void setSubtotal(BigDecimal subtotal) { this.subtotal = subtotal; }
+    public BigDecimal getDiscountAmount() { return discountAmount; }
+    public void setDiscountAmount(BigDecimal discountAmount) { this.discountAmount = discountAmount; }
+    public BigDecimal getDeliveryFee() { return deliveryFee; }
+    public void setDeliveryFee(BigDecimal deliveryFee) { this.deliveryFee = deliveryFee; }
+    public BigDecimal getTotalAmount() { return totalAmount; }
+    public void setTotalAmount(BigDecimal totalAmount) { this.totalAmount = totalAmount; }
+    public OrderStatus getStatus() { return status; }
+    public void setStatus(OrderStatus status) { this.status = status; }
+    public LocalDateTime getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+    public List<OrderDetail> getOrderDetails() { return orderDetails; }
+    public void setOrderDetails(List<OrderDetail> orderDetails) { this.orderDetails = orderDetails; }
+    public List<OrderStatusHistory> getStatusHistories() { return statusHistories; }
+    public void setStatusHistories(List<OrderStatusHistory> statusHistories) { this.statusHistories = statusHistories; }
+    public Payment getPayment() { return payment; }
+    public void setPayment(Payment payment) { this.payment = payment; }
+
+    public void addOrderDetail(OrderDetail detail) {
+        this.orderDetails.add(detail);
+        detail.setOrder(this);
     }
 
-    public BigDecimal getDeliveryFee() {
-        return deliveryFee;
+    public void addStatusHistory(OrderStatusHistory history) {
+        this.statusHistories.add(history);
+        history.setOrder(this);
     }
 
-    public void setDeliveryFee(BigDecimal deliveryFee) {
-        this.deliveryFee = deliveryFee != null ? deliveryFee : BigDecimal.ZERO;
-    }
-
-    public BigDecimal getTotalAmount() {
-        if (totalAmount != null) {
-            return totalAmount;
+    public void setPaymentHelper(Payment payment) {
+        this.payment = payment;
+        if (payment != null) {
+            payment.setOrder(this);
         }
-        return (subtotal != null ? subtotal : BigDecimal.ZERO)
-                .subtract(discountAmount != null ? discountAmount : BigDecimal.ZERO)
-                .add(deliveryFee != null ? deliveryFee : BigDecimal.ZERO)
-                .max(BigDecimal.ZERO);
-    }
-
-    public void setTotalAmount(BigDecimal totalAmount) {
-        this.totalAmount = totalAmount;
-    }
-
-    public OrderStatus getStatus() {
-        return status;
-    }
-
-    public void setStatus(OrderStatus status) {
-        this.status = status;
-    }
-
-    public LocalDateTime getUpdatedAt() {
-        return updatedAt;
-    }
-
-    public void setUpdatedAt(LocalDateTime updatedAt) {
-        this.updatedAt = updatedAt;
     }
 }
