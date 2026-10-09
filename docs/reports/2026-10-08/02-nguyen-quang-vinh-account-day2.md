@@ -83,6 +83,8 @@ filter dùng chung bảo vệ các route đó theo tài khoản và chức vụ.
 
 Môi trường: JDK 17.0.18, MySQL 8.0.43, Tomcat 10.1.48.
 
+Các số liệu bên dưới là kết quả xác minh trước lần đồng bộ main sau PR #17. Kết quả chạy lại trên baseline mới ngày 2026-10-09 được cập nhật ở phần 8, không mặc định dùng lại số liệu cũ.
+
 ```powershell
 $env:JAVA_HOME = '<đường dẫn JDK 17 hoặc 21>'
 mvn -f backend/pom.xml verify
@@ -154,3 +156,19 @@ Chrome/Edge, có thể đặt biến `CHROME_PATH`. Các ca MySQL mới kiểm t
 tranh chấp số điện thoại, tài khoản nhân viên/ngừng hoạt động và constraint phone thực tế.
 API tests cũng kiểm tra chuyển tài khoản không giữ role/customer ID cũ và từ chối
 request cố chèn role hoặc chủ sở hữu.
+
+## 8. Đồng bộ main sau PR #17 — 2026-10-09
+
+Đã lấy main sau khi [PR #17](https://github.com/nguyenvinhz/Servlet_Project_Crave/pull/17) tích hợp nhánh cart/voucher Ngày 1, rồi đồng bộ vào `feature/account-management`. Main giữ cart/voucher hoạt động đã có; việc đồng bộ bổ sung report và contract test phù hợp với main, không đổi các API đó về scaffold `501`.
+
+Nhánh tài khoản giữ phần Ngày 2 đã triển khai: đăng ký/đăng nhập/đăng xuất, session và filter xác thực, profile và CRUD địa chỉ, các form gọi API và demo đăng ký → đăng nhập → sửa profile → thêm/chọn địa chỉ. Các kiểm tra quyền và tích hợp session với cart/voucher được giữ cùng phần tài khoản; không đưa công việc order-payment hoặc phần setter Ngày 3 của nhánh cart/voucher vào task này.
+
+Kết quả chạy lại trên baseline mới:
+
+- `mvn -B -f backend/pom.xml clean verify`: 156 test đạt, 0 failure/error/skipped; tạo WAR thành công, bao gồm kiểm thử tích hợp MySQL.
+- Chrome headless: 33/33 kịch bản giao diện đạt.
+- Tomcat/MySQL trực tiếp: 87 kiểm tra HTTP đạt, exit code 0; bao phủ đăng ký, đăng nhập, profile, CRUD/chọn mặc định địa chỉ, session, xác thực cart và quyền sở hữu dữ liệu.
+- Các bản ghi được tạo riêng cho kiểm thử được dọn trong `finally`.
+- Main cục bộ khớp `origin/main` sau PR #17 và đã chứa lịch sử nhánh Trí Ngày 1. Sau khi đồng bộ, mã nguồn `backend/src/main` và `frontend` của phần tài khoản giữ nguyên so với trước lần pull này; không thêm thay đổi nghiệp vụ ngoài task.
+
+Task này chỉ commit và push nhánh `feature/account-management` để review, không merge phần tài khoản Ngày 2 vào main. Phạm vi bàn giao của Vinh không tự xác nhận Gate 2 của cả nhóm.
