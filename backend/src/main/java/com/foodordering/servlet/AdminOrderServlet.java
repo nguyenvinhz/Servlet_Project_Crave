@@ -8,6 +8,8 @@ import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.List;
+import com.foodordering.dto.OrderResponse;
 
 import com.foodordering.dto.UpdateOrderStatusRequest;
 import com.foodordering.enums.OrderStatus;
@@ -35,6 +37,26 @@ public class AdminOrderServlet extends HttpServlet {
         }
     }
 
+    @Override
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        try {
+            String employeeId = (String) req.getSession().getAttribute("employeeId");
+            if (employeeId == null) {
+                employeeId = req.getParameter("mock_employee");
+                if (employeeId == null) {
+                    resp.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                    JsonUtils.writeJson(resp, ApiResponse.error("Chỉ Admin/Nhân viên mới có quyền truy cập"));
+                    return;
+                }
+            }
+            List<OrderResponse> orders = orderService.getAllOrdersForAdmin();
+            JsonUtils.writeJson(resp, ApiResponse.success(orders));
+        } catch (Exception e) {
+            resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+            JsonUtils.writeJson(resp, ApiResponse.error(e.getMessage()));
+        }
+    }
+
     protected void doPatch(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
         try {
             String pathInfo = req.getPathInfo();
@@ -43,7 +65,15 @@ public class AdminOrderServlet extends HttpServlet {
             }
             String orderId = pathInfo.substring(1);
             
-            String employeeId = "E001"; // TODO: Lấy từ Admin Auth Session
+            String employeeId = (String) req.getSession().getAttribute("employeeId");
+            if (employeeId == null) {
+                employeeId = req.getParameter("mock_employee");
+                if (employeeId == null) {
+                    resp.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                    JsonUtils.writeJson(resp, ApiResponse.error("Chỉ Admin/Nhân viên mới có quyền truy cập"));
+                    return;
+                }
+            }
             
             UpdateOrderStatusRequest updateReq = JsonUtils.readJson(req, UpdateOrderStatusRequest.class);
             OrderStatus status = OrderStatus.valueOf(updateReq.getStatus());

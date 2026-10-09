@@ -30,8 +30,15 @@ public class OrderServlet extends HttpServlet {
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
         try {
-            // TODO: Lấy customerId từ auth session (hiện tại hardcode để test)
-            String customerId = "C001";
+            String customerId = (String) req.getSession().getAttribute("customerId");
+            if (customerId == null) {
+                customerId = req.getParameter("mock_customer"); // Mock for testing
+                if (customerId == null) {
+                    resp.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                    JsonUtils.writeJson(resp, ApiResponse.error("Bạn chưa đăng nhập"));
+                    return;
+                }
+            }
             
             // Xử lý route chi tiết đơn hàng /api/orders/{id} hoặc danh sách
             String pathInfo = req.getPathInfo();
@@ -52,7 +59,15 @@ public class OrderServlet extends HttpServlet {
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
         try {
-            String customerId = "C001"; // TODO: Lấy từ session
+            String customerId = (String) req.getSession().getAttribute("customerId");
+            if (customerId == null) {
+                customerId = req.getParameter("mock_customer");
+                if (customerId == null) {
+                    resp.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                    JsonUtils.writeJson(resp, ApiResponse.error("Bạn chưa đăng nhập"));
+                    return;
+                }
+            }
             OrderRequest request = JsonUtils.readJson(req, OrderRequest.class);
             OrderResponse response = orderService.createOrder(customerId, request);
             

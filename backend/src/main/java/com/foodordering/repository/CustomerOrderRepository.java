@@ -8,4 +8,5 @@ public interface CustomerOrderRepository {
     CustomerOrder save(CustomerOrder order);
     Optional<CustomerOrder> findById(String id);
     List<CustomerOrder> findByCustomerId(String customerId);
+    List<CustomerOrder> findAll();
 }

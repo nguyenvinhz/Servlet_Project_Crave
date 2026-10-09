@@ -41,6 +41,16 @@ public class PaymentServlet extends HttpServlet {
                 throw new IllegalArgumentException("Thiếu Payment ID");
             }
             
+            String employeeId = (String) req.getSession().getAttribute("employeeId");
+            if (employeeId == null) {
+                employeeId = req.getParameter("mock_employee");
+                if (employeeId == null) {
+                    resp.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                    JsonUtils.writeJson(resp, ApiResponse.error("Chỉ Admin/Nhân viên mới có quyền truy cập"));
+                    return;
+                }
+            }
+
             // Format URL: /api/payments/{paymentId}/status
             String[] segments = pathInfo.substring(1).split("/");
             String paymentId = segments[0];

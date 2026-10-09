@@ -56,4 +56,12 @@ public class CustomerOrderRepositoryImpl implements CustomerOrderRepository {
                     .getResultList();
         }
     }
+
+    @Override
+    public List<CustomerOrder> findAll() {
+        try (EntityManager em = DatabaseConfig.getEntityManagerFactory().createEntityManager()) {
+            String jpql = "SELECT o FROM CustomerOrder o ORDER BY o.orderedAt DESC";
+            return em.createQuery(jpql, CustomerOrder.class).getResultList();
+        }
+    }
 }

@@ -3,6 +3,7 @@ package com.foodordering.service;
 import com.foodordering.config.DatabaseConfig;
 import com.foodordering.dto.OrderRequest;
 import com.foodordering.dto.OrderResponse;
+import com.foodordering.dto.OrderSummaryResponse;
 import com.foodordering.entity.*;
 import com.foodordering.enums.OrderStatus;
 import com.foodordering.enums.PaymentStatus;
@@ -154,8 +155,15 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
     }
 
     @Override
-    public List<OrderResponse> getOrdersByCustomer(String customerId) {
+    public List<OrderSummaryResponse> getOrdersByCustomer(String customerId) {
         return orderRepository.findByCustomerId(customerId).stream()
+                .map(this::mapToSummaryResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<OrderResponse> getAllOrdersForAdmin() {
+        return orderRepository.findAll().stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
@@ -190,12 +198,70 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
         }
     }
 
+    private OrderSummaryResponse mapToSummaryResponse(CustomerOrder order) {
+        OrderSummaryResponse res = new OrderSummaryResponse();
+        res.setOrderId(order.getId());
+        res.setOrderedAt(order.getOrderedAt());
+        res.setFulfillmentType(order.getFulfillmentType().name());
+        res.setTotalAmount(order.getTotalAmount() != null ? order.getTotalAmount() : order.getSubtotal().add(order.getDeliveryFee()).subtract(order.getDiscountAmount()));
+        res.setStatus(order.getStatus().name());
+        if (order.getPayment() != null) {
+            res.setPaymentStatus(order.getPayment().getStatus().name());
+        }
+        return res;
+    }
+
     private OrderResponse mapToResponse(CustomerOrder order) {
         OrderResponse res = new OrderResponse();
         res.setOrderId(order.getId());
         res.setCustomerId(order.getCustomer().getId());
+        res.setOrderedAt(order.getOrderedAt());
+        res.setFulfillmentType(order.getFulfillmentType());
+        res.setReceiverName(order.getReceiverName());
+        res.setReceiverPhone(order.getReceiverPhone());
+        res.setDeliveryAddress(order.getDeliveryAddress());
+        res.setCustomerNote(order.getCustomerNote());
+        res.setSubtotal(order.getSubtotal());
+        res.setDiscountAmount(order.getDiscountAmount());
+        res.setDeliveryFee(order.getDeliveryFee());
+        res.setTotalAmount(order.getTotalAmount() != null ? order.getTotalAmount() : order.getSubtotal().add(order.getDeliveryFee()).subtract(order.getDiscountAmount()));
         res.setStatus(order.getStatus());
-        // ... map thêm các fields cần thiết
+
+        if (order.getOrderDetails() != null) {
+            List<OrderResponse.OrderItemResponse> items = order.getOrderDetails().stream().map(detail -> {
+                OrderResponse.OrderItemResponse itemRes = new OrderResponse.OrderItemResponse();
+                itemRes.setFoodId(detail.getFoodId());
+                itemRes.setFoodNameSnapshot(detail.getFoodNameSnapshot());
+                itemRes.setQuantity(detail.getQuantity());
+                itemRes.setUnitPrice(detail.getUnitPrice());
+                itemRes.setNote(detail.getNote());
+                
+                // Map options if needed (skipping option details in basic response for now or mapping it manually if needed)
+                return itemRes;
+            }).collect(Collectors.toList());
+            res.setItems(items);
+        }
+
+        if (order.getPayment() != null) {
+            OrderResponse.PaymentSummary paymentRes = new OrderResponse.PaymentSummary();
+            paymentRes.setPaymentId(order.getPayment().getId());
+            paymentRes.setMethod(order.getPayment().getPaymentMethod().name());
+            paymentRes.setStatus(order.getPayment().getStatus().name());
+            paymentRes.setAmount(order.getPayment().getAmount());
+            res.setPayment(paymentRes);
+        }
+        
+        if (order.getStatusHistories() != null) {
+            List<OrderResponse.StatusHistoryEntry> history = order.getStatusHistories().stream().map(h -> {
+                OrderResponse.StatusHistoryEntry entry = new OrderResponse.StatusHistoryEntry();
+                entry.setStatus(h.getStatus().name());
+                entry.setChangedAt(h.getChangedAt());
+                entry.setNote(h.getNote());
+                return entry;
+            }).collect(java.util.stream.Collectors.toList());
+            res.setHistory(history);
+        }
+
         return res;
     }
 }
