@@ -23,7 +23,7 @@ import java.util.List;
 public class Customer extends User {
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false)
+    @Column(name = "status", length = 20, nullable = false)
     private CustomerStatus status = CustomerStatus.ACTIVE;
 
     @Column(name = "registered_at", nullable = false, insertable = false, updatable = false)

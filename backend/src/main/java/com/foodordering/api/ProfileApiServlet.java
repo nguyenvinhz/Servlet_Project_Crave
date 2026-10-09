@@ -21,7 +21,7 @@ public class ProfileApiServlet extends BaseApiServlet {
 
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        methodNotAllowed(response, "GET, PUT");
+        doPut(request, response);
     }
 
     @Override

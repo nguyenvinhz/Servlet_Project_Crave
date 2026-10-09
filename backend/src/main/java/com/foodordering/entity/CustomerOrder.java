@@ -126,4 +126,21 @@ public class CustomerOrder {
     public void setStatusHistories(List<OrderStatusHistory> statusHistories) { this.statusHistories = statusHistories; }
     public Payment getPayment() { return payment; }
     public void setPayment(Payment payment) { this.payment = payment; }
+
+    public void addOrderDetail(OrderDetail detail) {
+        this.orderDetails.add(detail);
+        detail.setOrder(this);
+    }
+
+    public void addStatusHistory(OrderStatusHistory history) {
+        this.statusHistories.add(history);
+        history.setOrder(this);
+    }
+
+    public void setPaymentHelper(Payment payment) {
+        this.payment = payment;
+        if (payment != null) {
+            payment.setOrder(this);
+        }
+    }
 }

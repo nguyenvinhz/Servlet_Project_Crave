@@ -1,0 +1,438 @@
+/* ============================================================
+   Order & Payment Module — Dark Theme
+   Dùng cho: checkout, orders, order-detail, admin-orders
+   Kế thừa --accent, --accent-dark từ styles.css
+   ============================================================ */
+
+/* --- Dark-theme tokens --- */
+.order-page {
+    --bg: #141414;
+    --bg-card: #1e1e1e;
+    --bg-card-alt: #252525;
+    --bg-input: #2a2a2a;
+    --text: #f5f5f5;
+    --text-muted: #9ca3af;
+    --border: #333;
+    --border-focus: var(--accent);
+}
+
+/* --- Override body & header khi nằm trong trang order --- */
+.order-theme {
+    background: var(--bg);
+    color: var(--text);
+}
+
+.order-theme .site-header {
+    background: var(--bg);
+    border-bottom-color: var(--border);
+}
+
+.order-theme .site-header .brand {
+    color: var(--text);
+}
+
+.order-theme .site-header nav a {
+    color: var(--text-muted);
+}
+
+.order-theme .site-header nav a:hover,
+.order-theme .site-header nav a.active {
+    color: var(--accent);
+}
+
+.order-theme .site-footer {
+    background: var(--bg);
+    border-top-color: var(--border);
+    color: var(--text-muted);
+}
+
+/* --- Card chung (dark) --- */
+.order-page .card {
+    background: var(--bg-card);
+    border-color: var(--border);
+    color: var(--text);
+    box-shadow: none;
+}
+
+.order-page .card h2,
+.order-page .card h3 {
+    color: var(--text);
+    font-family: Georgia, serif;
+}
+
+/* --- Input & Select (dark) --- */
+.order-page input,
+.order-page textarea,
+.order-page select {
+    width: 100%;
+    padding: 0.85rem 0.95rem;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--bg-input);
+    color: var(--text);
+    font: inherit;
+}
+
+.order-page input::placeholder,
+.order-page textarea::placeholder {
+    color: var(--text-muted);
+}
+
+.order-page input:focus,
+.order-page textarea:focus,
+.order-page select:focus {
+    border-color: var(--border-focus);
+    outline: 3px solid rgba(239, 91, 53, 0.2);
+}
+
+.order-page label {
+    display: block;
+    margin: 1rem 0 0.4rem;
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--text);
+}
+
+/* --- Nút CTA (cam) --- */
+.order-page .btn-primary {
+    display: block;
+    width: 100%;
+    margin-top: 1.25rem;
+    padding: 0.9rem 1.25rem;
+    border: 0;
+    border-radius: 10px;
+    background: var(--accent);
+    color: #fff;
+    font: inherit;
+    font-weight: 800;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.order-page .btn-primary:hover {
+    background: var(--accent-dark);
+}
+
+/* ============================================================
+   CHECKOUT — Layout 2 cột
+   ============================================================ */
+.checkout-grid {
+    display: grid;
+    grid-template-columns: 1.2fr 0.8fr;
+    gap: 2rem;
+    align-items: start;
+}
+
+.checkout-left h1 {
+    margin: 0 0 0.5rem;
+    font-family: Georgia, serif;
+    font-size: clamp(2rem, 4vw, 2.8rem);
+    color: var(--text);
+}
+
+.checkout-section {
+    margin-top: 2rem;
+}
+
+.checkout-section h2 {
+    margin: 0 0 1rem;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--text);
+}
+
+/* Radio group cho Payment method */
+.radio-group {
+    display: grid;
+    gap: 0.5rem;
+}
+
+.radio-group label {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    margin: 0;
+    padding: 0.7rem 0.8rem;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: background 0.15s;
+}
+
+.radio-group label:hover {
+    background: var(--bg-card-alt);
+}
+
+.radio-group input[type="radio"] {
+    width: 1rem;
+    height: 1rem;
+    margin: 0;
+    accent-color: var(--accent);
+}
+
+/* Order summary card (cột phải checkout) */
+.order-summary {
+    padding: clamp(1.25rem, 3vw, 2rem);
+    border-radius: 16px;
+    background: var(--bg-card-alt);
+    border: 1px solid var(--border);
+}
+
+.order-summary h2 {
+    margin: 0 0 1rem;
+    font-size: 1.2rem;
+    font-weight: 700;
+}
+
+.summary-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.4rem 0;
+    font-size: 0.95rem;
+}
+
+.summary-row.total {
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--border);
+    font-size: 1.1rem;
+    font-weight: 800;
+}
+
+/* ============================================================
+   ORDERS LIST — Card danh sách đơn hàng
+   ============================================================ */
+.orders-list {
+    display: grid;
+    gap: 1rem;
+}
+
+.order-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.25rem 1.5rem;
+    border-radius: 14px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    transition: border-color 0.15s;
+}
+
+.order-card:hover {
+    border-color: var(--accent);
+}
+
+.order-card-info h3 {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 700;
+}
+
+.order-card-info p {
+    margin: 0.2rem 0 0;
+    font-size: 0.875rem;
+    color: var(--text-muted);
+}
+
+.order-card-right {
+    text-align: right;
+}
+
+.order-card-right .price {
+    font-size: 1rem;
+    font-weight: 700;
+}
+
+.order-status-badge {
+    display: inline-block;
+    margin-top: 0.3rem;
+    padding: 0.2rem 0.65rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.badge-pending { background: #3b2f00; color: #fbbf24; }
+.badge-preparing { background: #1e3a5f; color: #60a5fa; }
+.badge-delivering { background: #3b1f00; color: var(--accent); }
+.badge-completed { background: #052e16; color: #4ade80; }
+.badge-cancelled { background: #2d0a0a; color: #f87171; }
+
+/* ============================================================
+   ORDER DETAIL / TRACKING — Stepper bar
+   ============================================================ */
+.tracking-header h1 {
+    margin: 0;
+    font-family: Georgia, serif;
+    font-size: clamp(1.8rem, 4vw, 2.5rem);
+    color: var(--text);
+}
+
+.tracking-header p {
+    margin: 0.35rem 0 0;
+    color: var(--text-muted);
+    font-size: 0.95rem;
+}
+
+.stepper {
+    display: flex;
+    justify-content: space-between;
+    margin: 2.5rem 0;
+    padding: 2rem 1.5rem;
+    border-radius: 14px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    position: relative;
+}
+
+.stepper::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 10%;
+    width: 80%;
+    height: 2px;
+    background: var(--border);
+    transform: translateY(-50%);
+    z-index: 0;
+}
+
+.step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    position: relative;
+    z-index: 1;
+}
+
+.step-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    font-size: 0.85rem;
+    font-weight: 800;
+    background: var(--bg-card-alt);
+    color: var(--text-muted);
+    border: 2px solid var(--border);
+    transition: all 0.2s;
+}
+
+.step.done .step-icon {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+}
+
+.step.active .step-icon {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 4px rgba(239, 91, 53, 0.25);
+}
+
+.step-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-align: center;
+    max-width: 90px;
+}
+
+.step.done .step-label,
+.step.active .step-label {
+    color: var(--accent);
+}
+
+/* Item card trong tracking */
+.tracking-item {
+    padding: 1.25rem 1.5rem;
+    border-radius: 14px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+}
+
+.tracking-item h3 {
+    margin: 0;
+    font-size: 1.05rem;
+    font-weight: 700;
+}
+
+.tracking-item p {
+    margin: 0.25rem 0 0;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}
+
+/* ============================================================
+   ADMIN ORDERS — Dark table
+   ============================================================ */
+.admin-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+
+.admin-table th,
+.admin-table td {
+    padding: 0.85rem 1rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+}
+
+.admin-table th {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.admin-table tr:hover td {
+    background: var(--bg-card-alt);
+}
+
+.admin-table select {
+    width: auto;
+    padding: 0.45rem 0.6rem;
+    font-size: 0.85rem;
+}
+
+.admin-action-btn {
+    padding: 0.4rem 0.85rem;
+    border: 0;
+    border-radius: 8px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 0.8rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.admin-action-btn:hover {
+    background: var(--accent-dark);
+}
+
+/* ============================================================
+   Responsive
+   ============================================================ */
+@media (max-width: 800px) {
+    .checkout-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .stepper {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1.5rem;
+    }
+
+    .stepper::before {
+        display: none;
+    }
+}

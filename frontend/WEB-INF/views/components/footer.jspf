@@ -1,5 +1,6 @@
 <footer class="site-footer">
     <p>Crave · Đặt món nhanh, nhận món ngon.</p>
 </footer>
+<script src="<c:url value='/assets/js/account.js'/>"></script>
 </body>
 </html>
