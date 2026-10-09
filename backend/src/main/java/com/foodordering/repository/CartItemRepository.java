@@ -119,9 +119,10 @@ public class CartItemRepository {
         EntityManager em = DatabaseConfig.getEntityManager();
         if (em == null) return optionIds;
         try {
-            String jpql = "SELECT fo.optionId FROM FoodOption fo WHERE fo.food.foodId = :foodId AND fo.status = 'ACTIVE' AND fo.optionId IN (:optionIds)";
+            String jpql = "SELECT fo.id FROM FoodOption fo WHERE fo.food.id = :foodId AND fo.status = :status AND fo.id IN (:optionIds)";
             return em.createQuery(jpql, String.class)
                     .setParameter("foodId", foodId)
+                    .setParameter("status", com.foodordering.enums.OptionStatus.ACTIVE)
                     .setParameter("optionIds", optionIds)
                     .getResultList();
         } catch (Exception e) {
@@ -139,7 +140,7 @@ public class CartItemRepository {
         EntityManager em = DatabaseConfig.getEntityManager();
         if (em == null) return null;
         try {
-            List<CartItem> items = em.createQuery("SELECT ci FROM CartItem ci WHERE ci.cart.cartId = :cartId AND ci.food.foodId = :foodId", CartItem.class)
+            List<CartItem> items = em.createQuery("SELECT ci FROM CartItem ci WHERE ci.cart.cartId = :cartId AND ci.food.id = :foodId", CartItem.class)
                     .setParameter("cartId", cartId)
                     .setParameter("foodId", foodId)
                     .getResultList();
@@ -163,7 +164,7 @@ public class CartItemRepository {
     private Set<String> getOptionIdsForItem(EntityManager em, String cartItemId) {
         Set<String> set = new HashSet<>();
         try {
-            String jpql = "SELECT cio.option.optionId FROM CartItemOption cio WHERE cio.cartItem.cartItemId = :cartItemId";
+            String jpql = "SELECT cio.option.id FROM CartItemOption cio WHERE cio.cartItem.cartItemId = :cartItemId";
             List<String> list = em.createQuery(jpql, String.class)
                     .setParameter("cartItemId", cartItemId)
                     .getResultList();

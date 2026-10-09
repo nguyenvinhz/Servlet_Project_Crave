@@ -53,6 +53,7 @@ public class CartService {
      * Lấy hoặc tạo giỏ hàng cho khách hàng, chuyển đổi Entity sang DTO qua CartMapper.
      */
     public CartDto getOrCreateCart(String customerId) {
+        CartValidator.validateCustomerId(customerId);
         Cart cart = cartRepository.findByCustomerId(customerId);
         if (cart == null) {
             cart = cartRepository.createCart(customerId);
@@ -64,6 +65,9 @@ public class CartService {
     }
 
     public CartDto addItem(String customerId, AddToCartRequest request) {
+        CartValidator.validateCustomerId(customerId);
+        CartValidator.validateAddToCart(request);
+
         boolean foodAvailable = cartItemRepository.isFoodAvailable(request.getFoodId());
         if (!foodAvailable) {
             throw new BadRequestException(ErrorCode.FOOD_NOT_AVAILABLE, "Món ăn hiện không khả dụng hoặc đã ngừng phục vụ");
@@ -106,6 +110,9 @@ public class CartService {
     }
 
     public CartDto updateItem(String customerId, UpdateCartItemRequest request) {
+        CartValidator.validateCustomerId(customerId);
+        CartValidator.validateUpdateCartItem(request);
+
         Cart cart = cartRepository.findByCustomerId(customerId);
         if (cart == null) {
             throw new ResourceNotFoundException(ErrorCode.CART_NOT_FOUND, "Không tìm thấy giỏ hàng của bạn");
