@@ -80,6 +80,28 @@
             }
         });
 
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                // Giả lập gọi API giỏ hàng của Trí
+                const res = await fetch('/crave/api/cart?mock_customer=C001');
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.success && data.data) {
+                        const cart = data.data;
+                        document.getElementById('summarySubtotal').textContent = cart.subtotal.toLocaleString('vi-VN') + ' đ';
+                        const fee = 15000;
+                        document.getElementById('summaryFee').textContent = fee.toLocaleString('vi-VN') + ' đ';
+                        document.getElementById('summaryTotal').textContent = (cart.subtotal + fee).toLocaleString('vi-VN') + ' đ';
+                    }
+                } else {
+                    document.getElementById('summarySubtotal').textContent = 'Chưa có dữ liệu giỏ hàng';
+                    document.getElementById('summaryTotal').textContent = '...';
+                }
+            } catch (err) {
+                document.getElementById('summarySubtotal').textContent = 'Lỗi tải giỏ hàng';
+            }
+        });
+
         document.getElementById('checkoutForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             const alertBox = document.getElementById('checkoutAlert');
@@ -110,7 +132,7 @@
                     alertBox.classList.add('success');
                     alertBox.style.display = 'block';
                     setTimeout(() => {
-                        window.location.href = '/crave/orders';
+                        window.location.href = '/crave/orders?new=' + data.data.orderId;
                     }, 2000);
                 } else {
                     alertBox.textContent = data.message || 'Có lỗi xảy ra.';
