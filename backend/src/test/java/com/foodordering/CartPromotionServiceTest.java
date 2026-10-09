@@ -12,6 +12,7 @@ import com.foodordering.mapper.CartItemMapper;
 import com.foodordering.mapper.CartItemOptionMapper;
 import com.foodordering.mapper.CartMapper;
 import com.foodordering.mapper.PromotionMapper;
+import com.foodordering.repository.PromotionRepository;
 import com.foodordering.service.CartService;
 import com.foodordering.service.PromotionService;
 import com.foodordering.utils.JsonUtils;
@@ -78,7 +79,7 @@ public class CartPromotionServiceTest {
         p.setMinimumOrderValue(BigDecimal.ZERO);
         p.setMaximumDiscount(new BigDecimal("50000"));
 
-        PromotionService service = new PromotionService();
+        PromotionService service = offlinePromotionService();
         BigDecimal subtotal = new BigDecimal("200000"); // 200,000 đ
         BigDecimal discount = service.calculateDiscount(p, subtotal, LocalDateTime.now());
 
@@ -96,7 +97,7 @@ public class CartPromotionServiceTest {
         p.setMinimumOrderValue(BigDecimal.ZERO);
         p.setMaximumDiscount(new BigDecimal("50000"));
 
-        PromotionService service = new PromotionService();
+        PromotionService service = offlinePromotionService();
         BigDecimal subtotal = new BigDecimal("800000"); // 800,000 đ (10% = 80,000 đ > trần 50,000 đ)
         BigDecimal discount = service.calculateDiscount(p, subtotal, LocalDateTime.now());
 
@@ -112,7 +113,7 @@ public class CartPromotionServiceTest {
         p.setDiscountValue(new BigDecimal("20000"));
         p.setMinimumOrderValue(new BigDecimal("100000"));
 
-        PromotionService service = new PromotionService();
+        PromotionService service = offlinePromotionService();
         BigDecimal subtotal = new BigDecimal("150000");
         BigDecimal discount = service.calculateDiscount(p, subtotal, LocalDateTime.now());
 
@@ -256,6 +257,16 @@ public class CartPromotionServiceTest {
         List<PromotionDto> dtoList = mapper.toDtoList(List.of(promo));
         assert dtoList.size() == 1 : "Sai dtoList size";
         System.out.println("   [PASSED] Chuyển đổi Promotion Entity -> DTO thủ công hoàn toàn chính xác");
+    }
+
+    private static PromotionService offlinePromotionService() {
+        PromotionRepository repository = new PromotionRepository() {
+            @Override
+            public BigDecimal calculateDiscountViaDatabase(String promotionId, BigDecimal subtotal, LocalDateTime orderTime) {
+                return null;
+            }
+        };
+        return new PromotionService(repository, new CartService());
     }
 
     private static void testCustomerOrderOrderTimeValidation() {

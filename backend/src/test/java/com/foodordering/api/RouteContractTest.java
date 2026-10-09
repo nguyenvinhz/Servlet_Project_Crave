@@ -24,7 +24,8 @@ class RouteContractTest {
 
     @Test
     void allAccountApiRootsAreRegistered() {
-        assertEquals(Set.of("/api/auth/login", "/api/auth/register"), patterns(AuthApiServlet.class));
+        assertEquals(Set.of("/api/auth/login", "/api/auth/register", "/api/auth/logout", "/api/auth/session"),
+                patterns(AuthApiServlet.class));
         assertEquals(Set.of("/api/profile"), patterns(ProfileApiServlet.class));
         assertEquals(Set.of("/api/addresses", "/api/addresses/*"), patterns(AddressApiServlet.class));
         assertEquals(Set.of("/api/health"), patterns(HealthApiServlet.class));
