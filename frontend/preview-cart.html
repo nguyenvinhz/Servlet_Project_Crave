@@ -1,0 +1,542 @@
+<!doctype html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Your cart · Crave Preview</title>
+    <!-- Fonts matching Framer -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="./assets/css/styles.css">
+    <link rel="stylesheet" href="./assets/css/cart.css">
+    <style>
+        /* Interactive Preview Controls Toolbar */
+        .preview-toolbar {
+            background: #1e293b;
+            color: #fff;
+            padding: 10px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 12px;
+            font-size: 0.88rem;
+            position: sticky;
+            top: 0;
+            z-index: 99999;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        .preview-toolbar-badge {
+            background: #f4511e;
+            color: #fff;
+            font-weight: 800;
+            padding: 3px 8px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+        }
+        .preview-btn-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .preview-state-btn {
+            background: #334155;
+            color: #cbd5e1;
+            border: 1px solid #475569;
+            border-radius: 6px;
+            padding: 5px 12px;
+            font-size: 0.82rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .preview-state-btn:hover {
+            background: #475569;
+            color: #fff;
+        }
+        .preview-state-btn.active {
+            background: #f4511e;
+            color: #fff;
+            border-color: #f4511e;
+        }
+        
+        /* Header Matching Framer */
+        .site-header {
+            background: #ffffff;
+            border-bottom: 1px solid #f2e6df;
+            padding: 0 4vw;
+            min-height: 72px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .site-header .brand {
+            font-family: 'Nunito', sans-serif;
+            font-weight: 900;
+            font-size: 1.95rem;
+            color: #f4511e;
+            letter-spacing: -0.04em;
+            text-decoration: none;
+        }
+        .site-header nav {
+            display: flex;
+            align-items: center;
+            gap: 1.8rem;
+        }
+        .site-header nav a {
+            font-family: 'Inter', sans-serif;
+            font-weight: 600;
+            font-size: 0.95rem;
+            color: #4b5563;
+            transition: color 0.15s ease;
+            text-decoration: none;
+        }
+        .site-header nav a:hover {
+            color: #f4511e;
+        }
+        .header-actions-right {
+            display: flex;
+            align-items: center;
+            gap: 18px;
+        }
+        .header-cart-icon-btn {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            background: #fff8f3;
+            color: #1f2937;
+            border: 1px solid #f2e6df;
+            text-decoration: none;
+        }
+        .header-cart-icon-btn .cart-badge-count {
+            position: absolute;
+            top: -4px;
+            right: -4px;
+            background: #f4511e;
+            color: #fff;
+            font-size: 0.72rem;
+            font-weight: 800;
+            min-width: 18px;
+            height: 18px;
+            border-radius: 999px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 4px;
+            border: 2px solid #fff;
+        }
+        .header-login-link {
+            font-weight: 600;
+            color: #1f2937;
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body class="crave-body">
+
+<!-- Preview State Toggle Bar -->
+<div class="preview-toolbar">
+    <div style="display: flex; align-items: center; gap: 10px;">
+        <span class="preview-toolbar-badge">Demo Mode</span>
+        <span>Bộ công tắc mô phỏng trạng thái giao diện:</span>
+    </div>
+    <div class="preview-btn-group">
+        <button type="button" class="preview-state-btn active" onclick="switchState('populated')">🛒 Đang có món</button>
+        <button type="button" class="preview-state-btn" onclick="switchState('empty')">⚪ Trạng thái Rỗng</button>
+        <button type="button" class="preview-state-btn" onclick="switchState('error')">🔴 Trạng thái Lỗi</button>
+        <button type="button" class="preview-state-btn" onclick="switchState('loading')">⏳ Trạng thái Loading</button>
+        <a href="./preview-promotions.html" class="preview-state-btn" style="background:#0284c7; border-color:#0284c7; color:#fff; text-decoration:none;">🎟️ Xem trang Khuyến mãi</a>
+    </div>
+</div>
+
+<!-- Header (Matching Framer Design) -->
+<header class="site-header">
+    <a class="brand" href="javascript:void(0)">crave<span>.</span></a>
+    <nav aria-label="Điều hướng chính">
+        <a href="javascript:void(0)">Home</a>
+        <a href="javascript:void(0)">Restaurants</a>
+        <a href="javascript:void(0)">Food</a>
+        <a href="javascript:void(0)">Drinks</a>
+        <a href="./preview-promotions.html">Promotions</a>
+        <a href="javascript:void(0)">Orders</a>
+    </nav>
+    <div class="header-actions-right">
+        <a href="javascript:void(0)" class="header-cart-icon-btn" title="Giỏ hàng">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="9" cy="21" r="1"></circle>
+                <circle cx="20" cy="21" r="1"></circle>
+                <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+            </svg>
+            <span class="cart-badge-count" id="headerCartCount">1</span>
+        </a>
+        <a href="javascript:void(0)" class="header-login-link">Log in</a>
+    </div>
+</header>
+
+<!-- Main Page -->
+<main class="cart-page-wrapper">
+    <div class="cart-container">
+        
+        <header class="cart-header-section">
+            <h1 class="cart-page-title">Your cart</h1>
+        </header>
+
+        <!-- 1. LOADING STATE (SKELETON SHIMMER) -->
+        <div id="cartLoadingState" class="cart-loading-state" style="display: none;">
+            <div class="cart-layout-grid">
+                <div class="cart-items-column">
+                    <div class="skeleton-card">
+                        <div class="skeleton-thumb skeleton-shimmer"></div>
+                        <div class="skeleton-text-group">
+                            <div class="skeleton-line title skeleton-shimmer"></div>
+                            <div class="skeleton-line sub skeleton-shimmer"></div>
+                            <div class="skeleton-line price skeleton-shimmer"></div>
+                        </div>
+                    </div>
+                    <div class="skeleton-card">
+                        <div class="skeleton-thumb skeleton-shimmer"></div>
+                        <div class="skeleton-text-group">
+                            <div class="skeleton-line title skeleton-shimmer"></div>
+                            <div class="skeleton-line sub skeleton-shimmer"></div>
+                            <div class="skeleton-line price skeleton-shimmer"></div>
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <div class="order-summary-card" style="box-shadow: none;">
+                        <div class="skeleton-line title skeleton-shimmer" style="margin-bottom: 20px;"></div>
+                        <div class="skeleton-line sub skeleton-shimmer" style="margin-bottom: 12px;"></div>
+                        <div class="skeleton-line sub skeleton-shimmer" style="margin-bottom: 12px;"></div>
+                        <div class="summary-divider"></div>
+                        <div class="skeleton-line price skeleton-shimmer" style="height: 36px; margin-bottom: 24px;"></div>
+                        <div class="skeleton-line skeleton-shimmer" style="height: 52px; border-radius: 12px;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. ERROR STATE (TRẠNG THÁI LỖI) -->
+        <div id="cartErrorState" class="cart-error-state" style="display: none;">
+            <div class="cart-error-icon">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" y1="8" x2="12" y2="12"></line>
+                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                </svg>
+            </div>
+            <h3 class="cart-error-title">Không thể tải thông tin giỏ hàng</h3>
+            <p class="cart-error-desc">Máy chủ phản hồi lỗi hoặc phiên đăng nhập của bạn đã hết hạn. Vui lòng bấm thử lại.</p>
+            <button type="button" class="btn-retry" onclick="switchState('populated')">Thử lại ngay</button>
+        </div>
+
+        <!-- 3. EMPTY STATE (TRẠNG THÁI RỖNG) -->
+        <div id="cartEmptyState" class="cart-empty-state" style="display: none;">
+            <div class="cart-empty-illustration">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="9" cy="21" r="1"></circle>
+                    <circle cx="20" cy="21" r="1"></circle>
+                    <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+                </svg>
+            </div>
+            <h2 class="cart-empty-title">Giỏ hàng của bạn đang trống</h2>
+            <p class="cart-empty-desc">
+                Bạn chưa thêm món ăn nào vào giỏ. Hãy dạo quanh thực đơn phong phú của Crave để tìm những món ngon yêu thích nhé!
+            </p>
+            <button type="button" class="btn-explore-menu" onclick="switchState('populated')">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 3h18v18H3zM9 9h6M9 15h6"></path>
+                </svg>
+                Khám phá thực đơn ngay
+            </button>
+        </div>
+
+        <!-- 4. POPULATED STATE (MẪU THIẾT KẾ ĐẦY ĐỦ KHỚP 100% ẢNH CHỤP) -->
+        <div id="cartContentWrapper" class="cart-layout-grid">
+            
+            <!-- Left Column: Cart Items -->
+            <div class="cart-items-column">
+                <div id="demoItemsList" class="cart-items-column">
+                    <!-- Item 1: Smoky Stack Burger (Khớp 100% ảnh chụp) -->
+                    <div class="cart-item-card" id="demoItemCard">
+                        <div class="cart-item-image-wrapper">
+                            <img src="https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=300&auto=format&fit=crop&q=80"
+                                 alt="Smoky Stack Burger" class="cart-item-image">
+                        </div>
+                        <div class="cart-item-info">
+                            <h3 class="cart-item-title">Smoky Stack Burger</h3>
+                            <p class="cart-item-options">Double patty · Cheddar · House sauce</p>
+                            <div class="cart-item-actions">
+                                <div class="cart-stepper">
+                                    <button type="button" class="cart-stepper-btn" onclick="adjustDemoQty(-1)">−</button>
+                                    <span class="cart-stepper-val" id="demoQtyVal">1</span>
+                                    <button type="button" class="cart-stepper-btn" onclick="adjustDemoQty(1)">+</button>
+                                </div>
+                                <button type="button" class="cart-item-remove-btn" onclick="removeDemoItem()" title="Xóa món">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <polyline points="3 6 5 6 21 6"></polyline>
+                                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                        <!-- Price display: "$12.90 × 1" in bold orange -->
+                        <div class="cart-item-price-tag" id="demoPriceTag">
+                            $12.90 × 1
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Bottom Toolbar -->
+                <div class="cart-bottom-actions">
+                    <button type="button" class="btn-link-action" onclick="alert('Quay lại danh mục thực đơn')">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="19" y1="12" x2="5" y2="12"></line>
+                            <polyline points="12 19 5 12 12 5"></polyline>
+                        </svg>
+                        Chọn thêm món khác
+                    </button>
+                    <button type="button" class="btn-link-action danger" onclick="switchState('empty')">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                        </svg>
+                        Xóa toàn bộ giỏ
+                    </button>
+                </div>
+            </div>
+
+            <!-- Right Column: Order Summary (Khớp 100% ảnh chụp) -->
+            <div class="cart-summary-column">
+                <div class="order-summary-card">
+                    <h2 class="order-summary-title">Order summary</h2>
+                    
+                    <div class="summary-row">
+                        <span>Subtotal</span>
+                        <span id="demoSubtotal" style="font-weight: 600; color: var(--crave-text);">$12.90</span>
+                    </div>
+
+                    <div class="summary-row">
+                        <span>Delivery fee</span>
+                        <span id="demoDeliveryFee" style="font-weight: 600; color: var(--crave-text);">$2.50</span>
+                    </div>
+
+                    <div class="summary-row discount-row" id="demoDiscountRow">
+                        <span>Discount</span>
+                        <span id="demoDiscount">-$2.58</span>
+                    </div>
+
+                    <div class="summary-divider"></div>
+
+                    <!-- Total: $12.82 in bold -->
+                    <div class="summary-total-row">
+                        <span class="summary-total-label">Total</span>
+                        <span class="summary-total-value" id="demoTotal">$12.82</span>
+                    </div>
+
+                    <!-- Voucher Section (Khu vực nhập voucher) -->
+                    <div class="voucher-section">
+                        <div class="voucher-section-title">
+                            <span>Mã khuyến mãi (Voucher)</span>
+                            <a href="javascript:void(0)" class="voucher-view-all-link" onclick="openPromoModal()">Xem mã có sẵn</a>
+                        </div>
+                        
+                        <div class="voucher-input-group" id="demoInputGroup" style="display: none;">
+                            <input type="text" id="demoVoucherInput" class="voucher-input"
+                                   placeholder="Nhập WELCOME10 hoặc SAVE20K" value="WELCOME10">
+                            <button type="button" id="demoApplyBtn" class="voucher-apply-btn" onclick="applyDemoVoucher()">
+                                Áp dụng
+                            </button>
+                        </div>
+
+                        <!-- Applied Voucher Chip (Khớp số liệu -$2.58 trong ảnh) -->
+                        <div id="demoAppliedChip" class="voucher-applied-chip">
+                            <div class="voucher-chip-info">
+                                <span class="voucher-code-badge">WELCOME10</span>
+                                <span class="voucher-discount-text" id="demoChipDiscount">-20% (-$2.58)</span>
+                            </div>
+                            <button type="button" class="voucher-remove-btn" onclick="removeDemoVoucher()" title="Hủy mã">
+                                &times;
+                            </button>
+                        </div>
+
+                        <!-- Inline Feedback -->
+                        <div id="demoFeedback" class="voucher-feedback"></div>
+                    </div>
+
+                    <!-- Proceed to Checkout Button (Khớp 100% nút cam) -->
+                    <button type="button" class="btn-checkout" onclick="alert('Đang tiến hành chuyển đến màn hình Checkout!')">
+                        Proceed to Checkout
+                    </button>
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+</main>
+
+<!-- Promotion Modal -->
+<div id="demoPromoModal" class="promo-modal-backdrop">
+    <div class="promo-modal-dialog">
+        <div class="promo-modal-header">
+            <h3 class="promo-modal-title">Mã khuyến mãi có sẵn</h3>
+            <button type="button" class="promo-modal-close" onclick="closePromoModal()">&times;</button>
+        </div>
+        <div class="promo-list">
+            <div class="promo-card">
+                <div>
+                    <span class="promo-badge-tag">WELCOME10</span>
+                    <h4 class="promo-card-title">Giảm 20% đơn đầu tiên</h4>
+                    <p class="promo-card-desc">Áp dụng cho mọi đơn hàng mới hôm nay</p>
+                </div>
+                <button type="button" class="btn-apply-promo-card" onclick="selectPromoCode('WELCOME10')">
+                    Áp dụng
+                </button>
+            </div>
+            <div class="promo-card">
+                <div>
+                    <span class="promo-badge-tag">SAVE20K</span>
+                    <h4 class="promo-card-title">Giảm $2.00 đơn từ $10.00</h4>
+                    <p class="promo-card-desc">Áp dụng cho đơn burger & món chính</p>
+                </div>
+                <button type="button" class="btn-apply-promo-card" onclick="selectPromoCode('SAVE20K')">
+                    Áp dụng
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Footer (Matching Framer: crave. Fresh favorites, delivered.) -->
+<footer class="site-footer" style="background: #111827; color: #9ca3af; padding: 28px 4vw; margin-top: 60px;">
+    <div style="max-width: 1240px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+        <div style="font-size: 0.95rem;">
+            <strong style="color: #fff; font-family: 'Nunito', sans-serif; font-size: 1.15rem; font-weight: 900; letter-spacing: -0.02em;">crave.</strong>
+            <span style="color: #d1d5db; margin-left: 8px;">Fresh favorites, delivered.</span>
+        </div>
+        <div style="font-size: 0.85rem; color: #6b7280;">
+            &copy; 2026 Crave Food Ordering · All rights reserved.
+        </div>
+    </div>
+</footer>
+
+<script>
+    // State logic for Demo
+    let qty = 1;
+    let basePrice = 12.90;
+    let deliveryFee = 2.50;
+    let discountPercent = 0.20; // 20%
+    let hasVoucher = true;
+
+    function recalculate() {
+        const subtotal = basePrice * qty;
+        const discount = hasVoucher ? (subtotal * discountPercent) : 0;
+        const total = Math.max(0, subtotal + deliveryFee - discount);
+
+        document.getElementById('demoQtyVal').textContent = qty;
+        document.getElementById('demoPriceTag').textContent = '$' + basePrice.toFixed(2) + ' × ' + qty;
+        document.getElementById('demoSubtotal').textContent = '$' + subtotal.toFixed(2);
+        document.getElementById('demoDeliveryFee').textContent = '$' + deliveryFee.toFixed(2);
+        document.getElementById('headerCartCount').textContent = qty;
+
+        const discountRow = document.getElementById('demoDiscountRow');
+        const discountVal = document.getElementById('demoDiscount');
+        if (hasVoucher && discount > 0) {
+            discountRow.style.display = 'flex';
+            discountVal.textContent = '-$' + discount.toFixed(2);
+        } else {
+            discountRow.style.display = 'none';
+        }
+
+        document.getElementById('demoTotal').textContent = '$' + total.toFixed(2);
+    }
+
+    function adjustDemoQty(delta) {
+        qty = Math.max(1, qty + delta);
+        recalculate();
+    }
+
+    function removeDemoItem() {
+        if (confirm('Bạn có chắc muốn xóa Smoky Stack Burger khỏi giỏ hàng?')) {
+            switchState('empty');
+        }
+    }
+
+    function removeDemoVoucher() {
+        hasVoucher = false;
+        document.getElementById('demoAppliedChip').style.display = 'none';
+        document.getElementById('demoInputGroup').style.display = 'flex';
+        document.getElementById('demoVoucherInput').value = '';
+        recalculate();
+    }
+
+    function applyDemoVoucher() {
+        const input = document.getElementById('demoVoucherInput').value.trim().toUpperCase();
+        const feedback = document.getElementById('demoFeedback');
+        const applyBtn = document.getElementById('demoApplyBtn');
+
+        applyBtn.innerHTML = '<span class="btn-spinner"></span>';
+        applyBtn.disabled = true;
+
+        setTimeout(() => {
+            applyBtn.innerHTML = 'Áp dụng';
+            applyBtn.disabled = false;
+
+            if (input === 'WELCOME10' || input === 'SAVE20K') {
+                hasVoucher = true;
+                discountPercent = input === 'WELCOME10' ? 0.20 : 0.15;
+                document.getElementById('demoAppliedChip').style.display = 'flex';
+                document.getElementById('demoInputGroup').style.display = 'none';
+                feedback.style.display = 'none';
+                recalculate();
+            } else {
+                feedback.textContent = 'Mã khuyến mãi không tồn tại hoặc đã hết hạn!';
+                feedback.className = 'voucher-feedback error';
+                feedback.style.display = 'block';
+            }
+        }, 500);
+    }
+
+    function switchState(state) {
+        document.querySelectorAll('.preview-state-btn').forEach(btn => btn.classList.remove('active'));
+        const activeBtn = event?.target?.classList?.contains('preview-state-btn') ? event.target : null;
+        if (activeBtn) activeBtn.classList.add('active');
+
+        document.getElementById('cartContentWrapper').style.display = (state === 'populated') ? 'grid' : 'none';
+        document.getElementById('cartEmptyState').style.display = (state === 'empty') ? 'block' : 'none';
+        document.getElementById('cartErrorState').style.display = (state === 'error') ? 'block' : 'none';
+        document.getElementById('cartLoadingState').style.display = (state === 'loading') ? 'block' : 'none';
+
+        if (state === 'empty') {
+            document.getElementById('headerCartCount').textContent = '0';
+        } else if (state === 'populated') {
+            document.getElementById('headerCartCount').textContent = qty;
+        }
+    }
+
+    function openPromoModal() {
+        document.getElementById('demoPromoModal').classList.add('active');
+    }
+
+    function closePromoModal() {
+        document.getElementById('demoPromoModal').classList.remove('active');
+    }
+
+    function selectPromoCode(code) {
+        closePromoModal();
+        document.getElementById('demoVoucherInput').value = code;
+        applyDemoVoucher();
+    }
+
+    // Initialize initial calculations
+    recalculate();
+</script>
+
+</body>
+</html>
