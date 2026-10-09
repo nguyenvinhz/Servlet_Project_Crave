@@ -31,7 +31,7 @@
         document.addEventListener('DOMContentLoaded', async () => {
             const listEl = document.getElementById('orderList');
             try {
-                const res = await fetch('/crave/api/orders');
+                const res = await fetch('/crave/api/orders?mock_customer=C001');
                 const data = await res.json();
                 
                 if (res.ok && data.success) {

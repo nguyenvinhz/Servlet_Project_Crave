@@ -29,7 +29,7 @@
             const orderId = pathSegments[pathSegments.length - 1];
 
             try {
-                const res = await fetch('/crave/api/orders/' + orderId);
+                const res = await fetch('/crave/api/orders/' + orderId + '?mock_customer=C001');
                 const data = await res.json();
 
                 if (res.ok && data.success) {
@@ -55,7 +55,7 @@
                         </div>
                         <div class="item-list">
                             <h4>Danh sách món</h4>
-                            ${o.details ? o.details.map(item => `
+                            ${o.items ? o.items.map(item => `
                                 <div class="item-row">
                                     <div class="item-details">
                                         <strong>${item.quantity}x ${item.foodNameSnapshot}</strong>

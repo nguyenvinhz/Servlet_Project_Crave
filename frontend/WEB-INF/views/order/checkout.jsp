@@ -97,7 +97,7 @@
             };
 
             try {
-                const res = await fetch('/crave/api/orders', {
+                const res = await fetch('/crave/api/orders?mock_customer=C001', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)

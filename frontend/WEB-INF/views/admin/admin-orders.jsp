@@ -41,7 +41,7 @@
             const listEl = document.getElementById('adminOrderList');
             try {
                 // Mock endpoint or real if implemented later
-                const res = await fetch('/crave/api/orders'); // Fetch temporarily from customer api
+                const res = await fetch('/crave/api/admin/orders?mock_employee=E001'); // Fetch from admin api
                 const data = await res.json();
                 
                 if (res.ok && data.success) {
@@ -80,7 +80,7 @@
             const payload = { status: status, note: "Admin cập nhật" };
             
             try {
-                const res = await fetch('/crave/api/admin/orders/' + orderId, {
+                const res = await fetch('/crave/api/admin/orders/' + orderId + '?mock_employee=E001', {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
