@@ -173,8 +173,8 @@
                     </div>
 
                     <!-- Checkout Button (Matching Screenshot: Orange Button) -->
-                    <button type="button" class="btn-checkout" id="proceedCheckoutBtn" disabled>
-                        Thanh toán tạm thời chưa khả dụng
+                    <button type="button" class="btn-checkout" id="proceedCheckoutBtn">
+                        Proceed to Checkout
                     </button>
                 </div>
             </div>

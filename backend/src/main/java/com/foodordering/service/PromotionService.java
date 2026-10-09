@@ -3,6 +3,7 @@ package com.foodordering.service;
 import com.foodordering.dto.PromotionDto;
 import com.foodordering.dto.PromotionValidationResultDto;
 import com.foodordering.dto.ValidatePromotionRequest;
+import com.foodordering.entity.CustomerOrder;
 import com.foodordering.entity.Promotion;
 import com.foodordering.enums.DiscountType;
 import com.foodordering.enums.ErrorCode;
@@ -48,6 +49,19 @@ public class PromotionService {
             return new PromotionValidationResultDto(false, "Dữ liệu yêu cầu không được để trống", ErrorCode.BAD_REQUEST.getCode());
         }
         return validatePromotion(request.getCode(), customerId, request.getSubtotal(), LocalDateTime.now());
+    }
+
+    /**
+     * Xác thực voucher cho một đơn hàng cụ thể của khách hàng bằng cách lấy orderTime từ CustomerOrder.
+     */
+    public PromotionValidationResultDto validatePromotionForOrder(String code, CustomerOrder order) {
+        if (order == null) {
+            return validatePromotion(code, null, null, LocalDateTime.now());
+        }
+        String customerId = order.getCustomer() != null ? order.getCustomer().getId() : order.getCustomerId();
+        BigDecimal subtotal = order.getSubtotal();
+        LocalDateTime orderTime = order.getOrderTime(); // Lấy orderTime của khách hàng từ CustomerOrder
+        return validatePromotion(code, customerId, subtotal, orderTime);
     }
 
     /**

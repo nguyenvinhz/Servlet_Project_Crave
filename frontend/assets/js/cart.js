@@ -104,6 +104,9 @@
                 initCart();
             });
         }
+        if (elements.checkoutBtn) {
+            elements.checkoutBtn.addEventListener('click', handleProceedCheckout);
+        }
     }
 
     /* ==========================================================================
@@ -398,6 +401,20 @@
                 }
             });
         });
+    }
+
+    function handleProceedCheckout() {
+        if (!state.cart || !state.cart.items || state.cart.items.length === 0) {
+            showToast("Giỏ hàng của bạn đang trống!", "error");
+            return;
+        }
+        // Save applied voucher to session storage for checkout page
+        if (state.appliedVoucher) {
+            sessionStorage.setItem('crave_applied_voucher', JSON.stringify(state.appliedVoucher));
+        } else {
+            sessionStorage.removeItem('crave_applied_voucher');
+        }
+        window.location.href = `${API_BASE}/checkout`;
     }
 
     /* ==========================================================================
