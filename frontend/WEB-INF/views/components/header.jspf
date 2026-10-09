@@ -51,6 +51,7 @@
         .header-actions-right {
             display: flex;
             align-items: center;
+            flex-wrap: wrap;
             gap: 18px;
         }
         .header-cart-icon-btn {
@@ -93,7 +94,8 @@
         .header-cart-icon-btn:hover .cart-badge-count {
             background: #1f2937;
         }
-        .header-login-link {
+        .header-login-link,
+        .header-actions-right .nav-button {
             font-family: 'Inter', sans-serif;
             font-weight: 600;
             font-size: 0.95rem;
@@ -101,30 +103,58 @@
             text-decoration: none;
             transition: color 0.15s ease;
         }
-        .header-login-link:hover {
+        .header-login-link:hover,
+        .header-actions-right .nav-button:hover {
             color: #f4511e;
+        }
+        @media (max-width: 1000px) {
+            .site-header {
+                flex-wrap: wrap;
+                padding-block: 14px;
+                gap: 14px 24px;
+            }
+            .site-header nav {
+                gap: 1rem;
+            }
+            .header-actions-right {
+                gap: 14px;
+            }
         }
     </style>
 </head>
-<body class="crave-body">
+<body class="crave-body" data-context-path="<c:out value='${pageContext.request.contextPath}'/>">
 <header class="site-header">
     <a class="brand" href="<c:url value='/menu'/>">crave<span>.</span></a>
     <nav aria-label="Điều hướng chính">
         <a href="<c:url value='/menu'/>">Thực đơn</a>
         <a href="<c:url value='/promotions'/>">Khuyến mãi</a>
         <a href="<c:url value='/cart'/>">Giỏ hàng</a>
-        <a href="<c:url value='/customer/profile'/>">Hồ sơ</a>
-        <a href="<c:url value='/customer/addresses'/>">Địa chỉ</a>
     </nav>
     <div class="header-actions-right">
-        <a href="<c:url value='/cart'/>" class="header-cart-icon-btn" title="Giỏ hàng">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <a href="<c:url value='/cart'/>" class="header-cart-icon-btn" title="Giỏ hàng" aria-label="Giỏ hàng">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <circle cx="9" cy="21" r="1"></circle>
                 <circle cx="20" cy="21" r="1"></circle>
                 <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
             </svg>
             <span class="cart-badge-count">0</span>
         </a>
-        <a href="<c:url value='/auth/login'/>" class="header-login-link">Đăng nhập</a>
+        <c:choose>
+            <c:when test="${not empty sessionScope.currentUser}">
+                <a href="<c:url value='/customer/profile'/>" class="header-login-link">Hồ sơ</a>
+                <c:if test="${sessionScope.currentUser.accountType == 'CUSTOMER'}">
+                    <a href="<c:url value='/customer/addresses'/>" class="header-login-link">Địa chỉ</a>
+                </c:if>
+                <form id="logoutForm" class="logout-form" action="<c:url value='/api/auth/logout'/>" method="post">
+                    <button class="nav-button" type="submit">Đăng xuất</button>
+                </form>
+            </c:when>
+            <c:otherwise>
+                <a href="<c:url value='/auth/login'/>" class="header-login-link">Đăng nhập</a>
+                <a href="<c:url value='/auth/register'/>" class="header-login-link">Đăng ký</a>
+            </c:otherwise>
+        </c:choose>
     </div>
 </header>
+<p id="logout-error" class="form-error header-message" role="alert" hidden></p>
+<noscript><p class="header-message">Vui lòng bật JavaScript để sử dụng chức năng tài khoản.</p></noscript>
