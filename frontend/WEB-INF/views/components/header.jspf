@@ -5,15 +5,126 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title><c:out value="${pageTitle}"/> · Crave</title>
+    <!-- Google Fonts Nunito & Inter matching Framer design -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="<c:url value='/assets/css/styles.css'/>">
+    <style>
+        .site-header {
+            background: #ffffff;
+            border-bottom: 1px solid #f2e6df;
+            padding: 0 4vw;
+            min-height: 72px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .site-header .brand {
+            font-family: 'Nunito', sans-serif;
+            font-weight: 900;
+            font-size: 1.95rem;
+            color: #f4511e;
+            letter-spacing: -0.04em;
+            text-decoration: none;
+        }
+        .site-header .brand span {
+            color: #f4511e;
+        }
+        .site-header nav {
+            display: flex;
+            align-items: center;
+            gap: 1.8rem;
+        }
+        .site-header nav a {
+            font-family: 'Inter', sans-serif;
+            font-weight: 600;
+            font-size: 0.95rem;
+            color: #4b5563;
+            transition: color 0.15s ease;
+            text-decoration: none;
+        }
+        .site-header nav a:hover {
+            color: #f4511e;
+            text-decoration: none;
+        }
+        .header-actions-right {
+            display: flex;
+            align-items: center;
+            gap: 18px;
+        }
+        .header-cart-icon-btn {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            background: #fff8f3;
+            color: #1f2937;
+            border: 1px solid #f2e6df;
+            transition: all 0.2s ease;
+            text-decoration: none;
+        }
+        .header-cart-icon-btn:hover {
+            background: #f4511e;
+            color: #fff;
+            border-color: #f4511e;
+            text-decoration: none;
+        }
+        .header-cart-icon-btn .cart-badge-count {
+            position: absolute;
+            top: -4px;
+            right: -4px;
+            background: #f4511e;
+            color: #fff;
+            font-size: 0.72rem;
+            font-weight: 800;
+            min-width: 18px;
+            height: 18px;
+            border-radius: 999px;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 0 4px;
+            border: 2px solid #fff;
+        }
+        .header-cart-icon-btn:hover .cart-badge-count {
+            background: #1f2937;
+        }
+        .header-login-link {
+            font-family: 'Inter', sans-serif;
+            font-weight: 600;
+            font-size: 0.95rem;
+            color: #1f2937;
+            text-decoration: none;
+            transition: color 0.15s ease;
+        }
+        .header-login-link:hover {
+            color: #f4511e;
+        }
+    </style>
 </head>
-<body>
+<body class="crave-body">
 <header class="site-header">
-    <a class="brand" href="<c:url value='/auth/login'/>">Crave<span>.</span></a>
-    <nav aria-label="Điều hướng tài khoản">
-        <a href="<c:url value='/auth/login'/>">Đăng nhập</a>
-        <a href="<c:url value='/auth/register'/>">Đăng ký</a>
+    <a class="brand" href="<c:url value='/menu'/>">crave<span>.</span></a>
+    <nav aria-label="Điều hướng chính">
+        <a href="<c:url value='/menu'/>">Thực đơn</a>
+        <a href="<c:url value='/promotions'/>">Khuyến mãi</a>
+        <a href="<c:url value='/cart'/>">Giỏ hàng</a>
         <a href="<c:url value='/customer/profile'/>">Hồ sơ</a>
         <a href="<c:url value='/customer/addresses'/>">Địa chỉ</a>
     </nav>
+    <div class="header-actions-right">
+        <a href="<c:url value='/cart'/>" class="header-cart-icon-btn" title="Giỏ hàng">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="9" cy="21" r="1"></circle>
+                <circle cx="20" cy="21" r="1"></circle>
+                <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+            </svg>
+            <span class="cart-badge-count">0</span>
+        </a>
+        <a href="<c:url value='/auth/login'/>" class="header-login-link">Đăng nhập</a>
+    </div>
 </header>
