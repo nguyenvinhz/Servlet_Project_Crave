@@ -20,36 +20,16 @@
     // DOM Elements
     let elements = {};
 
-    const API_BASE = document.body.dataset.contextPath || '';
-
-    function apiErrorMessage(data, fallback) {
-        return data?.error?.message || data?.message || fallback;
-    }
-
-    async function requestApi(path, options = {}) {
-        const response = await fetch(`${API_BASE}${path}`, {
-            ...options,
-            credentials: 'same-origin',
-            headers: { 'Accept': 'application/json', ...options.headers }
-        });
-        if (response.status === 401) {
-            state.cart = null;
-            state.appliedVoucher = null;
-            updateCartBadges(0);
-            if (elements.itemsContainer) elements.itemsContainer.replaceChildren();
-            showErrorState('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
-            try { sessionStorage.removeItem('crave_applied_voucher'); } catch (_) { }
-            const query = new URLSearchParams({
-                reason: 'session-expired',
-                returnTo: `${window.location.pathname}${window.location.search}`
-            });
-            window.location.assign(`${API_BASE}/auth/login?${query}`);
-            return null;
+    function getContextPath() {
+        const path = window.location.pathname;
+        const idx = path.indexOf('/', 1);
+        if (idx !== -1 && !path.startsWith('/cart') && !path.startsWith('/promotions') && !path.startsWith('/menu')) {
+            return path.substring(0, idx);
         }
-        const data = await response.json();
-        if (!response.ok) data.success = false;
-        return data;
+        return '';
     }
+
+    const API_BASE = getContextPath();
 
     document.addEventListener('DOMContentLoaded', () => {
         cacheDOMElements();
@@ -136,8 +116,16 @@
     async function initCart() {
         showLoadingState();
         try {
-            const data = await requestApi('/api/cart');
-            if (!data) return;
+            const resp = await fetch(`${API_BASE}/api/cart`, {
+                headers: { 'Accept': 'application/json' }
+            });
+            const data = await resp.json();
+
+            if (!resp.ok && resp.status === 401) {
+                // Not logged in or guest session
+                showErrorState("Vui lòng đăng nhập để xem và quản lý giỏ hàng của bạn.");
+                return;
+            }
 
             if (data.success && data.data) {
                 state.cart = data.data;
@@ -146,7 +134,7 @@
                 renderCart();
                 checkUrlVoucherParam();
             } else {
-                showErrorState(apiErrorMessage(data, "Không thể tải giỏ hàng."));
+                showErrorState(data.message || "Không thể tải giỏ hàng.");
             }
         } catch (err) {
             console.error("Cart fetch error:", err);
@@ -173,7 +161,7 @@
         }
 
         try {
-            const data = await requestApi('/api/cart/items/update', {
+            const resp = await fetch(`${API_BASE}/api/cart/items/update`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -181,7 +169,7 @@
                 },
                 body: JSON.stringify({ cartItemId: cartItemId, quantity: newQty })
             });
-            if (!data) return;
+            const data = await resp.json();
 
             if (data.success && data.data) {
                 state.cart = data.data;
@@ -189,7 +177,7 @@
                 revalidateAppliedVoucher();
                 showToast("Đã cập nhật số lượng món", "success");
             } else {
-                const msg = apiErrorMessage(data, "Không thể cập nhật số lượng");
+                const msg = data.error?.message || data.message || "Không thể cập nhật số lượng";
                 showToast(msg, "error");
             }
         } catch (err) {
@@ -199,11 +187,11 @@
 
     async function removeItem(cartItemId) {
         try {
-            const data = await requestApi(`/api/cart/items?cartItemId=${encodeURIComponent(cartItemId)}`, {
+            const resp = await fetch(`${API_BASE}/api/cart/items?cartItemId=${encodeURIComponent(cartItemId)}`, {
                 method: 'DELETE',
                 headers: { 'Accept': 'application/json' }
             });
-            if (!data) return;
+            const data = await resp.json();
 
             if (data.success && data.data) {
                 state.cart = data.data;
@@ -211,7 +199,7 @@
                 revalidateAppliedVoucher();
                 showToast("Đã xóa món khỏi giỏ hàng", "success");
             } else {
-                const msg = apiErrorMessage(data, "Không thể xóa món");
+                const msg = data.error?.message || data.message || "Không thể xóa món";
                 showToast(msg, "error");
             }
         } catch (err) {
@@ -225,11 +213,11 @@
         }
 
         try {
-            const data = await requestApi('/api/cart/clear', {
+            const resp = await fetch(`${API_BASE}/api/cart/clear`, {
                 method: 'POST',
                 headers: { 'Accept': 'application/json' }
             });
-            if (!data) return;
+            const data = await resp.json();
 
             if (data.success && data.data) {
                 state.cart = data.data;
@@ -237,7 +225,7 @@
                 renderCart();
                 showToast("Đã làm sạch giỏ hàng", "success");
             } else {
-                showToast(apiErrorMessage(data, "Không thể xóa giỏ hàng"), "error");
+                showToast(data.message || "Không thể xóa giỏ hàng", "error");
             }
         } catch (err) {
             showToast("Lỗi kết nối khi xóa giỏ hàng", "error");
@@ -261,7 +249,7 @@
         setVoucherFeedback("", "");
 
         try {
-            const data = await requestApi('/api/promotions/validate', {
+            const resp = await fetch(`${API_BASE}/api/promotions/validate`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -272,8 +260,9 @@
                     subtotal: state.cart.subtotal
                 })
             });
+            const data = await resp.json();
+
             setButtonLoading(elements.voucherApplyBtn, false);
-            if (!data) return;
 
             if (data.success && data.data && data.data.valid) {
                 state.appliedVoucher = {
@@ -285,7 +274,7 @@
                 showToast(`Áp dụng mã ${code} thành công!`, "success");
                 setVoucherFeedback("", "");
             } else {
-                const msg = data.data?.message || apiErrorMessage(data, "Mã khuyến mãi không hợp lệ hoặc đã hết hạn");
+                const msg = data.data?.message || data.error?.message || data.message || "Mã khuyến mãi không hợp lệ hoặc đã hết hạn";
                 setVoucherFeedback(msg, "error");
             }
         } catch (err) {
@@ -312,7 +301,7 @@
         }
 
         try {
-            const data = await requestApi('/api/promotions/validate', {
+            const resp = await fetch(`${API_BASE}/api/promotions/validate`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -320,7 +309,7 @@
                     subtotal: state.cart.subtotal
                 })
             });
-            if (!data) return;
+            const data = await resp.json();
             if (data.success && data.data && data.data.valid) {
                 state.appliedVoucher.discountAmount = data.data.discountAmount;
             } else {
@@ -347,14 +336,12 @@
         }
 
         try {
-            const data = await requestApi('/api/promotions/active', {
+            const resp = await fetch(`${API_BASE}/api/promotions/active`, {
                 headers: { 'Accept': 'application/json' }
             });
-            if (!data) return;
+            const data = await resp.json();
 
-            if (!data.success) {
-                elements.promosModalList.textContent = apiErrorMessage(data, 'Không thể tải danh sách khuyến mãi.');
-            } else if (Array.isArray(data.data) && data.data.length > 0) {
+            if (data.success && Array.isArray(data.data) && data.data.length > 0) {
                 state.activePromotions = data.data;
                 renderPromotionsModalList(data.data);
             } else {

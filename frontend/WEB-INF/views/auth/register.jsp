@@ -20,7 +20,7 @@
         <form id="registerForm" action="<c:url value='/api/auth/register'/>" method="post" data-method="POST">
             <label for="fullName">Họ và tên</label>
             <input id="fullName" name="fullName" type="text" autocomplete="name"
-                   minlength="2" maxlength="100" placeholder="Nguyễn Văn An" required>
+                   maxlength="100" placeholder="Nguyễn Văn An" required>
 
             <div class="field-grid">
                 <div>
@@ -31,7 +31,7 @@
                 <div>
                     <label for="phone">Số điện thoại</label>
                     <input id="phone" name="phone" type="tel" autocomplete="tel"
-                           minlength="9" maxlength="15" pattern="\+?[0-9]{8,15}" inputmode="tel" placeholder="0901234567" required>
+                           maxlength="15" inputmode="tel" placeholder="0901234567" required>
                 </div>
             </div>
 
@@ -39,8 +39,7 @@
                 <div>
                     <label for="password">Mật khẩu</label>
                     <input id="password" name="password" type="password" autocomplete="new-password"
-                           minlength="8" maxlength="72" aria-describedby="password-hint" required>
-                    <p id="password-hint" class="field-hint">Mật khẩu có từ 8 đến 72 ký tự.</p>
+                           minlength="8" maxlength="72" required>
                 </div>
                 <div>
                     <label for="confirmPassword">Nhập lại mật khẩu</label>

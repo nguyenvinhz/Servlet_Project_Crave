@@ -51,13 +51,15 @@ public abstract class BaseApiServlet extends HttpServlet {
         } else if (e instanceof com.foodordering.exception.AppException appEx) {
             writeJson(response, appEx.getStatusCode(),
                     ApiResponse.failure(new ApiError(appEx.getErrorCode(), appEx.getMessage(), appEx.getDetails())));
-        } else if (e instanceof com.fasterxml.jackson.core.JsonProcessingException
-                || e instanceof IllegalArgumentException
-                || e.getCause() instanceof com.fasterxml.jackson.core.JsonProcessingException) {
-            badRequest(response, "Nội dung JSON không hợp lệ.");
+        } else if (e instanceof com.fasterxml.jackson.core.JsonProcessingException || e instanceof IllegalArgumentException) {
+            writeJson(response, HttpServletResponse.SC_BAD_REQUEST,
+                    ApiResponse.error("Dữ liệu JSON không hợp lệ: " + e.getMessage(), com.foodordering.enums.ErrorCode.BAD_REQUEST));
+        } else if (e.getCause() instanceof com.fasterxml.jackson.core.JsonProcessingException) {
+            writeJson(response, HttpServletResponse.SC_BAD_REQUEST,
+                    ApiResponse.error("Dữ liệu JSON không hợp lệ: " + e.getCause().getMessage(), com.foodordering.enums.ErrorCode.BAD_REQUEST));
         } else {
             writeJson(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
-                    ApiResponse.failure(new ApiError("INTERNAL_SERVER_ERROR", "Đã xảy ra lỗi hệ thống. Vui lòng thử lại sau.", Map.of())));
+                    ApiResponse.failure(new ApiError("INTERNAL_SERVER_ERROR", e.getMessage() != null ? e.getMessage() : "Đã xảy ra lỗi hệ thống.", Map.of())));
         }
     }
 }
