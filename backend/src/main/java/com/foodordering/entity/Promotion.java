@@ -163,6 +163,12 @@ public class Promotion {
      * Kiểm tra khuyến mãi có còn hiệu lực tại một thời điểm nhất định hay không.
      */
     public boolean isCurrentlyActive(LocalDateTime currentTime) {
-        throw new UnsupportedOperationException("Promotion validity is implemented on Day 2.");
+        if (status != PromotionStatus.ACTIVE) {
+            return false;
+        }
+        if (currentTime == null) {
+            currentTime = LocalDateTime.now();
+        }
+        return !currentTime.isBefore(startAt) && !currentTime.isAfter(endAt);
     }
 }

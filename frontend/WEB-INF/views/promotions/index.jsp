@@ -1,7 +1,6 @@
 <%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
 <c:set var="pageTitle" value="Ưu đãi & Khuyến mãi" />
-<c:set var="promosPreviewState" value="${param.state == 'empty' or param.state == 'loading' or param.state == 'error' ? param.state : 'layout'}" />
 <%@ include file="/WEB-INF/views/components/header.jspf" %>
 
 <link rel="stylesheet" href="<c:url value='/assets/css/cart.css'/>">
@@ -178,48 +177,21 @@
             <p class="promos-hero-lead">
                 Áp dụng các mã voucher giảm giá độc quyền từ Crave để thưởng thức trọn vẹn bữa ăn ngon với chi phí tối ưu nhất!
             </p>
-            <p class="promos-hero-lead">Chức năng đang được hoàn thiện.</p>
-            <nav aria-label="Trạng thái giao diện khuyến mãi" style="display: flex; justify-content: center; flex-wrap: wrap; gap: 16px; margin-top: 16px;">
-                <a class="btn-link-action" href="<c:url value='/promotions?state=layout'/>">Khung khuyến mãi</a>
-                <a class="btn-link-action" href="<c:url value='/promotions?state=empty'/>">Trạng thái rỗng</a>
-                <a class="btn-link-action" href="<c:url value='/promotions?state=loading'/>">Trạng thái loading</a>
-                <a class="btn-link-action" href="<c:url value='/promotions?state=error'/>">Trạng thái lỗi</a>
-            </nav>
         </header>
 
         <!-- Loading State -->
-        <div id="promosLoadingState" style="display: ${promosPreviewState == 'loading' ? 'block' : 'none'}; text-align: center; padding: 48px;">
+        <div id="promosLoadingState" style="text-align: center; padding: 48px;">
             <div class="btn-spinner" style="border-top-color: var(--crave-brand); border-color: rgba(244,81,30,0.2); width: 36px; height: 36px; margin: 0 auto 16px;"></div>
             <p style="color: var(--crave-text-muted); font-size: 1rem;">Đang tải danh sách chương trình khuyến mãi...</p>
         </div>
 
         <!-- Promos Grid -->
-        <div id="promosGridContainer" class="promos-grid" style="display: ${promosPreviewState == 'layout' ? 'grid' : 'none'};">
-            <article class="promo-ticket-card">
-                <div>
-                    <div class="promo-ticket-top">
-                        <span class="promo-ticket-code">MÃ ƯU ĐÃI</span>
-                        <span class="promo-ticket-value">—</span>
-                    </div>
-                    <h3 class="promo-ticket-name">Thông tin khuyến mãi</h3>
-                    <p class="promo-ticket-desc">Thông tin ưu đãi và điều kiện áp dụng tạm thời chưa khả dụng.</p>
-                </div>
-                <div class="promo-ticket-bottom">
-                    <button type="button" class="btn-copy-code" disabled>Sao chép mã</button>
-                    <button type="button" class="btn-apply-direct" disabled>Dùng ngay</button>
-                </div>
-            </article>
-        </div>
-
-        <!-- Error State -->
-        <div id="promosErrorState" class="cart-error-state" style="display: ${promosPreviewState == 'error' ? 'block' : 'none'};">
-            <h3 class="cart-error-title">Không thể tải thông tin khuyến mãi</h3>
-            <p id="promosErrorMsg" class="cart-error-desc">Đã xảy ra lỗi kết nối. Vui lòng thử lại.</p>
-            <button type="button" class="btn-retry" disabled>Thử lại ngay</button>
+        <div id="promosGridContainer" class="promos-grid" style="display: none;">
+            <!-- Rendered by JavaScript -->
         </div>
 
         <!-- Empty State -->
-        <div id="promosEmptyState" class="cart-empty-state" style="display: ${promosPreviewState == 'empty' ? 'block' : 'none'};">
+        <div id="promosEmptyState" class="cart-empty-state" style="display: none;">
             <div class="cart-empty-illustration">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <circle cx="12" cy="12" r="10"></circle>
@@ -235,5 +207,91 @@
 
     </div>
 </main>
+
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+    const loadingEl = document.getElementById('promosLoadingState');
+    const gridEl = document.getElementById('promosGridContainer');
+    const emptyEl = document.getElementById('promosEmptyState');
+
+    const contextPath = '${pageContext.request.contextPath}';
+
+    try {
+        const resp = await fetch(contextPath + '/api/promotions/active');
+        const data = await resp.json();
+
+        loadingEl.style.display = 'none';
+
+        if (data.success && Array.isArray(data.data) && data.data.length > 0) {
+            gridEl.style.display = 'grid';
+            gridEl.innerHTML = data.data.map(p => {
+                const discountValText = p.discountType === 'PERCENT'
+                    ? `Giảm \${p.discountValue}%`
+                    : `Giảm \${formatVnd(p.discountValue)}`;
+
+                const terms = [
+                    p.minimumOrderValue > 0 ? `Đơn tối thiểu \${formatVnd(p.minimumOrderValue)}` : 'Không giới hạn đơn tối thiểu',
+                    p.maximumDiscount > 0 ? `Giảm tối đa \${formatVnd(p.maximumDiscount)}` : null
+                ].filter(Boolean).join(' · ');
+
+                return `
+                    <div class="promo-ticket-card">
+                        <div>
+                            <div class="promo-ticket-top">
+                                <span class="promo-ticket-code">\${escapeHtml(p.code)}</span>
+                                <span class="promo-ticket-value">\${discountValText}</span>
+                            </div>
+                            <h3 class="promo-ticket-name">\${escapeHtml(p.name || 'Ưu đãi hấp dẫn')}</h3>
+                            <p class="promo-ticket-desc">\${escapeHtml(p.description || terms)}</p>
+                            <p style="font-size: 0.8rem; color: #9ca3af; margin-bottom: 16px;">\${terms}</p>
+                        </div>
+                        <div class="promo-ticket-bottom">
+                            <button type="button" class="btn-copy-code" onclick="copyVoucherCode('\${p.code}')">
+                                Sao chép mã
+                            </button>
+                            <a href="\${contextPath}/cart?code=\${encodeURIComponent(p.code)}" class="btn-apply-direct">
+                                Dùng ngay
+                            </a>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        } else {
+            emptyEl.style.display = 'block';
+        }
+    } catch (e) {
+        loadingEl.style.display = 'none';
+        emptyEl.style.display = 'block';
+    }
+});
+
+function copyVoucherCode(code) {
+    if (navigator.clipboard) {
+        navigator.clipboard.writeText(code).then(() => {
+            alert('Đã sao chép mã ' + code + ' vào bộ nhớ tạm!');
+        });
+    } else {
+        alert('Mã ưu đãi: ' + code);
+    }
+}
+
+function formatVnd(val) {
+    const num = parseFloat(val || 0);
+    if (num > 500) {
+        return new Intl.NumberFormat('vi-VN').format(num) + ' đ';
+    }
+    return '$' + num.toFixed(2);
+}
+
+function escapeHtml(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+</script>
 
 <%@ include file="/WEB-INF/views/components/footer.jspf" %>
