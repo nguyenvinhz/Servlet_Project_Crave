@@ -192,6 +192,41 @@ cases.push(
  const fixtureFetch=async()=>reply(401,null,{message:'Unauthorized'});`,run:'',
  redirect:'/cart-shop/auth/login?reason=session-expired&returnTo=%2Fcart-shop%2Fcart%3Fcode%3DSAVE20',
  redirectCheck:`if(sessionStorage.getItem('crave_applied_voucher')!==null)throw new Error('Expired account voucher retained');`},
+ {name:'cart-mutation-session-expiry-clears-private-ui',page:'cart/index',route:'cart',context:'/cart-shop',setup:cartFixture+`
+ sessionStorage.setItem('crave_applied_voucher','old account voucher');
+ const badge=document.createElement('span');badge.className='cart-badge-count';document.body.append(badge);
+ const fixtureFetch=async request=>{
+ if(request.method==='GET')return reply(200,cart);
+ if(request.url.endsWith('/validate'))return reply(200,{valid:true,discountAmount:10000});
+ return reply(401,null,{message:'Unauthorized'});};`,run:`
+ await waitFor(()=>document.querySelector('.btn-inc'));
+ document.getElementById('voucherCodeInput').value='SAVE10';
+ document.getElementById('voucherApplyBtn').click();
+ await waitFor(()=>document.getElementById('voucherAppliedCode').textContent==='SAVE10');
+ window.addEventListener('beforeunload',()=>sessionStorage.setItem('cart-expiry-snapshot',JSON.stringify({
+ items:document.getElementById('cartItemsList').children.length,
+ badge:document.querySelector('.cart-badge-count').textContent,
+ contentHidden:document.getElementById('cartContentWrapper').style.display==='none',
+ errorVisible:document.getElementById('cartErrorState').style.display==='block'
+ })));
+ document.querySelector('.btn-inc').click();`,
+ redirect:'/cart-shop/auth/login?reason=session-expired&returnTo=%2Fcart-shop%2Fcart',
+ redirectCheck:`
+ const snapshot=JSON.parse(sessionStorage.getItem('cart-expiry-snapshot'));
+ if(!snapshot||snapshot.items!==0||snapshot.badge!=='0'||!snapshot.contentHidden||!snapshot.errorVisible)throw new Error('Expired mutation retained private cart UI');
+ if(sessionStorage.getItem('crave_applied_voucher')!==null)throw new Error('Expired mutation retained stored voucher');
+ sessionStorage.removeItem('cart-expiry-snapshot');`},
+ {name:'cart-checkout-preserves-voucher-handoff',page:'cart/index',route:'cart',context:'/cart-shop',setup:cartFixture+`
+ const fixtureFetch=async request=>request.method==='GET'?reply(200,cart):reply(200,{valid:true,discountAmount:10000});`,run:`
+ await waitFor(()=>document.querySelector('.btn-inc'));
+ document.getElementById('voucherCodeInput').value=' save10 ';
+ document.getElementById('voucherApplyBtn').click();
+ await waitFor(()=>document.getElementById('voucherAppliedCode').textContent==='SAVE10');
+ assert(!document.getElementById('proceedCheckoutBtn').disabled,'Checkout button is disabled');
+ document.getElementById('proceedCheckoutBtn').click();`,redirect:'/cart-shop/checkout',
+ redirectCheck:`
+ const voucher=JSON.parse(sessionStorage.getItem('crave_applied_voucher'));
+ if(voucher?.code!=='SAVE10'||voucher.discountAmount!==10000)throw new Error('Checkout lost applied voucher handoff');`},
  {name:'logout-clears-checkout-voucher',page:'auth/login',setup:`
  sessionStorage.setItem('crave_applied_voucher','old account voucher');
  const fixtureFetch=async()=>reply(200,{message:'Signed out'});`,run:`submit('logoutForm');`,redirect:'/crave/auth/login?loggedOut=1',

@@ -53,7 +53,7 @@ public class CartPromotionServiceTest {
 
         CartItemOptionDto opt1 = new CartItemOptionDto("TC03", "Thêm trứng ốp la", "TOPPING", new BigDecimal("8000"));
         item.setOptions(List.of(opt1));
-        
+
         CartService cartService = new CartService();
         cartService.calculateItemTotals(item);
 

@@ -7,7 +7,7 @@
 
 <main class="cart-page-wrapper">
     <div class="cart-container">
-        
+
         <!-- Page Title matching Framer screenshot -->
         <header class="cart-header-section">
             <h1 class="cart-page-title">Your cart</h1>
@@ -85,7 +85,7 @@
 
         <!-- 4. POPULATED CART CONTENT (GIAO DIỆN CHÍNH THEO DESIGN MẪU) -->
         <div id="cartContentWrapper" class="cart-layout-grid" style="display: none;">
-            
+
             <!-- Left Column: Cart Items -->
             <div class="cart-items-column">
                 <div id="cartItemsList" class="cart-items-column">
@@ -115,7 +115,7 @@
             <div class="cart-summary-column">
                 <div class="order-summary-card">
                     <h2 class="order-summary-title">Order summary</h2>
-                    
+
                     <!-- Subtotal Row -->
                     <div class="summary-row">
                         <span>Subtotal</span>
@@ -148,7 +148,7 @@
                             <span>Mã khuyến mãi (Voucher)</span>
                             <a href="javascript:void(0)" class="voucher-view-all-link" id="viewPromosBtn">Xem mã có sẵn</a>
                         </div>
-                        
+
                         <div class="voucher-input-group">
                             <input type="text" id="voucherCodeInput" class="voucher-input"
                                    placeholder="Nhập mã ưu đãi (VD: WELCOME10)" autocomplete="off">

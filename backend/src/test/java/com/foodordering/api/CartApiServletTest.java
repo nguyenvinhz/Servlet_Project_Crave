@@ -9,6 +9,7 @@ import com.foodordering.enums.EmployeeRole;
 import com.foodordering.enums.ErrorCode;
 import com.foodordering.exception.BadRequestException;
 import com.foodordering.exception.ResourceNotFoundException;
+import com.foodordering.security.SessionAuth;
 import com.foodordering.service.CartService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -22,6 +23,8 @@ import java.io.PrintWriter;
 import java.io.StringReader;
 import java.io.StringWriter;
 import java.lang.reflect.Method;
+import java.util.HashMap;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -102,13 +105,32 @@ class CartApiServletTest {
         if (customerId != null) {
             HttpSession session = mock(HttpSession.class);
             when(req.getSession(false)).thenReturn(session);
-            when(session.getAttribute("currentUser")).thenReturn(new ProfileResponse(customerId,
+            Map<String, Object> sessionAttributes = new HashMap<>();
+            sessionAttributes.put("currentUser", new ProfileResponse(customerId,
                     AccountType.CUSTOMER, "Customer", "customer@example.com", "0901234567", null));
+            when(session.getAttribute(any(String.class)))
+                    .thenAnswer(call -> sessionAttributes.get(call.getArgument(0)));
+            doAnswer(call -> {
+                sessionAttributes.put(call.getArgument(0), call.getArgument(1));
+                return null;
+            }).when(session).setAttribute(any(String.class), any());
+            doAnswer(call -> {
+                sessionAttributes.remove(call.getArgument(0));
+                return null;
+            }).when(session).removeAttribute(any(String.class));
         } else {
             when(req.getSession(false)).thenReturn(null);
             when(req.getHeader("X-Customer-Id")).thenReturn(null);
             when(req.getParameter("customerId")).thenReturn(null);
         }
+
+        Map<String, Object> requestAttributes = new HashMap<>();
+        when(req.getAttribute(any(String.class)))
+                .thenAnswer(call -> requestAttributes.get(call.getArgument(0)));
+        doAnswer(call -> {
+            requestAttributes.put(call.getArgument(0), call.getArgument(1));
+            return null;
+        }).when(req).setAttribute(any(String.class), any());
 
         if (body != null) {
             when(req.getReader()).thenReturn(new BufferedReader(new StringReader(body)));
@@ -169,6 +191,58 @@ class CartApiServletTest {
 
         assertEquals("KH01", cartService.lastCustomerId);
         verify(resp).setStatus(200);
+    }
+
+    @Test
+    void everyCartOperationRejectsLoginChangesAfterFilterAuthorization() throws Exception {
+        ProfileResponse customer = new ProfileResponse("KH01", AccountType.CUSTOMER,
+                "Customer", "customer@example.com", "0901234567", null);
+        ProfileResponse anotherCustomer = new ProfileResponse("KH02", AccountType.CUSTOMER,
+                "Another customer", "other@example.com", "0901234568", null);
+        ProfileResponse employee = new ProfileResponse("NV01", AccountType.EMPLOYEE,
+                "Admin", "admin@example.com", "0901234569", EmployeeRole.ADMIN);
+        for (ProfileResponse next : new ProfileResponse[]{customer, anotherCustomer, employee}) {
+            for (String method : new String[]{"doGet", "doPost", "doPut", "doDelete"}) {
+                HttpServletRequest req = mockRequest(null, "KH01", null);
+                HttpSession session = req.getSession(false);
+                SessionAuth.capture(req); // The authentication filter binds this identity.
+                SessionAuth.store(session, next); // A concurrent login completes before the servlet.
+                when(req.getHeader("X-Customer-Id")).thenReturn("KH99");
+                when(req.getParameter("customerId")).thenReturn("KH99");
+                HttpServletResponse resp = mock(HttpServletResponse.class);
+                StringWriter body = new StringWriter();
+                when(resp.getWriter()).thenReturn(new PrintWriter(body));
+
+                invokeServletMethod(method, req, resp);
+
+                verify(resp).setStatus(401);
+                assertTrue(body.toString().contains("UNAUTHORIZED"));
+                assertNull(cartService.lastMethod);
+                assertEquals(next, session.getAttribute("currentUser"));
+                verify(session, never()).invalidate();
+            }
+        }
+    }
+
+    @Test
+    void missingSessionAfterFilterAuthorizationCannotFallBackToClientCustomerIds() throws Exception {
+        for (String method : new String[]{"doGet", "doPost", "doPut", "doDelete"}) {
+            HttpServletRequest req = mockRequest(null, "KH01", null);
+            SessionAuth.capture(req);
+            when(req.getSession(false)).thenReturn(null); // A concurrent logout removed the session.
+            when(req.getHeader("X-Customer-Id")).thenReturn("KH99");
+            when(req.getParameter("customerId")).thenReturn("KH99");
+            HttpServletResponse resp = mock(HttpServletResponse.class);
+            StringWriter body = new StringWriter();
+            when(resp.getWriter()).thenReturn(new PrintWriter(body));
+
+            invokeServletMethod(method, req, resp);
+
+            verify(resp).setStatus(401);
+            assertTrue(body.toString().contains("UNAUTHORIZED"));
+            assertNull(cartService.lastMethod);
+            verify(req, never()).getSession(true);
+        }
     }
 
     @Test
