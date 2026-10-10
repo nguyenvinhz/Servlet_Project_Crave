@@ -201,6 +201,57 @@ cases.push(
  const fixtureFetch=async()=>reply(200,{message:'Signed out'});`,run:`submit('logoutForm');`,redirect:'/crave/auth/login?loggedOut=1'}
 );
 cases.unshift(
+ {name:'refresh-syncs-pristine-edited-default-checkbox',page:'customer/addresses',setup:addressFixture,run:addressHelpers+`
+ button(0,'Sửa').click();await waitFor(()=>!document.getElementById('address-cancel').hidden&&idle());
+ setFields({addressLine:'Unsaved line',note:'Unsaved note'});
+ addresses.forEach(a=>a.isDefault=a.id==='DC02');
+ document.getElementById('address-refresh').click();await waitFor(()=>list.children[1].querySelector('.address-badge')&&idle());
+ assert(document.getElementById('addressLine').value==='Unsaved line'&&document.getElementById('note').value==='Unsaved note','Refresh discarded text draft');
+ assert(!document.getElementById('isDefault').checked,'Refresh retains stale default checkbox after server default changed');
+ submit('addressForm');await waitFor(()=>document.getElementById('address-cancel').hidden&&idle());
+ assert(addresses.find(a=>a.id==='DC02').isDefault&&!addresses.find(a=>a.id==='DC01').isDefault,'Saving refreshed text draft unexpectedly switched default back');
+ `},
+ {name:'delete-unrelated-keeps-unsaved-default-checkbox',page:'customer/addresses',setup:addressFixture+`
+ addresses.push({id:'DC03',addressLine:'Third address',note:null,isDefault:false});
+ `,run:`
+ const list=document.getElementById('address-list');
+ const button=(index,label)=>[...list.children[index].querySelectorAll('button')].find(b=>b.textContent===label);
+ const idle=()=>!document.querySelector('#addressForm button[type=submit]').disabled&&!document.getElementById('address-refresh').disabled;
+ await waitFor(()=>list.children.length===3&&idle());
+ button(1,'Sửa').click();await waitFor(()=>!document.getElementById('address-cancel').hidden&&idle());
+ document.getElementById('isDefault').checked=true;
+ setFields({addressLine:'Unsaved line',note:'Unsaved note'});
+ document.getElementById('address-refresh').click();await waitFor(idle);
+ assert(document.getElementById('isDefault').checked,'Refresh discarded unsaved default checkbox');
+ button(2,'Xóa').click();await waitFor(()=>list.children.length===2&&idle());
+ assert(document.getElementById('addressLine').value==='Unsaved line'&&document.getElementById('note').value==='Unsaved note','Unrelated delete discarded text draft');
+ assert(document.getElementById('isDefault').checked,'Unrelated delete discarded unsaved default checkbox');
+ submit('addressForm');await waitFor(()=>document.getElementById('address-cancel').hidden&&idle());
+ assert(addresses.find(a=>a.id==='DC02').isDefault&&!addresses.find(a=>a.id==='DC01').isDefault,'Saving draft did not apply retained default choice');
+ `},
+ {name:'forbidden-detail-clears-stale-address-ui-and-recovers',page:'customer/addresses',setup:`
+ let forbidden=true;const fixtureFetch=async request=>request.url.endsWith('/addresses')?reply(200,[
+ {id:'DC01',addressLine:'Private address',note:null,isDefault:true}
+ ]):forbidden?reply(403,null,{message:'Customer only'}):reply(200,{id:'DC01',addressLine:'Private address',note:null,isDefault:true});
+ `,run:`
+ const list=document.getElementById('address-list');
+ await waitFor(()=>list.children.length===1&&!document.getElementById('address-fields').disabled);
+ [...list.querySelectorAll('button')].find(b=>b.textContent==='Sửa').click();
+ await waitFor(()=>document.getElementById('form-error').textContent==='Customer only'&&!document.getElementById('address-refresh').disabled);
+ assert(list.children.length===0&&document.getElementById('address-fields').disabled,'Forbidden detail keeps stale private address/actions and writable form');
+ assert(document.getElementById('address-empty-state').hidden&&document.getElementById('address-cancel').hidden,'Forbidden detail retained empty/edit state');
+ forbidden=false;document.getElementById('address-refresh').click();
+ await waitFor(()=>list.children.length===1&&!document.getElementById('address-fields').disabled);
+ [...list.querySelectorAll('button')].find(b=>b.textContent==='Sửa').click();
+ await waitFor(()=>!document.getElementById('address-cancel').hidden&&!document.getElementById('address-cancel').disabled);
+ assert(document.getElementById('addressLine').value==='Private address','Forbidden detail recovery did not restore edit capability');
+ forbidden=true;setFields({addressLine:'Draft address'});submit('addressForm');
+ await waitFor(()=>document.getElementById('form-error').textContent==='Customer only'&&!document.getElementById('addressForm').hasAttribute('aria-busy'));
+ assert(list.children.length===0&&document.getElementById('address-fields').disabled,'Forbidden save retained stale addresses or restored writable fieldset');
+ assert(document.getElementById('addressLine').value===''&&document.getElementById('address-cancel').hidden,'Forbidden save retained private edit draft');
+ forbidden=false;document.getElementById('address-refresh').click();
+ await waitFor(()=>list.children.length===1&&!document.getElementById('address-fields').disabled);
+ `},
  {name:'refresh-serializes-address-mutations',page:'customer/addresses',setup: `
  let reads=0,release;
  const fixtureFetch=async request=>{

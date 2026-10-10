@@ -28,6 +28,9 @@ public final class PasswordHasher {
     }
 
     public String hash(String password) {
+        if (!isValidPasswordText(password)) {
+            throw new IllegalArgumentException("Password contains NUL or malformed Unicode.");
+        }
         byte[] salt = new byte[SALT_BYTES];
         random.nextBytes(salt);
         byte[] key = keyDerivation.apply(password, salt);
@@ -39,6 +42,7 @@ public final class PasswordHasher {
         if (password == null) {
             return false;
         }
+        boolean validPassword = isValidPasswordText(password);
         // Unknown accounts and unsupported stored hashes consume the same PBKDF2 work as a real login.
         byte[] salt = new byte[SALT_BYTES];
         byte[] expected = new byte[KEY_BITS / 8];
@@ -59,13 +63,35 @@ public final class PasswordHasher {
                 }
             }
         }
-        byte[] actual = keyDerivation.apply(password, salt);
+        // Still do one derivation for invalid text, without passing lossy input to the KDF.
+        byte[] actual = keyDerivation.apply(validPassword ? password : "invalid-password", salt);
         try {
             boolean matches = MessageDigest.isEqual(expected, actual);
-            return supported && matches;
+            return validPassword && supported && matches;
         } finally {
             Arrays.fill(actual, (byte) 0);
         }
+    }
+
+    /** Prevents UTF-8 replacement and HMAC zero-padding from making distinct passwords equivalent. */
+    public static boolean isValidPasswordText(String password) {
+        if (password == null) {
+            return false;
+        }
+        for (int i = 0; i < password.length(); i++) {
+            char character = password.charAt(i);
+            if (character == '\0') {
+                return false;
+            }
+            if (Character.isHighSurrogate(character)) {
+                if (++i >= password.length() || !Character.isLowSurrogate(password.charAt(i))) {
+                    return false;
+                }
+            } else if (Character.isLowSurrogate(character)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static byte[] derive(String password, byte[] salt) {

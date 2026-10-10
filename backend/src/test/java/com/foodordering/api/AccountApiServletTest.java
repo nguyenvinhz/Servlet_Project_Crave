@@ -10,6 +10,7 @@ import com.foodordering.dto.RegisterRequest;
 import com.foodordering.enums.AccountType;
 import com.foodordering.enums.EmployeeRole;
 import com.foodordering.exception.AccountException;
+import com.foodordering.security.SessionAuth;
 import com.foodordering.service.AccountService;
 import com.foodordering.utils.JsonProvider;
 import jakarta.servlet.ReadListener;
@@ -31,7 +32,9 @@ import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -40,6 +43,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -161,6 +165,130 @@ class AccountApiServletTest {
         assertTrue(anonymous.json().path("success").asBoolean());
         verify(anonymous.request, never()).getSession(true);
         verifyNoInteractions(accounts);
+    }
+
+    @Test
+    void sessionRefreshCannotReplaceALoginCompletedDuringDatabaseWork() throws Exception {
+        Exchange exchange = request("GET", "/api/auth/session", null, "", CUSTOMER);
+        when(accounts.getProfile("KH01")).thenAnswer(call -> {
+            SessionAuth.store(exchange.session, EMPLOYEE);
+            return CUSTOMER;
+        });
+
+        exchange.send(new AuthApiServlet(accounts));
+
+        exchange.assertError(401, "UNAUTHORIZED");
+        assertEquals(EMPLOYEE, exchange.session.getAttribute("currentUser"));
+        verify(exchange.session, never()).invalidate();
+    }
+
+    @Test
+    void failedSessionRefreshCannotInvalidateSameAccountRelogin() throws Exception {
+        Exchange exchange = request("GET", "/api/auth/session", null, "", CUSTOMER);
+        when(accounts.getProfile("KH01")).thenAnswer(call -> {
+            SessionAuth.store(exchange.session, CUSTOMER);
+            throw new AccountException("ACCOUNT_INACTIVE", "Tài khoản bị khóa.", 401);
+        });
+
+        exchange.send(new AuthApiServlet(accounts));
+
+        exchange.assertError(401, "ACCOUNT_INACTIVE");
+        assertEquals(CUSTOMER, exchange.session.getAttribute("currentUser"));
+        verify(exchange.session, never()).invalidate();
+    }
+
+    @Test
+    void profileReadAndUpdateCannotReplaceConcurrentLogin() throws Exception {
+        for (String method : new String[]{"GET", "PUT"}) {
+            Exchange exchange = request(method, "/api/profile", null, PROFILE_JSON, CUSTOMER);
+            if (method.equals("GET")) {
+                when(accounts.getProfile("KH01")).thenAnswer(call -> {
+                    SessionAuth.store(exchange.session, EMPLOYEE);
+                    return CUSTOMER;
+                });
+            } else {
+                when(accounts.updateProfile(eq("KH01"), any(ProfileUpdateRequest.class))).thenAnswer(call -> {
+                    SessionAuth.store(exchange.session, EMPLOYEE);
+                    return CUSTOMER;
+                });
+            }
+
+            exchange.send(new ProfileApiServlet(accounts));
+
+            exchange.assertError(401, "UNAUTHORIZED");
+            assertEquals(EMPLOYEE, exchange.session.getAttribute("currentUser"));
+            verify(exchange.session, never()).invalidate();
+        }
+    }
+
+    @Test
+    void profile401CannotInvalidateLoginCompletedDuringDatabaseWork() throws Exception {
+        Exchange exchange = request("GET", "/api/profile", null, "", CUSTOMER);
+        when(accounts.getProfile("KH01")).thenAnswer(call -> {
+            SessionAuth.store(exchange.session, EMPLOYEE);
+            throw new AccountException("ACCOUNT_INACTIVE", "Tài khoản bị khóa.", 401);
+        });
+
+        exchange.send(new ProfileApiServlet(accounts));
+
+        exchange.assertError(401, "ACCOUNT_INACTIVE");
+        assertEquals(EMPLOYEE, exchange.session.getAttribute("currentUser"));
+        verify(exchange.session, never()).invalidate();
+    }
+
+    @Test
+    void sessionAndProfileRefreshAfterConcurrentLogoutReturn401() throws Exception {
+        for (String path : new String[]{"/api/auth/session", "/api/profile"}) {
+            Exchange exchange = request("GET", path, null, "", CUSTOMER);
+            when(accounts.getProfile("KH01")).thenAnswer(call -> {
+                SessionAuth.logout(exchange.request);
+                return CUSTOMER;
+            });
+
+            exchange.send(path.equals("/api/profile") ? new ProfileApiServlet(accounts) : new AuthApiServlet(accounts));
+
+            exchange.assertError(401, "UNAUTHORIZED");
+            verify(exchange.session).invalidate();
+            verify(exchange.session, never()).setAttribute("currentUser", CUSTOMER);
+        }
+    }
+
+    @Test
+    void loginDoesNotRecreateAuthenticatedOrAnonymousSessionInvalidatedDuringPasswordVerification() throws Exception {
+        for (ProfileResponse principal : new ProfileResponse[]{CUSTOMER, null}) {
+            Exchange exchange = request("POST", "/api/auth/login", null,
+                    "{\"email\":\"vinh@example.com\",\"password\":\"password123\"}", principal);
+            HttpSession session = exchange.session;
+            if (session == null) {
+                session = mock(HttpSession.class);
+                sessionAttributes(session, null);
+                when(exchange.request.getSession(false)).thenReturn(session);
+            }
+            HttpSession original = session;
+            when(accounts.login(any(LoginRequest.class))).thenAnswer(call -> {
+                SessionAuth.logout(exchange.request);
+                return CUSTOMER;
+            });
+
+            exchange.send(new AuthApiServlet(accounts));
+
+            exchange.assertError(401, "UNAUTHORIZED");
+            verify(original).invalidate();
+            verify(original, never()).setAttribute("currentUser", CUSTOMER);
+            verify(exchange.request, never()).getSession(true);
+            verify(exchange.request, never()).changeSessionId();
+        }
+    }
+
+    @Test
+    void logoutRemainsSuccessfulIfSessionWasAlreadyInvalidated() throws Exception {
+        Exchange exchange = request("POST", "/api/auth/logout", null, "", CUSTOMER);
+        doAnswer(call -> { throw new IllegalStateException("Session invalidated"); })
+                .when(exchange.session).invalidate();
+
+        exchange.send(new AuthApiServlet(accounts));
+
+        exchange.assertStatus(200);
     }
 
     @Test
@@ -503,10 +631,46 @@ class AccountApiServletTest {
         when(request.getSession()).thenReturn(session);
         when(request.getSession(true)).thenReturn(session);
         if (session != null) {
-            when(session.getAttribute("currentUser")).thenReturn(principal);
+            sessionAttributes(session, principal);
         }
+        Map<String, Object> attributes = new HashMap<>();
+        when(request.getAttribute(any(String.class))).thenAnswer(call -> attributes.get(call.getArgument(0)));
+        doAnswer(call -> {
+            attributes.put(call.getArgument(0), call.getArgument(1));
+            return null;
+        }).when(request).setAttribute(any(String.class), any());
         when(response.getWriter()).thenReturn(new PrintWriter(body));
         return new Exchange(request, response, session, body);
+    }
+
+    private static void sessionAttributes(HttpSession session, ProfileResponse principal) {
+        Map<String, Object> attributes = new HashMap<>();
+        if (principal != null) {
+            attributes.put("currentUser", principal);
+        }
+        AtomicBoolean invalidated = new AtomicBoolean();
+        when(session.getAttribute(any(String.class))).thenAnswer(call -> {
+            if (invalidated.get()) {
+                throw new IllegalStateException("Session invalidated");
+            }
+            return attributes.get(call.getArgument(0));
+        });
+        doAnswer(call -> {
+            if (invalidated.get()) {
+                throw new IllegalStateException("Session invalidated");
+            }
+            attributes.put(call.getArgument(0), call.getArgument(1));
+            return null;
+        }).when(session).setAttribute(any(String.class), any());
+        doAnswer(call -> {
+            attributes.remove(call.getArgument(0));
+            return null;
+        }).when(session).removeAttribute(any(String.class));
+        doAnswer(call -> {
+            invalidated.set(true);
+            attributes.clear();
+            return null;
+        }).when(session).invalidate();
     }
 
     static ServletInputStream jsonStream(String json) {

@@ -9,7 +9,6 @@ import com.foodordering.service.AccountService;
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import jakarta.servlet.http.HttpSession;
 
 import java.io.IOException;
 import java.util.Map;
@@ -44,24 +43,16 @@ public class AuthApiServlet extends AccountApiServlet {
             switch (request.getServletPath()) {
                 case "/api/auth/login" -> {
                     LoginRequest login = readAccountJson(request, LoginRequest.class);
+                    SessionAuth.Snapshot before = SessionAuth.captureLogin(request);
                     ProfileResponse user = accountService.login(login);
-                    HttpSession session = request.getSession(false);
-                    if (session == null) {
-                        session = request.getSession(true);
-                    } else {
-                        request.changeSessionId();
-                    }
-                    session.setMaxInactiveInterval(Boolean.TRUE.equals(login.rememberMe()) ? 7 * 24 * 60 * 60 : 30 * 60);
-                    SessionAuth.store(session, user);
+                    SessionAuth.login(request, before, user,
+                            Boolean.TRUE.equals(login.rememberMe()) ? 7 * 24 * 60 * 60 : 30 * 60);
                     writeJson(response, HttpServletResponse.SC_OK, ApiResponse.success(user));
                 }
                 case "/api/auth/register" -> writeJson(response, HttpServletResponse.SC_CREATED,
                         ApiResponse.success(accountService.register(readAccountJson(request, RegisterRequest.class))));
                 case "/api/auth/logout" -> {
-                    HttpSession session = request.getSession(false);
-                    if (session != null) {
-                        session.invalidate();
-                    }
+                    SessionAuth.logout(request);
                     writeJson(response, HttpServletResponse.SC_OK, ApiResponse.success(Map.of("message", "Đã đăng xuất.")));
                 }
                 default -> methodNotAllowed(response, "GET");
@@ -77,15 +68,16 @@ public class AuthApiServlet extends AccountApiServlet {
             methodNotAllowed(response, "POST");
             return;
         }
+        SessionAuth.Snapshot snapshot = null;
         try {
-            ProfileResponse current = SessionAuth.requireUser(request);
-            ProfileResponse fresh = accountService.getProfile(current.id());
-            SessionAuth.store(request.getSession(false), fresh);
+            snapshot = SessionAuth.capture(request);
+            ProfileResponse fresh = accountService.getProfile(snapshot.user().id());
+            SessionAuth.refresh(request, snapshot, fresh);
             writeJson(response, HttpServletResponse.SC_OK, ApiResponse.success(fresh));
         } catch (Exception exception) {
             if (exception instanceof com.foodordering.exception.AccountException accountException
-                    && accountException.getStatusCode() == 401 && request.getSession(false) != null) {
-                request.getSession(false).invalidate();
+                    && accountException.getStatusCode() == 401) {
+                SessionAuth.invalidateIfCurrent(request, snapshot);
             }
             handleError(response, exception);
         }

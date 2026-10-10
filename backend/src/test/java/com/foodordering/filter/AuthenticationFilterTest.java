@@ -6,6 +6,7 @@ import com.foodordering.dto.ProfileResponse;
 import com.foodordering.enums.AccountType;
 import com.foodordering.enums.EmployeeRole;
 import com.foodordering.exception.AccountException;
+import com.foodordering.security.SessionAuth;
 import com.foodordering.service.AccountService;
 import com.foodordering.utils.JsonProvider;
 import jakarta.servlet.FilterChain;
@@ -20,9 +21,17 @@ import org.junit.jupiter.api.Test;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -264,6 +273,76 @@ class AuthenticationFilterTest {
     }
 
     @Test
+    void oldRefreshCannotReplaceAnotherAccountLoginAndDoesNotLockDatabaseWork() throws Exception {
+        Exchange exchange = request("GET", "/api/addresses", CUSTOMER);
+        ProfileResponse next = employee(EmployeeRole.ADMIN);
+        when(accounts.getProfile("KH01")).thenAnswer(call -> {
+            CompletableFuture.runAsync(() -> SessionAuth.store(exchange.session, next)).get(2, TimeUnit.SECONDS);
+            return CUSTOMER;
+        });
+
+        exchange.send();
+
+        exchange.assertError(401, "UNAUTHORIZED");
+        assertEquals(next, exchange.session.getAttribute("currentUser"));
+        verify(exchange.session, never()).invalidate();
+        verifyNoInteractions(exchange.chain);
+    }
+
+    @Test
+    void failedOldRefreshCannotInvalidateAnotherLoginIncludingSameAccount() throws Exception {
+        for (ProfileResponse next : new ProfileResponse[]{CUSTOMER, employee(EmployeeRole.ADMIN)}) {
+            Exchange exchange = request("GET", "/api/addresses", CUSTOMER);
+            doAnswer(call -> {
+                SessionAuth.store(exchange.session, next);
+                throw new AccountException("ACCOUNT_INACTIVE", "Tài khoản bị khóa.", 401);
+            }).when(accounts).getProfile("KH01");
+
+            exchange.send();
+
+            exchange.assertError(401, "ACCOUNT_INACTIVE");
+            assertEquals(next, exchange.session.getAttribute("currentUser"));
+            verify(exchange.session, never()).invalidate();
+            verifyNoInteractions(exchange.chain);
+        }
+    }
+
+    @Test
+    void logoutDuringRefreshReturns401WithoutRestoringTheInvalidatedSession() throws Exception {
+        Exchange exchange = request("GET", "/api/addresses", CUSTOMER);
+        when(accounts.getProfile("KH01")).thenAnswer(call -> {
+            SessionAuth.logout(exchange.request);
+            return CUSTOMER;
+        });
+
+        exchange.send();
+
+        exchange.assertError(401, "UNAUTHORIZED");
+        verify(exchange.session).invalidate();
+        verify(exchange.session, never()).setAttribute("currentUser", CUSTOMER);
+        verifyNoInteractions(exchange.chain);
+    }
+
+    @Test
+    void servletCannotAdoptAPrincipalChangedAfterFilterAuthorization() throws Exception {
+        Exchange exchange = request("GET", "/api/addresses", CUSTOMER);
+        when(accounts.getProfile("KH01")).thenReturn(CUSTOMER);
+        doAnswer(call -> {
+            SessionAuth.store(exchange.session, employee(EmployeeRole.ADMIN));
+            AccountException rejected = assertThrows(AccountException.class,
+                    () -> SessionAuth.requireCustomer(exchange.request));
+            assertEquals(401, rejected.getStatusCode());
+            return null;
+        }).when(exchange.chain).doFilter(exchange.request, exchange.response);
+
+        exchange.send();
+
+        verify(exchange.chain).doFilter(exchange.request, exchange.response);
+        assertEquals("NV01", ((ProfileResponse) exchange.session.getAttribute("currentUser")).id());
+        verify(exchange.session, never()).invalidate();
+    }
+
+    @Test
     void accountDatabaseFailureReturns503WithoutLeakingDetails() throws Exception {
         when(accounts.getProfile("KH01")).thenThrow(new IllegalStateException("jdbc:mysql://private-host secret"));
         Exchange exchange = request("GET", "/api/profile", CUSTOMER);
@@ -334,8 +413,38 @@ class AuthenticationFilterTest {
         when(request.getServerPort()).thenReturn(8080);
         when(request.getSession(false)).thenReturn(session);
         if (session != null) {
-            when(session.getAttribute("currentUser")).thenReturn(principal);
+            Map<String, Object> attributes = new HashMap<>();
+            attributes.put("currentUser", principal);
+            AtomicBoolean invalidated = new AtomicBoolean();
+            when(session.getAttribute(any(String.class))).thenAnswer(call -> {
+                if (invalidated.get()) {
+                    throw new IllegalStateException("Session invalidated");
+                }
+                return attributes.get(call.getArgument(0));
+            });
+            doAnswer(call -> {
+                if (invalidated.get()) {
+                    throw new IllegalStateException("Session invalidated");
+                }
+                attributes.put(call.getArgument(0), call.getArgument(1));
+                return null;
+            }).when(session).setAttribute(any(String.class), any());
+            doAnswer(call -> {
+                attributes.remove(call.getArgument(0));
+                return null;
+            }).when(session).removeAttribute(any(String.class));
+            doAnswer(call -> {
+                invalidated.set(true);
+                attributes.clear();
+                return null;
+            }).when(session).invalidate();
         }
+        Map<String, Object> attributes = new HashMap<>();
+        when(request.getAttribute(any(String.class))).thenAnswer(call -> attributes.get(call.getArgument(0)));
+        doAnswer(call -> {
+            attributes.put(call.getArgument(0), call.getArgument(1));
+            return null;
+        }).when(request).setAttribute(any(String.class), any());
         when(response.getWriter()).thenReturn(new PrintWriter(body));
         return new Exchange(request, response, session, chain, body, filter);
     }

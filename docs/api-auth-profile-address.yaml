@@ -22,6 +22,8 @@ info:
     Logout invalidates the session and succeeds even when already signed out.
     Active account status and current employee role are rechecked on protected
     requests; a locked, inactive or deleted account loses authenticated access.
+    An in-flight request whose session identity changed through login or logout
+    returns 401 when rechecked; it cannot refresh or invalidate the newer login.
 
     A customer may read and update their own profile and addresses. An employee
     may read their own profile, but receives 403 for profile mutations and all
@@ -437,6 +439,7 @@ components:
           format: password
           minLength: 8
           maxLength: 72
+          description: Valid Unicode text without NUL or unpaired UTF-16 surrogates
         rememberMe:
           type: boolean
           default: false
@@ -464,12 +467,13 @@ components:
           format: password
           minLength: 8
           maxLength: 72
+          description: Valid Unicode text without NUL or unpaired UTF-16 surrogates
         confirmPassword:
           type: string
           format: password
           minLength: 8
           maxLength: 72
-          description: Must equal password
+          description: Must equal password; NUL and unpaired UTF-16 surrogates are rejected
     ProfileUpdateRequest:
       type: object
       required: [fullName, email, phone]

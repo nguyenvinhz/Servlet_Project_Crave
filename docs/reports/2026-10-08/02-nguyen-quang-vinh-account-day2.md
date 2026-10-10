@@ -3,6 +3,7 @@
 - Người thực hiện: Nguyễn Quang Vinh
 - Ngày: 2026-10-08
 - Rà soát lần hai: 2026-10-09
+- Chuẩn bị pull request: 2026-10-10
 - Branch: `feature/account-management`
 - Task: Ngày 2 — tài khoản, xác thực, hồ sơ và địa chỉ theo `docs/phan-cong-nhiem-vu-3-ngay.md`
 
@@ -172,3 +173,24 @@ Kết quả chạy lại trên baseline mới:
 - Main cục bộ khớp `origin/main` sau PR #17 và đã chứa lịch sử nhánh Trí Ngày 1. Sau khi đồng bộ, mã nguồn `backend/src/main` và `frontend` của phần tài khoản giữ nguyên so với trước lần pull này; không thêm thay đổi nghiệp vụ ngoài task.
 
 Task này chỉ commit và push nhánh `feature/account-management` để review, không merge phần tài khoản Ngày 2 vào main. Phạm vi bàn giao của Vinh không tự xác nhận Gate 2 của cả nhóm.
+
+## 9. Hoàn thiện kiểm tra và chuẩn bị pull request — 2026-10-10
+
+Đã hoàn tất lần merge main đang chờ commit, đồng bộ phần đính chính báo cáo cart/voucher Ngày 1. Phần thay đổi này khớp main; không thêm nghiệp vụ cart/voucher vào task tài khoản.
+
+Các thay đổi tài khoản được review và hoàn thiện trước khi push:
+
+- Gắn snapshot người dùng và revision xác thực vào từng request. Login đổi revision, còn refresh profile chỉ cập nhật khi snapshot vẫn khớp session. Request cũ không ghi đè hoặc hủy login mới; logout đồng thời trả `401` thay vì lỗi server khi session đã bị hủy.
+- Từ chối mật khẩu chứa NUL hoặc surrogate UTF-16 không hợp lệ trước khi hash/kiểm tra đăng nhập; tiếp tục hỗ trợ Unicode hợp lệ, gồm tiếng Việt và emoji. Kiểm tra hash vẫn thực hiện một lần dẫn xuất giả cho đầu vào không hợp lệ.
+- Đồng bộ checkbox địa chỉ mặc định khi giá trị chưa được người dùng sửa; giữ lựa chọn chưa lưu khi xóa địa chỉ khác. Mọi lỗi `403` ở trang địa chỉ đều xóa danh sách/form cũ và khóa trường nhập.
+- Bổ sung regression tests cho session đổi tài khoản/logout đồng thời, mật khẩu và trạng thái địa chỉ. Sửa fixture `FormApiContractTest` để lưu session/request attributes như servlet container; giữ nguyên assertions thành công cho cả PUT và POST.
+- Cập nhật OpenAPI về session thay đổi giữa request và ký tự mật khẩu không hợp lệ.
+
+Kết quả xác minh trên nhánh đã đồng bộ main:
+
+- `mvn -B -f backend/pom.xml clean verify` với JDK 21: **174 test đạt, 0 failure/error/skipped**, gồm 13 test tích hợp MySQL; tạo `backend/target/crave.war` thành công.
+- `node frontend/tests/account-browser-smoke.cjs`: **36/36 kịch bản Chrome đạt**. Runner dùng JSP/JavaScript thật với API fixture; kết quả này không thay thế demo HTTP trên Tomcat.
+- `node --check frontend/assets/js/account.js` và `node --check frontend/tests/account-browser-smoke.cjs`: đạt.
+- `git diff --check`: đạt. Không chạy lại bộ kiểm tra HTTP/Tomcat trực tiếp trong lần chuẩn bị PR này; kết quả 87 kiểm tra ở phần 8 thuộc lần xác minh trước.
+
+Nhánh nguồn bàn giao vẫn là `feature/account-management`, nhánh đích pull request là `main`. Pull request bàn giao phạm vi tài khoản Ngày 2 của Nguyễn Quang Vinh và chưa xác nhận Gate 2 của toàn nhóm.

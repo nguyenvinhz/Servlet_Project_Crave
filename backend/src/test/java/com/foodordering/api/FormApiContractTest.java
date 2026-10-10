@@ -22,10 +22,13 @@ import java.io.PrintWriter;
 import java.io.StringReader;
 import java.io.StringWriter;
 import java.lang.reflect.Method;
+import java.util.HashMap;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.verify;
@@ -48,7 +51,26 @@ class FormApiContractTest {
             StringWriter body = new StringWriter();
             when(request.getSession(false)).thenReturn(session);
             when(request.getContentType()).thenReturn("application/json");
-            when(session.getAttribute("currentUser")).thenReturn(customer);
+            // Preserve attributes written by SessionAuth, as a servlet container does.
+            Map<String, Object> sessionAttributes = new HashMap<>();
+            sessionAttributes.put("currentUser", customer);
+            when(session.getAttribute(any(String.class)))
+                    .thenAnswer(call -> sessionAttributes.get(call.getArgument(0)));
+            doAnswer(call -> {
+                sessionAttributes.put(call.getArgument(0), call.getArgument(1));
+                return null;
+            }).when(session).setAttribute(any(String.class), any());
+            doAnswer(call -> {
+                sessionAttributes.remove(call.getArgument(0));
+                return null;
+            }).when(session).removeAttribute(any(String.class));
+            Map<String, Object> requestAttributes = new HashMap<>();
+            when(request.getAttribute(any(String.class)))
+                    .thenAnswer(call -> requestAttributes.get(call.getArgument(0)));
+            doAnswer(call -> {
+                requestAttributes.put(call.getArgument(0), call.getArgument(1));
+                return null;
+            }).when(request).setAttribute(any(String.class), any());
             when(request.getReader()).thenReturn(new BufferedReader(new StringReader(
                     "{\"fullName\":\"Nguyễn Quang Vinh\",\"email\":\"vinh@example.com\",\"phone\":\"0901234567\"}")));
             when(request.getInputStream()).thenReturn(AccountApiServletTest.jsonStream(

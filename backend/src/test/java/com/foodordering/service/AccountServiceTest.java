@@ -37,6 +37,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 class AccountServiceTest {
 
@@ -87,6 +88,59 @@ class AccountServiceTest {
         assertTrue(exception.getDetails().keySet().containsAll(
                 List.of("fullName", "email", "phone", "password", "confirmPassword")));
         assertEquals(2, repository.users.size());
+    }
+
+    @Test
+    void registrationAndLoginRejectMalformedPasswordTextBeforeHashingOrVerification() {
+        PasswordHasher hasher = mock(PasswordHasher.class);
+        AccountService guarded = new AccountService(repository, hasher);
+
+        for (String invalid : List.of("Password#123" + '\0', "Pass" + '\0' + "word#123",
+                "Password" + (char) 0xD800 + "42", "Password" + (char) 0xD801 + "42",
+                "Password" + (char) 0xDC00 + "42")) {
+            AccountException register = assertThrows(AccountException.class, () -> guarded.register(
+                    new RegisterRequest("Audit User", "audit@example.com", "0912345678", invalid, invalid)));
+            assertEquals(400, register.getStatusCode());
+            assertEquals("VALIDATION_ERROR", register.getErrorCode());
+            assertTrue(register.getDetails().keySet().containsAll(List.of("password", "confirmPassword")));
+
+            AccountException login = assertThrows(AccountException.class, () -> guarded.login(
+                    new LoginRequest("customer@example.com", invalid, false)));
+            assertEquals(400, login.getStatusCode());
+            assertEquals("VALIDATION_ERROR", login.getErrorCode());
+            assertTrue(login.getDetails().containsKey("password"));
+        }
+
+        verifyNoInteractions(hasher);
+        assertEquals(2, repository.users.size());
+    }
+
+    @Test
+    void confirmationPasswordIsValidatedBeforeRegistration() {
+        PasswordHasher hasher = mock(PasswordHasher.class);
+        AccountService guarded = new AccountService(repository, hasher);
+        AccountException failure = assertThrows(AccountException.class, () -> guarded.register(
+                new RegisterRequest("Audit User", "audit@example.com", "0912345678",
+                        "Password?42", "Password" + (char) 0xD800 + "42")));
+
+        assertEquals(400, failure.getStatusCode());
+        assertTrue(failure.getDetails().containsKey("confirmPassword"));
+        assertFalse(failure.getDetails().containsKey("password"));
+        verifyNoInteractions(hasher);
+        assertEquals(2, repository.users.size());
+    }
+
+    @Test
+    void registrationAndLoginPreserveValidVietnameseAndEmojiPasswords() {
+        String password = "MậtKhẩu#🔒123";
+        ProfileResponse registered = service.register(new RegisterRequest("Audit User", "audit@example.com",
+                "0912345678", password, password));
+
+        assertEquals(registered, service.login(new LoginRequest(registered.email(), password, false)));
+        AccountException wrong = assertThrows(AccountException.class, () -> service.login(
+                new LoginRequest(registered.email(), "MậtKhẩu#🔑123", false)));
+        assertEquals(401, wrong.getStatusCode());
+        assertEquals("INVALID_CREDENTIALS", wrong.getErrorCode());
     }
 
     @Test

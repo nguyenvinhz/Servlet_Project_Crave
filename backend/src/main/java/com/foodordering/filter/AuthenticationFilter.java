@@ -17,7 +17,6 @@ import jakarta.servlet.ServletResponse;
 import jakarta.servlet.annotation.WebFilter;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import jakarta.servlet.http.HttpSession;
 
 import java.io.IOException;
 import java.net.URI;
@@ -53,23 +52,21 @@ public class AuthenticationFilter implements Filter {
         }
         path = path.replaceAll(";[^/]*", "");
         boolean protectedRoute = isProtected(path, request.getMethod());
+        SessionAuth.Snapshot snapshot = null;
         try {
             if (!READ_METHODS.contains(request.getMethod())) {
                 validateOrigin(request);
             }
             if (protectedRoute) {
                 response.setHeader("Cache-Control", "no-store");
-                ProfileResponse user = SessionAuth.requireUser(request);
-                ProfileResponse fresh = accountService.getProfile(user.id());
-                SessionAuth.store(request.getSession(false), fresh);
+                snapshot = SessionAuth.capture(request);
+                ProfileResponse fresh = accountService.getProfile(snapshot.user().id());
+                SessionAuth.refresh(request, snapshot, fresh);
                 authorize(path, fresh);
             }
         } catch (AccountException exception) {
             if (exception.getStatusCode() == 401) {
-                HttpSession session = request.getSession(false);
-                if (session != null) {
-                    session.invalidate();
-                }
+                SessionAuth.invalidateIfCurrent(request, snapshot);
             }
             reject(request, response, path, exception.getStatusCode(), exception.getErrorCode(), exception.getMessage());
             return;

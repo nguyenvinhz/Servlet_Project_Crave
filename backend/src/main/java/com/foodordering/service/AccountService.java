@@ -255,6 +255,8 @@ public class AccountService {
     private static void validatePassword(String password, String field, Map<String, String> errors) {
         if (password == null || password.isBlank() || password.length() < 8 || password.length() > 72) {
             errors.put(field, "Mật khẩu phải có từ 8 đến 72 ký tự.");
+        } else if (!PasswordHasher.isValidPasswordText(password)) {
+            errors.put(field, "Mật khẩu chứa ký tự không hợp lệ.");
         }
     }
 

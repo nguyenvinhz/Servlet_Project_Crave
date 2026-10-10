@@ -127,6 +127,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function handleError(error, form, protectedPage = false) {
         if (error.status === 401 && protectedPage) return loginRedirect();
+        if (error.status === 403 && protectedPage && document.getElementById("addressForm")) {
+            clearForbiddenAddresses();
+        }
         showMessage(errorBox, error.message);
         if (form) showFieldErrors(form, error.fieldErrors || {});
     }
@@ -273,17 +276,26 @@ document.addEventListener("DOMContentLoaded", () => {
     const cancel = document.getElementById("address-cancel");
     const fields = document.getElementById("address-fields");
     let editingId = null;
+    let editingDefault = null;
     let actionInProgress = false;
     let listLoadInProgress = false;
     const addressUrl = (id) => `${addressForm.action}/${encodeURIComponent(id)}`;
 
     function resetAddressForm() {
         editingId = null;
+        editingDefault = null;
         addressForm.reset();
         clearFieldErrors(addressForm);
         document.getElementById("address-form-title").textContent = "Thêm địa chỉ";
         document.getElementById("address-submit").textContent = "Thêm địa chỉ";
         cancel.hidden = true;
+    }
+
+    function clearForbiddenAddresses() {
+        addressList.replaceChildren();
+        resetAddressForm();
+        fields.disabled = true;
+        emptyState.hidden = true;
     }
 
     async function addressAction(action) {
@@ -337,6 +349,7 @@ document.addEventListener("DOMContentLoaded", () => {
             actions.append(addressButton("Sửa", async () => {
                 const detail = await request(addressUrl(address.id));
                 editingId = detail.id;
+                editingDefault = detail.isDefault;
                 clearFieldErrors(addressForm);
                 addressForm.elements.addressLine.value = detail.addressLine;
                 addressForm.elements.note.value = detail.note || "";
@@ -359,7 +372,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 await request(addressUrl(address.id), "DELETE");
                 if (editingId === address.id) resetAddressForm();
                 showMessage(successBox, "Đã xóa địa chỉ.");
-                await loadAddresses(true);
+                await loadAddresses();
             }, "danger"));
             item.append(actions);
             addressList.append(item);
@@ -385,18 +398,17 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (!editingAddress) {
                     resetAddressForm();
                     showMessage(errorBox, "Địa chỉ đang sửa không còn tồn tại. Vui lòng chọn lại địa chỉ.");
-                } else if (syncDefault) {
-                    addressForm.elements.isDefault.checked = editingAddress.isDefault;
+                } else {
+                    const checkbox = addressForm.elements.isDefault;
+                    if (syncDefault || checkbox.checked === editingDefault) {
+                        checkbox.checked = editingAddress.isDefault;
+                    }
+                    editingDefault = editingAddress.isDefault;
                 }
             }
             fields.disabled = false;
         } catch (error) {
             emptyState.hidden = true;
-            if (error.status === 403) {
-                addressList.replaceChildren();
-                resetAddressForm();
-                fields.disabled = true;
-            }
             handleError(error, null, true);
         } finally {
             listLoadInProgress = false;
