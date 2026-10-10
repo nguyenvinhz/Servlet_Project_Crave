@@ -1,53 +1,32 @@
 <%@ page contentType="text/html;charset=UTF-8" language="java" %>
-<%@ taglib prefix="c" uri="jakarta.tags.core" %>
-<c:set var="pageTitle" value="My Orders" scope="request"/>
-<%@ include file="../components/header.jspf" %>
-
-<link rel="stylesheet" href="<c:url value='/assets/css/order.css'/>">
-
-<main class="page order-page order-theme">
-    <div class="tracking-header" style="margin-bottom: 2rem;">
-        <h1>My Orders</h1>
-        <p>Review your past cravings and track current orders.</p>
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <title>Lịch sử đơn hàng | Crave</title>
+    <link rel="stylesheet" href="/crave/assets/css/styles.css">
+    <style>
+        .orders-container { max-width: 800px; margin: 40px auto; }
+        .order-card { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 15px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; }
+        .order-info h4 { margin: 0 0 5px 0; }
+        .order-info p { margin: 2px 0; color: #555; font-size: 14px; }
+        .badge { padding: 5px 10px; border-radius: 4px; font-size: 12px; font-weight: bold; }
+        .badge.PENDING_CONFIRMATION { background: #f39c12; color: #fff; }
+        .badge.PREPARING { background: #3498db; color: #fff; }
+        .badge.DELIVERING { background: #9b59b6; color: #fff; }
+        .badge.COMPLETED { background: #2ecc71; color: #fff; }
+        .badge.CANCELLED { background: #e74c3c; color: #fff; }
+        .btn-view { padding: 8px 15px; background: #ecf0f1; text-decoration: none; color: #333; border-radius: 4px; font-size: 14px; }
+        .btn-view:hover { background: #bdc3c7; }
+    </style>
+</head>
+<body>
+    <div class="orders-container">
+        <h2>Lịch sử đơn hàng của bạn</h2>
+        <div id="orderList">
+            <p>Đang tải dữ liệu...</p>
+        </div>
     </div>
 
-    <div class="orders-list" id="ordersContainer">
-        <!-- Placeholder cho UI dev -->
-        <a href="<c:url value='/orders/CRV-48291'/>" class="order-card">
-            <div class="order-card-info">
-                <h3>Order #CRV-48291</h3>
-                <p>1 Item · 15 Oct, 2026</p>
-                <span class="order-status-badge badge-delivering">Delivering</span>
-            </div>
-            <div class="order-card-right">
-                <div class="price">$12.82</div>
-            </div>
-        </a>
-
-        <a href="<c:url value='/orders/CRV-48110'/>" class="order-card">
-            <div class="order-card-info">
-                <h3>Order #CRV-48110</h3>
-                <p>2 Items · 10 Oct, 2026</p>
-                <span class="order-status-badge badge-completed">Completed</span>
-            </div>
-            <div class="order-card-right">
-                <div class="price">$25.40</div>
-            </div>
-        </a>
-    </div>
-</main>
-
-<script>
-    // Script mẫu cho Frontend lấy danh sách API (Chưa gọi thật vì Day 1 Backend chỉ có tạo đơn)
-    /*
-    fetch('${pageContext.request.contextPath}/api/orders')
-        .then(res => res.json())
-        .then(json => {
-            if(json.success) {
-                // render json.data
-            }
-        });
-    */
-</script>
-
-<%@ include file="../components/footer.jspf" %>
+    <script src="/crave/assets/js/orders.js"></script>
+</body>
+</html>
