@@ -4,12 +4,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title><c:out value="${pageTitle}"/> · Crave</title>
-    <!-- Google Fonts Nunito & Inter matching Framer design -->
+    <title><c:out value="${pageTitle}"/> · crave.</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Nunito:wght@600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="<c:url value='/assets/css/styles.css'/>">
+    <script>window.CONTEXT_PATH = '${pageContext.request.contextPath}';</script>
     <style>
         .site-header {
             background: #ffffff;
@@ -34,7 +34,7 @@
         .site-header nav {
             display: flex;
             align-items: center;
-            gap: 1.8rem;
+            gap: 1.6rem;
         }
         .site-header nav a {
             font-family: 'Inter', sans-serif;
@@ -44,7 +44,8 @@
             transition: color 0.15s ease;
             text-decoration: none;
         }
-        .site-header nav a:hover {
+        .site-header nav a:hover,
+        .site-header nav a.active {
             color: #f4511e;
             text-decoration: none;
         }
@@ -126,9 +127,13 @@
 <header class="site-header">
     <a class="brand" href="<c:url value='/menu'/>">crave<span>.</span></a>
     <nav aria-label="Điều hướng chính">
-        <a href="<c:url value='/menu'/>">Thực đơn</a>
-        <a href="<c:url value='/promotions'/>">Khuyến mãi</a>
-        <a href="<c:url value='/cart'/>">Giỏ hàng</a>
+        <a href="<c:url value='/menu'/>" class="${pageTitle == 'Thực đơn' ? 'active' : ''}">Thực đơn</a>
+        <a href="<c:url value='/promotions'/>" class="${pageTitle == 'Khuyến mãi' ? 'active' : ''}">Khuyến mãi</a>
+        <a href="<c:url value='/cart'/>" class="${pageTitle == 'Giỏ hàng' ? 'active' : ''}">Giỏ hàng</a>
+        <c:if test="${sessionScope.currentUser.role == 'ADMIN' or sessionScope.currentUser.role == 'MENU_MANAGER'}">
+            <a href="<c:url value='/admin/menu'/>" class="${pageTitle == 'Quản lý thực đơn' ? 'active' : ''}">Quản lý món</a>
+            <a href="<c:url value='/admin/categories'/>" class="${pageTitle == 'Quản lý danh mục' ? 'active' : ''}">Quản lý danh mục</a>
+        </c:if>
     </nav>
     <div class="header-actions-right">
         <a href="<c:url value='/cart'/>" class="header-cart-icon-btn" title="Giỏ hàng" aria-label="Giỏ hàng">
