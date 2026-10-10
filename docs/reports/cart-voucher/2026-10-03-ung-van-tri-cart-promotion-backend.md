@@ -98,7 +98,7 @@ Xây dựng toàn bộ tầng backend (Entity, DTO, Repository, Service, Servlet
 - `backend/src/main/java/com/foodordering/api/CartApiServlet.java`
 - `backend/src/main/java/com/foodordering/api/PromotionApiServlet.java`
 - `backend/src/test/java/com/foodordering/CartPromotionServiceTest.java`
-- `docs/reports/2026-10-03/tri/01-cart-promotion-backend.md`
+- `docs/reports/cart-voucher/2026-10-03-ung-van-tri-cart-promotion-backend.md`
 
 ## Cách kiểm tra
 

@@ -35,7 +35,7 @@ Báo cáo này liệt kê chi tiết các sửa đổi đối với phần nền
   - `AdminOrdersPageServlet.java` -> map tới `/admin/orders`
 
 ### 2.5. Hợp đồng API (OpenAPI YAML)
-- **Vấn đề:** `docs/api-order-payment.yaml` dùng trường `message` trong wrapper response thay vì `error` theo chuẩn của project.
+- **Vấn đề:** `docs/api/api-order-payment.yaml` dùng trường `message` trong wrapper response thay vì `error` theo chuẩn của project.
 - **Khắc phục:** Đã sửa lại định dạng response trong YAML để map chính xác với cấu trúc `ApiError` của `ApiResponse`.
 
 ## 3. Vòng sửa lỗi 2 (Bổ sung sau Feedback PR #4)
@@ -59,7 +59,7 @@ Báo cáo này liệt kê chi tiết các sửa đổi đối với phần nền
 - Thêm các helper method (`addOrderDetail`, `addStatusHistory`) vào `CustomerOrder` để đồng bộ owning side.
 - Thêm `OrderResponseSerializationTest` để test quá trình parse Jackson, chống drift contract.
 ### 2.6. Khác
-- Đã đính chính lại file Báo cáo Ngày 1 (`docs/reports/2026-10-06/01-nguyen-duc-phat-order-payment.md`) để xác nhận Ranh giới Transaction (Transaction boundary) được bao bọc trực tiếp trong Service Interface `CustomerOrderService`, không chờ dời sang Ngày 2 nữa.
+- Đã đính chính lại file Báo cáo Ngày 1 (`docs/reports/order-payment/2026-10-06-nguyen-duc-phat-order-payment.md`) để xác nhận Ranh giới Transaction (Transaction boundary) được bao bọc trực tiếp trong Service Interface `CustomerOrderService`, không chờ dời sang Ngày 2 nữa.
 
 ## 3. Tình trạng và Đề xuất
 - **Tình trạng:** Khối lượng công việc nền tảng (Entity, DTO, API Contract, View routing) hiện đã hoàn thiện 100%. Lịch sử Git hoàn toàn sạch (đã loại bỏ code nghiệp vụ của Day 2/Day 3 khỏi nhánh này).

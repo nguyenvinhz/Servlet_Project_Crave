@@ -3,7 +3,7 @@
 - Người thực hiện mã nguồn gốc: Ung Văn Trí.
 - Ngày cập nhật báo cáo: 2026-10-09.
 - Branch: `feature/cart-voucher-split-day1`.
-- Task: Ngày 1 — dựng nền và chốt hợp đồng theo `docs/phan-cong-nhiem-vu-3-ngay.md`.
+- Task: Ngày 1 — dựng nền và chốt hợp đồng theo `docs/project/phan-cong-nhiem-vu-3-ngay.md`.
 - Phạm vi báo cáo: phần nền cart/voucher được tách từ nhánh đã chứa công việc của nhiều ngày.
 
 ## Mục tiêu
