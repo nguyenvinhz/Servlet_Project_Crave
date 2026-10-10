@@ -69,3 +69,11 @@ Sáu kiểm thử `501` của snapshot Ngày 1 được điều chỉnh cho main
 - So sánh với main trước khi tích hợp: mã nguồn trong `backend/src/main`, `frontend` và `database` không thay đổi; phần tích hợp thêm báo cáo và kiểm thử contract phù hợp với main hiện có.
 
 Các kết quả này không xác nhận Gate của cả nhóm.
+
+## Đính chính source của Pull Request
+
+PR #17 trước đây được merge từ `fix/cart-voucher-day1-merge`, chưa đúng nhánh nguồn yêu cầu. Lần tích hợp sửa này dùng trực tiếp `feature/cart-voucher-split-day1`, sau commit revert thông thường của lần tích hợp trước; PR #17 vẫn là lịch sử.
+
+Mã runtime cart/voucher giữ nguyên trong quá trình này; nhánh tài khoản Ngày 2 không thay đổi. Nhánh đúng nguồn đưa lại hai file thực tế là `CartPromotionApiContractTest.java` và báo cáo này, không tạo một PR rỗng chỉ để đổi metadata.
+
+Đã kiểm tra lại trên nhánh feature đúng nguồn: Maven đạt 57 test, 0 failure/error/skipped, tạo WAR thành công và kiểm tra mapping với MySQL thật; Tomcat đạt 26 kiểm tra HTTP/JSP. Mã runtime backend/frontend/database khớp lần tích hợp trước và sáu contract test được đưa lại nguyên nội dung đã xác minh. Kết quả này không xác nhận Gate của cả nhóm.
