@@ -4,16 +4,43 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title><c:out value="${pageTitle}"/> · Crave</title>
+    <title><c:out value="${pageTitle}"/> · crave.</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="<c:url value='/assets/css/styles.css'/>">
+    <script>window.CONTEXT_PATH = '${pageContext.request.contextPath}';</script>
 </head>
 <body>
 <header class="site-header">
-    <a class="brand" href="<c:url value='/auth/login'/>">Crave<span>.</span></a>
-    <nav aria-label="Điều hướng tài khoản">
-        <a href="<c:url value='/auth/login'/>">Đăng nhập</a>
-        <a href="<c:url value='/auth/register'/>">Đăng ký</a>
-        <a href="<c:url value='/customer/profile'/>">Hồ sơ</a>
-        <a href="<c:url value='/customer/addresses'/>">Địa chỉ</a>
-    </nav>
+    <div class="site-header-inner">
+        <a class="brand" href="<c:url value='/menu'/>">crave<span>.</span></a>
+
+        <nav class="main-nav" aria-label="Điều hướng chính">
+            <a href="<c:url value='/menu'/>" class="${empty param.categoryId and empty param.keyword and pageTitle == 'Thực đơn' ? 'active' : ''}">Home</a>
+            <a href="<c:url value='/menu'/>" class="${pageTitle == 'Thực đơn' and (not empty param.categoryId or not empty param.keyword) ? 'active' : ''}">Food</a>
+            <a href="<c:url value='/admin/menu'/>" class="${pageTitle == 'Quản lý thực đơn' ? 'active' : ''}">Quản lý món</a>
+            <a href="<c:url value='/admin/categories'/>" class="${pageTitle == 'Quản lý danh mục' ? 'active' : ''}">Quản lý danh mục</a>
+            <a href="<c:url value='/customer/profile'/>" class="${pageTitle == 'Hồ sơ khách hàng' ? 'active' : ''}">Hồ sơ</a>
+            <a href="<c:url value='/customer/addresses'/>" class="${pageTitle == 'Sổ địa chỉ' ? 'active' : ''}">Địa chỉ</a>
+        </nav>
+
+        <div class="header-actions">
+            <a href="<c:url value='/menu#catalogSection'/>" class="header-icon-btn" title="Tìm kiếm" aria-label="Tìm kiếm">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+            </a>
+            <a href="<c:url value='/menu'/>" class="header-icon-btn cart-btn" title="Giỏ hàng" aria-label="Giỏ hàng">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="9" cy="21" r="1"></circle>
+                    <circle cx="20" cy="21" r="1"></circle>
+                    <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+                </svg>
+                <span class="cart-badge-dot"></span>
+            </a>
+            <a href="<c:url value='/auth/login'/>" class="header-login-link">Log in</a>
+        </div>
+    </div>
 </header>
