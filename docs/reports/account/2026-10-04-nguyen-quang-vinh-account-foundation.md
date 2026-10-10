@@ -50,7 +50,7 @@ Thiết lập Maven WAR/Tomcat và kết nối JPA/Hibernate qua connection pool
 ### 2.3. API & Hợp đồng giao tiếp (OpenAPI)
 
 - **Định dạng Envelope chuẩn:** Thống nhất định dạng JSON qua `ApiResponse<T>` và `ApiError`, bảo đảm tính nhất quán trên toàn bộ API.
-- **Tài liệu OpenAPI 3.0 (`docs/api-auth-profile-address.yaml`):**
+- **Tài liệu OpenAPI 3.0 (`docs/api/api-auth-profile-address.yaml`):**
   - Định nghĩa chi tiết các endpoint: `/api/health`, `/api/auth/login`, `/api/auth/register`, `/api/profile`, `/api/addresses`.
   - Mô tả đầy đủ Request Body (JSON), Response Codes (200, 201, 400, 401, 405, 409, 501, 503).
 - **Trạng thái Ngày 1:** Các API nghiệp vụ chủ động trả `501 NOT_IMPLEMENTED` có kèm mã lỗi và thông điệp rõ ràng theo đúng ranh giới Ngày 1; riêng `/api/health` trả `200` khi database sẵn sàng hoặc `503` khi database lỗi.

@@ -29,7 +29,7 @@ Chốt contract API cho tạo đơn, xem đơn, cập nhật trạng thái đơn
 
 ### API
 
-- Khởi tạo hợp đồng OpenAPI tại `docs/api-order-payment.yaml`.
+- Khởi tạo hợp đồng OpenAPI tại `docs/api/api-order-payment.yaml`.
 - Chốt request/response tạo đơn, cập nhật trạng thái đơn và thanh toán.
 
 ### Database
@@ -38,8 +38,8 @@ Chốt contract API cho tạo đơn, xem đơn, cập nhật trạng thái đơn
 
 ## File hoặc khu vực đã thay đổi
 
-- `docs/api-order-payment.yaml`
-- `docs/reports/2026-10-06/01-nguyen-duc-phat-order-payment.md`
+- `docs/api/api-order-payment.yaml`
+- `docs/reports/order-payment/2026-10-06-nguyen-duc-phat-order-payment.md`
 - `backend/src/main/java/com/foodordering/entity/...`
 - `backend/src/main/java/com/foodordering/repository/...`
 - `backend/src/main/java/com/foodordering/service/...`

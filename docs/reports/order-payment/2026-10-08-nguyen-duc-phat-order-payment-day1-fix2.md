@@ -27,7 +27,7 @@ Tiếp tục xử lý các phản hồi từ Reviewer sau lần review ngày 07/
 
 ### 2.4. Đồng bộ DTO và OpenAPI (Contract Sync)
 - **Vấn đề:** Có sự chênh lệch thuộc tính giữa cấu trúc đối tượng trả về (`OrderResponse`) và tài liệu thiết kế API YAML.
-- **Khắc phục:** Bổ sung các trường `foodNameSnapshot` và `note` vào `OrderItemResponse` trong file `docs/api-order-payment.yaml` để đồng bộ 100% với codebase thực tế.
+- **Khắc phục:** Bổ sung các trường `foodNameSnapshot` và `note` vào `OrderItemResponse` trong file `docs/api/api-order-payment.yaml` để đồng bộ 100% với codebase thực tế.
 
 ### 2.5. Hoàn thiện Logic Entity (JPA)
 - **Vấn đề:** Các thực thể (Entity) liên kết 2 chiều cần các Helper Method để tự động cập nhật các reference qua lại trước khi lưu vào cơ sở dữ liệu.

@@ -3,6 +3,9 @@
 Ứng dụng Java Servlet/JSP đóng gói dạng WAR, dùng Jakarta Servlet 6, JPA/Hibernate,
 HikariCP và MySQL.
 
+Tài liệu được chia thành API, kế hoạch/quy ước làm việc và báo cáo theo chức năng.
+Xem [mục lục tài liệu](docs/README.md) để tìm đúng phần cần đọc.
+
 ## Chạy môi trường phát triển
 
 Yêu cầu: JDK 17+, Maven 3.9+, Docker (nếu chưa có MySQL) và Tomcat 10.1+.
@@ -42,7 +45,7 @@ Yêu cầu: JDK 17+, Maven 3.9+, Docker (nếu chưa có MySQL) và Tomcat 10.1+
 
 Phần tài khoản Ngày 2 đã hoàn thiện: đăng ký, đăng nhập/đăng xuất, session,
 cập nhật hồ sơ và quản lý địa chỉ giao hàng. Hợp đồng nằm tại
-[`docs/api-auth-profile-address.yaml`](docs/api-auth-profile-address.yaml).
+[`docs/api/api-auth-profile-address.yaml`](docs/api/api-auth-profile-address.yaml).
 
 ## Demo tài khoản Ngày 2 — Nguyễn Quang Vinh
 

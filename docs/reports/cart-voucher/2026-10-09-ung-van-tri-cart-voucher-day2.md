@@ -3,7 +3,7 @@
 - Người thực hiện mã nguồn gốc: Ung Văn Trí.
 - Ngày cập nhật báo cáo: 2026-10-10.
 - Branch: `feature/cart-voucher-split-day2`.
-- Task: Ngày 2 — hoàn thiện cart/voucher theo `docs/phan-cong-nhiem-vu-3-ngay.md`.
+- Task: Ngày 2 — hoàn thiện cart/voucher theo `docs/project/phan-cong-nhiem-vu-3-ngay.md`.
 - Phạm vi báo cáo: chức năng cart/voucher được tách từ mã nguồn đã gộp, đồng bộ lại với `main` và bổ sung kiểm thử hồi quy.
 
 ## Mục tiêu

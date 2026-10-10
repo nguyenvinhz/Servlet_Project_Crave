@@ -81,7 +81,7 @@ Xây dựng nền tảng và chốt hợp đồng API cho vertical slice Menu v�
 - `backend/src/test/java/com/foodordering/`
 - `frontend/WEB-INF/views/menu/`
 - `frontend/WEB-INF/views/admin/`
-- `docs/reports/2026-10-04/02-nguyen-minh-huan-menu-management-day1.md`
+- `docs/reports/menu-management/2026-10-04-nguyen-minh-huan-menu-management-day1.md`
 
 ## Cách kiểm tra
 

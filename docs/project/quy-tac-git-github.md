@@ -294,21 +294,23 @@ Closes #24
 Mỗi task/branch chỉ tạo một báo cáo tại:
 
 ~~~text
-docs/reports/YYYY-MM-DD/<so-thu-tu>-<ho-ten-thanh-vien>-<task>.md
+docs/reports/<scope>/YYYY-MM-DD-<ho-ten-thanh-vien>-<task>.md
 ~~~
 
 Ví dụ:
 
 ~~~text
-docs/reports/2026-10-02/01-nguyen-quang-vinh-auth-login.md
-docs/reports/2026-10-02/02-nguyen-minh-huan-menu-filter.md
-docs/reports/2026-10-02/03-ung-van-tri-cart-voucher.md
-docs/reports/2026-10-02/04-nguyen-duc-phat-order-status.md
+docs/reports/account/2026-10-02-nguyen-quang-vinh-auth-login.md
+docs/reports/menu-management/2026-10-02-nguyen-minh-huan-menu-filter.md
+docs/reports/cart-voucher/2026-10-02-ung-van-tri-cart-voucher.md
+docs/reports/order-payment/2026-10-02-nguyen-duc-phat-order-status.md
+docs/reports/documentation/2026-10-10-nguyen-quang-vinh-docs-layout.md
 ~~~
 
 Quy tắc:
 
-- Số thứ tự gồm hai chữ số: 01, 02, 03.
+- Thư mục `scope` phân theo phạm vi: `account`, `menu-management`, `cart-voucher`, `order-payment` hoặc `documentation`.
+- Ngày `YYYY-MM-DD` là ngày tạo báo cáo; giữ nguyên tên file khi cập nhật báo cáo.
 - Tên file viết thường, không dấu, dùng dấu gạch nối.
 - Tên file phải có họ tên người thực hiện; không tạo thư mục riêng theo tên thành viên.
 - Báo cáo được tạo trong commit đầu tiên của branch và nằm cùng commit với code.
@@ -323,11 +325,11 @@ Quy tắc:
 Có thể tạo bằng IDE hoặc PowerShell:
 
 ~~~powershell
-New-Item -ItemType Directory -Force "docs/reports/2026-10-02"
-New-Item -ItemType File "docs/reports/2026-10-02/01-nguyen-quang-vinh-auth-login.md"
+New-Item -ItemType Directory -Force "docs/reports/account"
+New-Item -ItemType File "docs/reports/account/2026-10-02-nguyen-quang-vinh-auth-login.md"
 ~~~
 
-Thay ngày, tên thành viên, số thứ tự và task cho đúng công việc thực tế.
+Thay phạm vi, ngày, tên thành viên và task cho đúng công việc thực tế. Thêm liên kết báo cáo vào [mục lục báo cáo](../reports/README.md).
 
 ### 9.3. Template báo cáo commit
 
@@ -418,7 +420,7 @@ Tạo report theo mục 9 và điền đúng kết quả thực tế.
 ~~~powershell
 git add backend/src/main/java/com/foodordering/servlet
 git add frontend/auth
-git add docs/reports/2026-10-02/01-nguyen-quang-vinh-auth-login.md
+git add docs/reports/account/2026-10-02-nguyen-quang-vinh-auth-login.md
 ~~~
 
 Có thể dùng chế độ chọn từng phần:
@@ -561,7 +563,7 @@ Mô tả vấn đề và kết quả mong muốn.
 
 ## Báo cáo branch
 
-- Link đến file report duy nhất của branch tại docs/reports/...
+- Link đến file report duy nhất của branch tại docs/reports/<scope>/...
 
 ## Ảnh giao diện
 
@@ -614,7 +616,7 @@ Sau khi sửa:
 
 ~~~powershell
 git add <cac-file-da-sua>
-git add docs/reports/<report-cua-branch>.md
+git add docs/reports/<scope>/<report-cua-branch>.md
 git diff --cached
 git commit -m "fix(auth): xử lý góp ý validation đăng nhập"
 git push
