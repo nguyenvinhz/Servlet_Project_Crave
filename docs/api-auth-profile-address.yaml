@@ -1,11 +1,34 @@
 openapi: 3.0.3
 info:
   title: Crave Account API
-  version: 1.0.0-day1
+  version: 1.0.0-day2
   description: |
-    Contract for authentication, customer profile, and delivery addresses.
-    The routes exist on Day 1 and return the standard NOT_IMPLEMENTED response
-    until their business logic is completed on Day 2.
+    Implemented authentication, profile and customer delivery-address APIs.
+    Send JSON request bodies with Content-Type: application/json and use
+    credentials: same-origin in fetch requests. A missing or incompatible
+    Content-Type returns 415. Fields must use their declared JSON types;
+    string, number and boolean values are not coerced between types. Malformed
+    JSON, duplicate object keys, unknown fields and trailing JSON return 400.
+    Responses use the shared success/data/error envelope, except DELETE 204.
+    Mutation requests from a different Origin or with cross-site fetch metadata
+    are rejected with 403, including public login, registration and logout.
+    Account responses carry Cache-Control: no-store. Unsupported HTTP methods
+    return a JSON 405 error and an Allow header.
+
+    Login creates an HttpOnly JSESSIONID session cookie and rotates an existing
+    session id. Sessions expire after 30 minutes of inactivity, or 7 days when
+    rememberMe is true. rememberMe extends the server inactivity timeout only;
+    the cookie remains a browser-session cookie. Registration does not sign in.
+    Logout invalidates the session and succeeds even when already signed out.
+    Active account status and current employee role are rechecked on protected
+    requests; a locked, inactive or deleted account loses authenticated access.
+    An in-flight request whose session identity changed through login or logout
+    returns 401 when rechecked; it cannot refresh or invalidate the newer login.
+
+    A customer may read and update their own profile and addresses. An employee
+    may read their own profile, but receives 403 for profile mutations and all
+    address operations. Resource ownership always comes from the session;
+    request bodies cannot select a different user or customer.
 servers:
   - url: /crave
     description: Default Tomcat context
@@ -41,7 +64,7 @@ paths:
               $ref: "#/components/schemas/LoginRequest"
       responses:
         "200":
-          description: Login succeeded; the session id is returned in an HttpOnly cookie
+          description: Login succeeded; session id is set or rotated in an HttpOnly cookie
           headers:
             Set-Cookie:
               schema:
@@ -55,13 +78,15 @@ paths:
           $ref: "#/components/responses/ValidationError"
         "401":
           $ref: "#/components/responses/Unauthorized"
-        "501":
-          $ref: "#/components/responses/NotImplemented"
+        "405":
+          $ref: "#/components/responses/MethodNotAllowed"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
 
   /api/auth/register:
     post:
       tags: [Authentication]
-      summary: Register a customer account
+      summary: Register a customer without starting a session
       requestBody:
         required: true
         content:
@@ -70,7 +95,7 @@ paths:
               $ref: "#/components/schemas/RegisterRequest"
       responses:
         "201":
-          description: Customer account created
+          description: Customer account created; use login to start a session
           content:
             application/json:
               schema:
@@ -78,61 +103,99 @@ paths:
         "400":
           $ref: "#/components/responses/ValidationError"
         "409":
-          description: Email or phone already exists
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorEnvelope"
-        "501":
-          $ref: "#/components/responses/NotImplemented"
+          $ref: "#/components/responses/AccountConflict"
+        "405":
+          $ref: "#/components/responses/MethodNotAllowed"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
 
-  /api/profile:
+  /api/auth/session:
     get:
-      tags: [Profile]
-      summary: Get the signed-in user's profile
+      tags: [Authentication]
+      summary: Read the current active account and refresh the session principal
       security:
         - cookieAuth: []
       responses:
         "200":
-          description: Current profile
+          $ref: "#/components/responses/ProfileSuccess"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "405":
+          $ref: "#/components/responses/MethodNotAllowed"
+
+  /api/auth/logout:
+    post:
+      tags: [Authentication]
+      summary: Invalidate the current session
+      description: Idempotent; no request body or authenticated session is required.
+      responses:
+        "200":
+          description: Signed out, including when no session existed
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ProfileEnvelope"
+                $ref: "#/components/schemas/LogoutEnvelope"
+        "405":
+          $ref: "#/components/responses/MethodNotAllowed"
+
+  /api/profile:
+    get:
+      tags: [Profile]
+      summary: Get the signed-in customer or employee profile
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          $ref: "#/components/responses/ProfileSuccess"
         "401":
           $ref: "#/components/responses/Unauthorized"
-        "501":
-          $ref: "#/components/responses/NotImplemented"
+        "405":
+          $ref: "#/components/responses/MethodNotAllowed"
     put:
       tags: [Profile]
       summary: Update the signed-in customer's profile
       security:
         - cookieAuth: []
       requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/ProfileUpdateRequest"
+        $ref: "#/components/requestBodies/ProfileWrite"
       responses:
         "200":
-          description: Updated profile
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ProfileEnvelope"
+          $ref: "#/components/responses/ProfileSuccess"
         "400":
           $ref: "#/components/responses/ValidationError"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "409":
-          description: Email or phone already belongs to another account
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorEnvelope"
-        "501":
-          $ref: "#/components/responses/NotImplemented"
+          $ref: "#/components/responses/AccountConflict"
+        "405":
+          $ref: "#/components/responses/MethodNotAllowed"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+    post:
+      tags: [Profile]
+      summary: Update the signed-in customer's profile (PUT compatibility alias)
+      description: Accepts the same JSON body and has the same behavior as PUT.
+      security:
+        - cookieAuth: []
+      requestBody:
+        $ref: "#/components/requestBodies/ProfileWrite"
+      responses:
+        "200":
+          $ref: "#/components/responses/ProfileSuccess"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/AccountConflict"
+        "405":
+          $ref: "#/components/responses/MethodNotAllowed"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
 
   /api/addresses:
     get:
@@ -142,26 +205,27 @@ paths:
         - cookieAuth: []
       responses:
         "200":
-          description: Address list
+          description: Address list; an empty list is valid
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/AddressListEnvelope"
         "401":
           $ref: "#/components/responses/Unauthorized"
-        "501":
-          $ref: "#/components/responses/NotImplemented"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "405":
+          $ref: "#/components/responses/MethodNotAllowed"
     post:
       tags: [Addresses]
       summary: Create a delivery address
+      description: |
+        The first address is always the default. Setting isDefault to true
+        selects this address and clears the previous default in one transaction.
       security:
         - cookieAuth: []
       requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/AddressWriteRequest"
+        $ref: "#/components/requestBodies/AddressWrite"
       responses:
         "201":
           description: Address created
@@ -173,8 +237,12 @@ paths:
           $ref: "#/components/responses/ValidationError"
         "401":
           $ref: "#/components/responses/Unauthorized"
-        "501":
-          $ref: "#/components/responses/NotImplemented"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "405":
+          $ref: "#/components/responses/MethodNotAllowed"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
 
   /api/addresses/{addressId}:
     parameters:
@@ -186,63 +254,71 @@ paths:
         - cookieAuth: []
       responses:
         "200":
-          description: Address detail
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/AddressEnvelope"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "404":
-          $ref: "#/components/responses/NotFound"
-        "501":
-          $ref: "#/components/responses/NotImplemented"
-    put:
-      tags: [Addresses]
-      summary: Update an address owned by the signed-in customer
-      security:
-        - cookieAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/AddressWriteRequest"
-      responses:
-        "200":
-          description: Address updated
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/AddressEnvelope"
+          $ref: "#/components/responses/AddressSuccess"
         "400":
           $ref: "#/components/responses/ValidationError"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
-        "501":
-          $ref: "#/components/responses/NotImplemented"
+        "405":
+          $ref: "#/components/responses/MethodNotAllowed"
+    put:
+      tags: [Addresses]
+      summary: Update an address owned by the signed-in customer
+      description: |
+        Selecting this address as default clears the previous default. Clearing
+        the current default selects another address when one exists; a sole
+        remaining address stays default. Exactly one default remains whenever
+        the customer has addresses.
+      security:
+        - cookieAuth: []
+      requestBody:
+        $ref: "#/components/requestBodies/AddressWrite"
+      responses:
+        "200":
+          $ref: "#/components/responses/AddressSuccess"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "405":
+          $ref: "#/components/responses/MethodNotAllowed"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
     delete:
       tags: [Addresses]
       summary: Delete an address owned by the signed-in customer
+      description: |
+        Deleting the default selects a remaining address as default, if any.
+        Existing orders retain their delivery-address snapshots.
       security:
         - cookieAuth: []
       responses:
         "204":
           description: Address deleted; no response body
+        "400":
+          $ref: "#/components/responses/ValidationError"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
         "409":
-          description: The address cannot currently be deleted
+          description: The address is still referenced and cannot be deleted (ADDRESS_IN_USE)
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
-        "501":
-          $ref: "#/components/responses/NotImplemented"
+        "405":
+          $ref: "#/components/responses/MethodNotAllowed"
 
 components:
   securitySchemes:
@@ -250,7 +326,6 @@ components:
       type: apiKey
       in: cookie
       name: JSESSIONID
-
   parameters:
     AddressId:
       name: addressId
@@ -258,12 +333,38 @@ components:
       required: true
       schema:
         type: string
+        minLength: 1
         maxLength: 10
+        pattern: "^[A-Za-z0-9_-]{1,10}$"
       example: DC01
-
+  requestBodies:
+    ProfileWrite:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ProfileUpdateRequest"
+    AddressWrite:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/AddressWriteRequest"
   responses:
+    ProfileSuccess:
+      description: Current profile; passwords and password hashes are never returned
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ProfileEnvelope"
+    AddressSuccess:
+      description: Address data
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/AddressEnvelope"
     ValidationError:
-      description: One or more request fields are invalid
+      description: Invalid fields (VALIDATION_ERROR) or malformed JSON/path, wrong JSON types, duplicate/unknown keys or trailing JSON (INVALID_REQUEST)
       content:
         application/json:
           schema:
@@ -277,37 +378,51 @@ components:
               fieldErrors:
                 email: Email không đúng định dạng.
     Unauthorized:
-      description: No valid authenticated session
+      description: Missing/invalid session (UNAUTHORIZED), wrong credentials (INVALID_CREDENTIALS), or inactive account (ACCOUNT_INACTIVE)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    Forbidden:
+      description: Authenticated account does not have the required customer role (FORBIDDEN)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    AccountConflict:
+      description: Email or phone already belongs to another account (ACCOUNT_CONFLICT); fieldErrors identifies the conflicting fields
       content:
         application/json:
           schema:
             $ref: "#/components/schemas/ErrorEnvelope"
     NotFound:
-      description: Resource does not exist or is not owned by this customer
+      description: Address does not exist or is not owned by this customer (NOT_FOUND)
       content:
         application/json:
           schema:
             $ref: "#/components/schemas/ErrorEnvelope"
-    NotImplemented:
-      description: Day 1 route scaffold; business logic is scheduled for Day 2
+    MethodNotAllowed:
+      description: Unsupported HTTP method (METHOD_NOT_ALLOWED)
+      headers:
+        Allow:
+          schema:
+            type: string
       content:
         application/json:
           schema:
             $ref: "#/components/schemas/ErrorEnvelope"
-          example:
-            success: false
-            data: null
-            error:
-              code: NOT_IMPLEMENTED
-              message: This operation is contracted but will be implemented on Day 2.
-              fieldErrors: {}
+    UnsupportedMediaType:
+      description: Missing or incompatible Content-Type; request bodies must use application/json (UNSUPPORTED_MEDIA_TYPE)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
     DatabaseUnavailable:
       description: Application is running, but its database is unavailable
       content:
         application/json:
           schema:
             $ref: "#/components/schemas/ErrorEnvelope"
-
   schemas:
     LoginRequest:
       type: object
@@ -318,15 +433,17 @@ components:
           type: string
           format: email
           maxLength: 100
+          description: Trimmed and normalized to lowercase before authentication
         password:
           type: string
           format: password
           minLength: 8
           maxLength: 72
+          description: Valid Unicode text without NUL or unpaired UTF-16 surrogates
         rememberMe:
           type: boolean
           default: false
-
+          description: Extend inactivity timeout to seven days; no persistent cookie is issued
     RegisterRequest:
       type: object
       required: [fullName, email, phone, password, confirmPassword]
@@ -342,18 +459,21 @@ components:
           maxLength: 100
         phone:
           type: string
-          pattern: "^[0-9+]{9,15}$"
+          minLength: 9
+          maxLength: 15
+          pattern: '^\+?[0-9]{8,15}$'
         password:
           type: string
           format: password
           minLength: 8
           maxLength: 72
+          description: Valid Unicode text without NUL or unpaired UTF-16 surrogates
         confirmPassword:
           type: string
           format: password
           minLength: 8
           maxLength: 72
-
+          description: Must equal password; NUL and unpaired UTF-16 surrogates are rejected
     ProfileUpdateRequest:
       type: object
       required: [fullName, email, phone]
@@ -369,8 +489,9 @@ components:
           maxLength: 100
         phone:
           type: string
-          pattern: "^[0-9+]{9,15}$"
-
+          minLength: 9
+          maxLength: 15
+          pattern: '^\+?[0-9]{8,15}$'
     AddressWriteRequest:
       type: object
       required: [addressLine, isDefault]
@@ -386,7 +507,6 @@ components:
           nullable: true
         isDefault:
           type: boolean
-
     Profile:
       type: object
       required: [id, accountType, fullName, email, phone]
@@ -404,10 +524,14 @@ components:
           format: email
         phone:
           type: string
-
+        role:
+          type: string
+          nullable: true
+          enum: [ADMIN, MENU_MANAGER, ORDER_STAFF, PROMOTION_MANAGER, HR_MANAGER, null]
+          description: Employee role; omitted for customers
     Address:
       type: object
-      required: [id, addressLine, isDefault, createdAt, updatedAt]
+      required: [id, addressLine, note, isDefault, createdAt, updatedAt]
       properties:
         id:
           type: string
@@ -421,11 +545,12 @@ components:
           type: boolean
         createdAt:
           type: string
-          format: date-time
+          description: Local database timestamp (Asia/Ho_Chi_Minh), without an offset
+          example: "2026-10-08T12:00:00"
         updatedAt:
           type: string
-          format: date-time
-
+          description: Local database timestamp (Asia/Ho_Chi_Minh), without an offset
+          example: "2026-10-08T12:00:00"
     ApiError:
       type: object
       required: [code, message, fieldErrors]
@@ -438,7 +563,6 @@ components:
           type: object
           additionalProperties:
             type: string
-
     ErrorEnvelope:
       type: object
       required: [success, data, error]
@@ -450,10 +574,9 @@ components:
           nullable: true
         error:
           $ref: "#/components/schemas/ApiError"
-
     ProfileEnvelope:
       type: object
-      required: [success, data]
+      required: [success, data, error]
       properties:
         success:
           type: boolean
@@ -462,10 +585,9 @@ components:
           $ref: "#/components/schemas/Profile"
         error:
           nullable: true
-
     AddressEnvelope:
       type: object
-      required: [success, data]
+      required: [success, data, error]
       properties:
         success:
           type: boolean
@@ -474,10 +596,9 @@ components:
           $ref: "#/components/schemas/Address"
         error:
           nullable: true
-
     AddressListEnvelope:
       type: object
-      required: [success, data]
+      required: [success, data, error]
       properties:
         success:
           type: boolean
@@ -488,10 +609,25 @@ components:
             $ref: "#/components/schemas/Address"
         error:
           nullable: true
-
+    LogoutEnvelope:
+      type: object
+      required: [success, data, error]
+      properties:
+        success:
+          type: boolean
+          enum: [true]
+        data:
+          type: object
+          required: [message]
+          properties:
+            message:
+              type: string
+              example: Đã đăng xuất.
+        error:
+          nullable: true
     HealthEnvelope:
       type: object
-      required: [success, data]
+      required: [success, data, error]
       properties:
         success:
           type: boolean

@@ -2,7 +2,10 @@ package com.foodordering.api;
 
 import com.foodordering.dto.AddToCartRequest;
 import com.foodordering.dto.CartDto;
+import com.foodordering.dto.ProfileResponse;
 import com.foodordering.dto.UpdateCartItemRequest;
+import com.foodordering.enums.AccountType;
+import com.foodordering.enums.EmployeeRole;
 import com.foodordering.enums.ErrorCode;
 import com.foodordering.exception.BadRequestException;
 import com.foodordering.exception.ResourceNotFoundException;
@@ -99,7 +102,8 @@ class CartApiServletTest {
         if (customerId != null) {
             HttpSession session = mock(HttpSession.class);
             when(req.getSession(false)).thenReturn(session);
-            when(session.getAttribute("customerId")).thenReturn(customerId);
+            when(session.getAttribute("currentUser")).thenReturn(new ProfileResponse(customerId,
+                    AccountType.CUSTOMER, "Customer", "customer@example.com", "0901234567", null));
         } else {
             when(req.getSession(false)).thenReturn(null);
             when(req.getHeader("X-Customer-Id")).thenReturn(null);
@@ -129,6 +133,74 @@ class CartApiServletTest {
         String responseJson = sw.toString();
         assertTrue(responseJson.contains("\"success\":false"));
         assertTrue(responseJson.contains("UNAUTHORIZED"));
+    }
+
+    @Test
+    void requestAndLegacySessionIdsCannotAuthenticateAnyCartOperation() throws Exception {
+        for (String method : new String[]{"doGet", "doPost", "doPut", "doDelete"}) {
+            HttpServletRequest req = mockRequest(null, null, null);
+            HttpSession legacySession = mock(HttpSession.class);
+            when(req.getSession(false)).thenReturn(legacySession);
+            when(legacySession.getAttribute("customerId")).thenReturn("KH99");
+            when(req.getHeader("X-Customer-Id")).thenReturn("KH99");
+            when(req.getParameter("customerId")).thenReturn("KH99");
+            HttpServletResponse resp = mock(HttpServletResponse.class);
+            StringWriter body = new StringWriter();
+            when(resp.getWriter()).thenReturn(new PrintWriter(body));
+
+            invokeServletMethod(method, req, resp);
+
+            verify(resp).setStatus(401);
+            assertTrue(body.toString().contains("UNAUTHORIZED"));
+            assertNull(cartService.lastMethod);
+        }
+    }
+
+    @Test
+    void cartUsesAuthenticatedPrincipalWhenOtherCustomerIdsDisagree() throws Exception {
+        HttpServletRequest req = mockRequest(null, "KH01", null);
+        when(req.getSession(false).getAttribute("customerId")).thenReturn("KH99");
+        when(req.getHeader("X-Customer-Id")).thenReturn("KH99");
+        when(req.getParameter("customerId")).thenReturn("KH99");
+        HttpServletResponse resp = mock(HttpServletResponse.class);
+        when(resp.getWriter()).thenReturn(new PrintWriter(new StringWriter()));
+
+        invokeServletMethod("doGet", req, resp);
+
+        assertEquals("KH01", cartService.lastCustomerId);
+        verify(resp).setStatus(200);
+    }
+
+    @Test
+    void employeeSessionCannotAccessCustomerCart() throws Exception {
+        HttpServletRequest req = mockRequest(null, "KH01", null);
+        when(req.getSession(false).getAttribute("currentUser")).thenReturn(new ProfileResponse("NV01",
+                AccountType.EMPLOYEE, "Employee", "employee@example.com", "0901234567", EmployeeRole.ADMIN));
+        HttpServletResponse resp = mock(HttpServletResponse.class);
+        StringWriter body = new StringWriter();
+        when(resp.getWriter()).thenReturn(new PrintWriter(body));
+
+        invokeServletMethod("doGet", req, resp);
+
+        verify(resp).setStatus(403);
+        assertTrue(body.toString().contains("FORBIDDEN"));
+        assertNull(cartService.lastMethod);
+    }
+
+    @Test
+    void unexpectedCartFailureUsesSharedErrorEnvelopeWithoutInternalDetails() throws Exception {
+        cartService.exceptionToThrow = new IllegalStateException("jdbc:mysql://private-host secret");
+        HttpServletRequest req = mockRequest(null, "KH01", null);
+        HttpServletResponse resp = mock(HttpServletResponse.class);
+        StringWriter body = new StringWriter();
+        when(resp.getWriter()).thenReturn(new PrintWriter(body));
+
+        invokeServletMethod("doGet", req, resp);
+
+        verify(resp).setStatus(500);
+        assertTrue(body.toString().contains("INTERNAL_SERVER_ERROR"));
+        assertFalse(body.toString().contains("private-host"));
+        assertFalse(body.toString().contains("secret"));
     }
 
     @Test
