@@ -16,6 +16,7 @@
         <div id="form-error" class="form-error" role="alert" aria-live="polite">
             <c:out value="${error}"/>
         </div>
+        <div id="form-success" class="form-success" role="status" aria-live="polite"></div>
 
         <form id="loginForm" action="<c:url value='/api/auth/login'/>" method="post" data-method="POST">
             <label for="email">Email</label>
@@ -25,11 +26,6 @@
             <label for="password">Mật khẩu</label>
             <input id="password" name="password" type="password" autocomplete="current-password"
                    minlength="8" maxlength="72" placeholder="Nhập mật khẩu" required>
-
-            <label class="checkbox-row" for="rememberMe">
-                <input id="rememberMe" name="rememberMe" type="checkbox" value="true">
-                <span>Ghi nhớ đăng nhập</span>
-            </label>
 
             <button class="button primary" type="submit">Đăng nhập</button>
         </form>

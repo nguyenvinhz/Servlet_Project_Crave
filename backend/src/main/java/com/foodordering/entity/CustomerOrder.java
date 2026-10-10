@@ -79,6 +79,21 @@ public class CustomerOrder {
 
     public CustomerOrder() {}
 
+    public CustomerOrder(String orderId) {
+        this.id = orderId;
+    }
+
+    public CustomerOrder(String orderId, Customer customer, LocalDateTime orderedAt) {
+        this(orderId);
+        this.customer = customer;
+        this.orderedAt = orderedAt != null ? orderedAt : LocalDateTime.now();
+    }
+
+    public CustomerOrder(String orderId, Customer customer, BigDecimal subtotal, LocalDateTime orderedAt) {
+        this(orderId, customer, orderedAt);
+        this.subtotal = subtotal != null ? subtotal : BigDecimal.ZERO;
+    }
+
     @PrePersist
     protected void onCreate() {
         if (orderedAt == null) orderedAt = LocalDateTime.now();
@@ -89,6 +104,11 @@ public class CustomerOrder {
     }
 
     public String getId() { return id; }
+    public String getOrderId() { return id; }
+    public void setOrderId(String orderId) { this.id = orderId; }
+    public String getCustomerId() { return customer != null ? customer.getId() : null; }
+    public LocalDateTime getOrderTime() { return orderedAt; }
+    public void setOrderTime(LocalDateTime orderTime) { this.orderedAt = orderTime; }
     public void setId(String id) { this.id = id; }
     public Customer getCustomer() { return customer; }
     public void setCustomer(Customer customer) { this.customer = customer; }

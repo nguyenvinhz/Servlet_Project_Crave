@@ -32,7 +32,11 @@ public class Customer extends User {
     @OneToMany(mappedBy = "customer", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Address> addresses = new ArrayList<>();
 
-    protected Customer() {
+    public Customer() {
+    }
+
+    public Customer(String id) {
+        super(id, null, null, null, null);
     }
 
     public Customer(String id, String fullName, String email, String phone, String passwordHash) {

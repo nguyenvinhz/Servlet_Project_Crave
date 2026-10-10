@@ -1,5 +1,13 @@
-<footer class="site-footer">
-    <p>Crave · Đặt món nhanh, nhận món ngon.</p>
+<footer class="site-footer" style="background: #111827; color: #9ca3af; padding: 28px 4vw; margin-top: auto; border-top: none;">
+    <div style="max-width: 1240px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+        <div style="font-size: 0.95rem;">
+            <strong style="color: #fff; font-family: 'Nunito', sans-serif; font-size: 1.15rem; font-weight: 900; letter-spacing: -0.02em;">crave.</strong>
+            <span style="color: #d1d5db; margin-left: 8px;">Fresh favorites, delivered.</span>
+        </div>
+        <div style="font-size: 0.85rem; color: #6b7280;">
+            &copy; 2026 Crave Food Ordering · All rights reserved.
+        </div>
+    </div>
 </footer>
 <script src="<c:url value='/assets/js/account.js'/>"></script>
 </body>

@@ -56,7 +56,17 @@ public class Food {
     @OneToMany(mappedBy = "food", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<FoodOption> options = new ArrayList<>();
 
-    protected Food() {
+    public Food() {
+    }
+
+    public Food(String id) {
+        this.id = id;
+    }
+
+    public Food(String id, String name, BigDecimal price) {
+        this.id = id;
+        this.name = name;
+        this.price = price;
     }
 
     public Food(String id, Category category, String name, BigDecimal price, String imageUrl, String description) {
@@ -70,7 +80,7 @@ public class Food {
     }
 
     public Food(String id, Category category, String name, BigDecimal price, String imageUrl, String description,
-            FoodStatus status) {
+                FoodStatus status) {
         this(id, category, name, price, imageUrl, description);
         this.status = status != null ? status : FoodStatus.AVAILABLE;
     }
@@ -81,6 +91,14 @@ public class Food {
 
     public void setId(String id) {
         this.id = id;
+    }
+
+    public String getFoodId() {
+        return id;
+    }
+
+    public void setFoodId(String foodId) {
+        this.id = foodId;
     }
 
     public Category getCategory() {
@@ -100,6 +118,10 @@ public class Food {
     }
 
     public BigDecimal getPrice() {
+        return price;
+    }
+
+    public BigDecimal getBasePrice() {
         return price;
     }
 
@@ -141,6 +163,10 @@ public class Food {
 
     public List<FoodOption> getOptions() {
         return Collections.unmodifiableList(options);
+    }
+
+    public void setOptions(List<FoodOption> options) {
+        this.options = options != null ? new ArrayList<>(options) : new ArrayList<>();
     }
 
     public void addOption(FoodOption option) {
