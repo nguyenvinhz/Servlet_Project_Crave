@@ -82,20 +82,38 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
             order.setReceiverPhone(request.getReceiverPhone());
             order.setDeliveryAddress(request.getDeliveryAddress());
             order.setCustomerNote(request.getCustomerNote());
-            order.setPromotionId(request.getPromotionId());
+            
+            // Xác thực Promotion
+            if (request.getPromotionId() != null && !request.getPromotionId().trim().isEmpty()) {
+                Query promoQuery = em.createNativeQuery("SELECT status FROM promotion WHERE promotion_id = ?");
+                promoQuery.setParameter(1, request.getPromotionId());
+                List<?> promoStatus = promoQuery.getResultList();
+                if (promoStatus.isEmpty() || !"ACTIVE".equals(promoStatus.get(0).toString())) {
+                    throw new RuntimeException("Voucher không tồn tại hoặc đã hết hạn/không hoạt động");
+                }
+                order.setPromotionId(request.getPromotionId());
+            }
+            
             order.setSubtotal(subtotal);
-            order.setDeliveryFee(new BigDecimal("15000")); // Hardcode fee cho demo
+            BigDecimal fee = com.foodordering.enums.FulfillmentType.DELIVERY.equals(request.getFulfillmentType()) 
+                    ? new BigDecimal("15000") : BigDecimal.ZERO;
+            order.setDeliveryFee(fee);
 
             em.persist(order);
 
             // Copy từ CartItem sang OrderDetail
-            Query itemsQuery = em.createNativeQuery("SELECT ci.cart_item_id, ci.food_id, f.name, ci.quantity, f.price, ci.note " +
+            Query itemsQuery = em.createNativeQuery("SELECT ci.cart_item_id, ci.food_id, f.name, ci.quantity, f.price, ci.note, f.status " +
                     "FROM cart_item ci JOIN food f ON f.food_id = ci.food_id " +
                     "WHERE ci.cart_id = ?");
             itemsQuery.setParameter(1, cartId);
             List<Object[]> items = itemsQuery.getResultList();
 
             for (Object[] item : items) {
+                String foodStatus = (String) item[6];
+                if (!"AVAILABLE".equals(foodStatus)) {
+                    throw new RuntimeException("Món " + item[2] + " hiện không khả dụng");
+                }
+
                 String cartItemId = (String) item[0];
                 OrderDetail detail = new OrderDetail();
                 detail.setId(generateId(10));

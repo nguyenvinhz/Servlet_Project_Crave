@@ -1,3 +1,31 @@
+let currentPromotionId = null;
+let currentCartSubtotal = 0;
+let currentCartDiscount = 0;
+
+function updateSummary() {
+    const fulfillmentType = document.getElementById('fulfillmentType').value;
+    const fee = fulfillmentType === 'DELIVERY' ? 15000 : 0;
+    
+    document.getElementById('summarySubtotal').textContent = currentCartSubtotal.toLocaleString('vi-VN') + ' đ';
+    document.getElementById('summaryFee').textContent = fee.toLocaleString('vi-VN') + ' đ';
+    
+    let total = currentCartSubtotal + fee - currentCartDiscount;
+    if (total < 0) total = 0;
+    document.getElementById('summaryTotal').textContent = total.toLocaleString('vi-VN') + ' đ';
+
+    let discountEl = document.getElementById('summaryDiscount');
+    if (!discountEl && currentCartDiscount > 0) {
+        const p = document.createElement('p');
+        p.innerHTML = `<strong>Giảm giá:</strong> <span id="summaryDiscount"></span>`;
+        const hr = document.querySelector('.summary-section hr');
+        hr.parentNode.insertBefore(p, hr);
+        discountEl = document.getElementById('summaryDiscount');
+    }
+    if (discountEl) {
+        discountEl.textContent = '-' + currentCartDiscount.toLocaleString('vi-VN') + ' đ';
+    }
+}
+
 document.getElementById('fulfillmentType').addEventListener('change', function(e) {
     const addressGroup = document.getElementById('addressGroup');
     const addressInput = document.getElementById('deliveryAddress');
@@ -8,6 +36,7 @@ document.getElementById('fulfillmentType').addEventListener('change', function(e
         addressGroup.style.display = 'block';
         addressInput.setAttribute('required', 'required');
     }
+    updateSummary();
 });
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -18,10 +47,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             const data = await res.json();
             if (data.success && data.data) {
                 const cart = data.data;
-                document.getElementById('summarySubtotal').textContent = cart.subtotal.toLocaleString('vi-VN') + ' đ';
-                const fee = 15000;
-                document.getElementById('summaryFee').textContent = fee.toLocaleString('vi-VN') + ' đ';
-                document.getElementById('summaryTotal').textContent = (cart.subtotal + fee).toLocaleString('vi-VN') + ' đ';
+                currentCartSubtotal = cart.subtotal || 0;
+                currentPromotionId = cart.promotionId || null;
+                // mock discount for visual
+                currentCartDiscount = cart.discountAmount || (currentPromotionId ? 20000 : 0);
+                updateSummary();
             }
         } else {
             document.getElementById('summarySubtotal').textContent = 'Chưa có dữ liệu giỏ hàng';
@@ -45,7 +75,8 @@ document.getElementById('checkoutForm').addEventListener('submit', async functio
         deliveryAddress: document.getElementById('fulfillmentType').value === 'DELIVERY' 
                             ? document.getElementById('deliveryAddress').value : null,
         paymentMethod: document.getElementById('paymentMethod').value,
-        customerNote: document.getElementById('customerNote').value
+        customerNote: document.getElementById('customerNote').value,
+        promotionId: currentPromotionId
     };
 
     try {

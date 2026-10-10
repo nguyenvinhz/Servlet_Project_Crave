@@ -18,7 +18,7 @@ import com.foodordering.service.PaymentService;
 import com.foodordering.service.PaymentServiceImpl;
 import com.foodordering.repository.PaymentRepositoryImpl;
 
-@WebServlet(name = "PaymentServlet", urlPatterns = "/api/payments/*")
+@WebServlet(name = "PaymentServlet", urlPatterns = "/api/admin/payments/*")
 public class PaymentServlet extends BaseApiServlet {
 
     private PaymentService paymentService;
