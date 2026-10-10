@@ -29,6 +29,16 @@ public final class DatabaseConfig {
         return current;
     }
 
+    public static EntityManager getEntityManager() {
+        try {
+            EntityManagerFactory emf = getEntityManagerFactory();
+            return emf != null ? emf.createEntityManager() : null;
+        } catch (Exception e) {
+            System.err.println("Chưa thể tạo EntityManager: " + e.getMessage());
+            return null;
+        }
+    }
+
     public static void verifyConnection() {
         try (EntityManager entityManager = getEntityManagerFactory().createEntityManager()) {
             entityManager.createNativeQuery("SELECT 1", Integer.class).getSingleResult();
@@ -41,6 +51,15 @@ public final class DatabaseConfig {
             current.close();
         }
         entityManagerFactory = null;
+    }
+
+    public static void closeQuietly(AutoCloseable closeable) {
+        if (closeable != null) {
+            try {
+                closeable.close();
+            } catch (Exception ignored) {
+            }
+        }
     }
 
     static {

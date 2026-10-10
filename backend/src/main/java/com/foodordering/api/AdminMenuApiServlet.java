@@ -9,11 +9,12 @@ import com.foodordering.dto.FoodOptionResponse;
 import com.foodordering.dto.FoodRequest;
 import com.foodordering.dto.FoodStatusUpdateRequest;
 import com.foodordering.dto.FoodSummaryResponse;
-import com.foodordering.entity.Customer;
-import com.foodordering.entity.Employee;
+import com.foodordering.dto.ProfileResponse;
+import com.foodordering.enums.AccountType;
 import com.foodordering.enums.EmployeeRole;
 import com.foodordering.enums.FoodStatus;
 import com.foodordering.exception.ForbiddenException;
+import com.foodordering.security.SessionAuth;
 import com.foodordering.service.MenuService;
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServletRequest;
@@ -48,17 +49,10 @@ public class AdminMenuApiServlet extends BaseApiServlet {
     }
 
     private void checkAdminAccess(HttpServletRequest request) {
-        HttpSession session = request.getSession(false);
-        if (session != null) {
-            Object userObj = session.getAttribute("currentUser");
-            if (userObj instanceof Employee employee) {
-                EmployeeRole role = employee.getRole();
-                if (role != EmployeeRole.ADMIN && role != EmployeeRole.MENU_MANAGER) {
-                    throw new ForbiddenException("Bạn không có quyền thực hiện thao tác quản lý menu.");
-                }
-            } else if (userObj instanceof Customer) {
-                throw new ForbiddenException("Tài khoản khách hàng không thể thực hiện thao tác quản trị.");
-            }
+        ProfileResponse user = SessionAuth.requireUser(request);
+        if (user.accountType() != AccountType.EMPLOYEE
+                || (user.role() != EmployeeRole.ADMIN && user.role() != EmployeeRole.MENU_MANAGER)) {
+            throw new ForbiddenException("Bạn không có quyền thực hiện thao tác quản lý menu.");
         }
     }
 

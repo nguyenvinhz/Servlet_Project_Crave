@@ -9,10 +9,19 @@
         <class>com.foodordering.entity.Customer</class>
         <class>com.foodordering.entity.Employee</class>
         <class>com.foodordering.entity.Address</class>
+        <class>com.foodordering.entity.CustomerOrder</class>
+        <class>com.foodordering.entity.OrderDetail</class>
+        <class>com.foodordering.entity.OrderDetailOption</class>
+        <class>com.foodordering.entity.OrderStatusHistory</class>
+        <class>com.foodordering.entity.Payment</class>
         <class>com.foodordering.entity.Category</class>
         <class>com.foodordering.entity.Food</class>
         <class>com.foodordering.entity.FoodOption</class>
-        <exclude-unlisted-classes>true</exclude-unlisted-classes>
+        <class>com.foodordering.entity.Cart</class>
+        <class>com.foodordering.entity.CartItem</class>
+        <class>com.foodordering.entity.CartItemOption</class>
+        <class>com.foodordering.entity.Promotion</class>
+        <exclude-unlisted-classes>false</exclude-unlisted-classes>
         <properties>
             <property name="hibernate.hbm2ddl.auto" value="validate"/>
             <property name="hibernate.show_sql" value="false"/>

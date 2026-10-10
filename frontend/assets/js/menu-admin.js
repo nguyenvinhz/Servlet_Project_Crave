@@ -310,23 +310,23 @@ async function loadFoodOptions(foodId) {
             }
 
             tbody.innerHTML = options.map(opt => `
-                <tr id="optRow-${opt.id}">
-                    <td><code>${opt.optionType}</code></td>
-                    <td><strong>${opt.name}</strong></td>
+                <tr id="optRow-${escapeHtml(opt.id)}">
+                    <td><code>${escapeHtml(opt.optionType)}</code></td>
+                    <td><strong>${escapeHtml(opt.name)}</strong></td>
                     <td>+${(opt.extraPrice || 0).toLocaleString('vi-VN')} ₫</td>
                     <td><span class="badge ${opt.status === 'ACTIVE' ? 'available' : 'unavailable'}">${opt.status === 'ACTIVE' ? 'Khả dụng' : 'Khóa'}</span></td>
                     <td style="text-align: right;">
-                        <button type="button" class="action-btn delete-btn" onclick="deleteFoodOption('${opt.id}', '${opt.name}')" title="Xóa">
+                        <button type="button" class="action-btn delete-btn" data-id="${escapeHtml(opt.id)}" data-name="${escapeHtml(opt.name)}" onclick="handleDeleteOptionClick(this)" title="Xóa">
                             🗑️
                         </button>
                     </td>
                 </tr>
             `).join('');
         } else {
-            tbody.innerHTML = `<tr><td colspan="5" class="text-center py-2 text-error">${data.error?.message || 'Lỗi tải tùy chọn'}</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="5" class="text-center py-2 text-error">${escapeHtml(data.error?.message || 'Lỗi tải tùy chọn')}</td></tr>`;
         }
     } catch (e) {
-        tbody.innerHTML = `<tr><td colspan="5" class="text-center py-2 text-error">Lỗi kết nối: ${e.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="5" class="text-center py-2 text-error">Lỗi kết nối: ${escapeHtml(e.message)}</td></tr>`;
     }
 }
 
@@ -388,6 +388,22 @@ async function deleteFoodOption(optionId, optName) {
 }
 
 // Helpers
+function escapeHtml(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function handleDeleteOptionClick(btn) {
+    const id = btn.dataset.id;
+    const name = btn.dataset.name;
+    deleteFoodOption(id, name);
+}
+
 function showAlert(elementId, msg) {
     const el = document.getElementById(elementId);
     if (!el) return;

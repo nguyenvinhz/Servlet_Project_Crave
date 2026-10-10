@@ -24,6 +24,8 @@ public final class MenuValidator {
             errors.put("name", "Tên danh mục không được để trống.");
         } else if (request.name().trim().length() > 100) {
             errors.put("name", "Tên danh mục không được vượt quá 100 ký tự.");
+        } else if (request.name().contains("<") || request.name().contains(">")) {
+            errors.put("name", "Tên danh mục không được chứa ký tự HTML.");
         }
 
         if (request.description() != null && request.description().trim().length() > 255) {
@@ -49,6 +51,8 @@ public final class MenuValidator {
             errors.put("name", "Tên món ăn không được để trống.");
         } else if (request.name().trim().length() > 150) {
             errors.put("name", "Tên món ăn không được vượt quá 150 ký tự.");
+        } else if (request.name().contains("<") || request.name().contains(">")) {
+            errors.put("name", "Tên món ăn không được chứa ký tự HTML.");
         }
 
         if (request.price() == null) {
@@ -84,6 +88,8 @@ public final class MenuValidator {
             errors.put("name", "Tên tùy chọn không được để trống.");
         } else if (request.name().trim().length() > 100) {
             errors.put("name", "Tên tùy chọn không được vượt quá 100 ký tự.");
+        } else if (request.name().contains("<") || request.name().contains(">")) {
+            errors.put("name", "Tên tùy chọn không được chứa ký tự HTML.");
         }
 
         if (request.extraPrice() == null) {

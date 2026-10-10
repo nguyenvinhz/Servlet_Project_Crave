@@ -47,7 +47,19 @@ public class FoodOption {
     @Column(name = "updated_at", nullable = false, insertable = false, updatable = false)
     private LocalDateTime updatedAt;
 
-    protected FoodOption() {
+    public FoodOption() {
+    }
+
+    public FoodOption(String id) {
+        this.id = id;
+    }
+
+    public FoodOption(String id, String name, OptionType optionType, BigDecimal extraPrice) {
+        this.id = id;
+        this.name = name;
+        this.optionType = optionType;
+        this.extraPrice = extraPrice != null ? extraPrice : BigDecimal.ZERO;
+        this.status = OptionStatus.ACTIVE;
     }
 
     public FoodOption(String id, Food food, OptionType optionType, String name, BigDecimal extraPrice) {
@@ -60,7 +72,7 @@ public class FoodOption {
     }
 
     public FoodOption(String id, Food food, OptionType optionType, String name, BigDecimal extraPrice,
-            OptionStatus status) {
+                      OptionStatus status) {
         this(id, food, optionType, name, extraPrice);
         this.status = status != null ? status : OptionStatus.ACTIVE;
     }
@@ -71,6 +83,14 @@ public class FoodOption {
 
     public void setId(String id) {
         this.id = id;
+    }
+
+    public String getOptionId() {
+        return id;
+    }
+
+    public void setOptionId(String optionId) {
+        this.id = optionId;
     }
 
     public Food getFood() {

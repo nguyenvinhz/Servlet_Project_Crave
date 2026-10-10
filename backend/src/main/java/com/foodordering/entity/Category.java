@@ -1,6 +1,5 @@
 package com.foodordering.entity;
 
-import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
@@ -35,7 +34,12 @@ public class Category {
     @OneToMany(mappedBy = "category")
     private List<Food> foods = new ArrayList<>();
 
-    protected Category() {
+    public Category() {
+    }
+
+    public Category(String id, String name) {
+        this.id = id;
+        this.name = name;
     }
 
     public Category(String id, String name, String description) {
@@ -50,6 +54,14 @@ public class Category {
 
     public void setId(String id) {
         this.id = id;
+    }
+
+    public String getCategoryId() {
+        return id;
+    }
+
+    public void setCategoryId(String categoryId) {
+        this.id = categoryId;
     }
 
     public String getName() {

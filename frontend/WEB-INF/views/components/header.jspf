@@ -7,40 +7,159 @@
     <title><c:out value="${pageTitle}"/> · crave.</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Nunito:wght@600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="<c:url value='/assets/css/styles.css'/>">
     <script>window.CONTEXT_PATH = '${pageContext.request.contextPath}';</script>
+    <style>
+        .site-header {
+            background: #ffffff;
+            border-bottom: 1px solid #f2e6df;
+            padding: 0 4vw;
+            min-height: 72px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .site-header .brand {
+            font-family: 'Nunito', sans-serif;
+            font-weight: 900;
+            font-size: 1.95rem;
+            color: #f4511e;
+            letter-spacing: -0.04em;
+            text-decoration: none;
+        }
+        .site-header .brand span {
+            color: #f4511e;
+        }
+        .site-header nav {
+            display: flex;
+            align-items: center;
+            gap: 1.6rem;
+        }
+        .site-header nav a {
+            font-family: 'Inter', sans-serif;
+            font-weight: 600;
+            font-size: 0.95rem;
+            color: #4b5563;
+            transition: color 0.15s ease;
+            text-decoration: none;
+        }
+        .site-header nav a:hover,
+        .site-header nav a.active {
+            color: #f4511e;
+            text-decoration: none;
+        }
+        .header-actions-right {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 18px;
+        }
+        .header-cart-icon-btn {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            background: #fff8f3;
+            color: #1f2937;
+            border: 1px solid #f2e6df;
+            transition: all 0.2s ease;
+            text-decoration: none;
+        }
+        .header-cart-icon-btn:hover {
+            background: #f4511e;
+            color: #fff;
+            border-color: #f4511e;
+            text-decoration: none;
+        }
+        .header-cart-icon-btn .cart-badge-count {
+            position: absolute;
+            top: -4px;
+            right: -4px;
+            background: #f4511e;
+            color: #fff;
+            font-size: 0.72rem;
+            font-weight: 800;
+            min-width: 18px;
+            height: 18px;
+            border-radius: 999px;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 0 4px;
+            border: 2px solid #fff;
+        }
+        .header-cart-icon-btn:hover .cart-badge-count {
+            background: #1f2937;
+        }
+        .header-login-link,
+        .header-actions-right .nav-button {
+            font-family: 'Inter', sans-serif;
+            font-weight: 600;
+            font-size: 0.95rem;
+            color: #1f2937;
+            text-decoration: none;
+            transition: color 0.15s ease;
+        }
+        .header-login-link:hover,
+        .header-actions-right .nav-button:hover {
+            color: #f4511e;
+        }
+        @media (max-width: 1000px) {
+            .site-header {
+                flex-wrap: wrap;
+                padding-block: 14px;
+                gap: 14px 24px;
+            }
+            .site-header nav {
+                gap: 1rem;
+            }
+            .header-actions-right {
+                gap: 14px;
+            }
+        }
+    </style>
 </head>
-<body>
+<body class="crave-body" data-context-path="<c:out value='${pageContext.request.contextPath}'/>">
 <header class="site-header">
-    <div class="site-header-inner">
-        <a class="brand" href="<c:url value='/menu'/>">crave<span>.</span></a>
-
-        <nav class="main-nav" aria-label="Điều hướng chính">
-            <a href="<c:url value='/menu'/>" class="${empty param.categoryId and empty param.keyword and pageTitle == 'Thực đơn' ? 'active' : ''}">Home</a>
-            <a href="<c:url value='/menu'/>" class="${pageTitle == 'Thực đơn' and (not empty param.categoryId or not empty param.keyword) ? 'active' : ''}">Food</a>
+    <a class="brand" href="<c:url value='/menu'/>">crave<span>.</span></a>
+    <nav aria-label="Điều hướng chính">
+        <a href="<c:url value='/menu'/>" class="${pageTitle == 'Thực đơn' ? 'active' : ''}">Thực đơn</a>
+        <a href="<c:url value='/promotions'/>" class="${pageTitle == 'Khuyến mãi' ? 'active' : ''}">Khuyến mãi</a>
+        <a href="<c:url value='/cart'/>" class="${pageTitle == 'Giỏ hàng' ? 'active' : ''}">Giỏ hàng</a>
+        <c:if test="${sessionScope.currentUser.role == 'ADMIN' or sessionScope.currentUser.role == 'MENU_MANAGER'}">
             <a href="<c:url value='/admin/menu'/>" class="${pageTitle == 'Quản lý thực đơn' ? 'active' : ''}">Quản lý món</a>
             <a href="<c:url value='/admin/categories'/>" class="${pageTitle == 'Quản lý danh mục' ? 'active' : ''}">Quản lý danh mục</a>
-            <a href="<c:url value='/customer/profile'/>" class="${pageTitle == 'Hồ sơ khách hàng' ? 'active' : ''}">Hồ sơ</a>
-            <a href="<c:url value='/customer/addresses'/>" class="${pageTitle == 'Sổ địa chỉ' ? 'active' : ''}">Địa chỉ</a>
-        </nav>
-
-        <div class="header-actions">
-            <a href="<c:url value='/menu#catalogSection'/>" class="header-icon-btn" title="Tìm kiếm" aria-label="Tìm kiếm">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="11" cy="11" r="8"></circle>
-                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                </svg>
-            </a>
-            <a href="<c:url value='/menu'/>" class="header-icon-btn cart-btn" title="Giỏ hàng" aria-label="Giỏ hàng">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="9" cy="21" r="1"></circle>
-                    <circle cx="20" cy="21" r="1"></circle>
-                    <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
-                </svg>
-                <span class="cart-badge-dot"></span>
-            </a>
-            <a href="<c:url value='/auth/login'/>" class="header-login-link">Log in</a>
-        </div>
+        </c:if>
+    </nav>
+    <div class="header-actions-right">
+        <a href="<c:url value='/cart'/>" class="header-cart-icon-btn" title="Giỏ hàng" aria-label="Giỏ hàng">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="9" cy="21" r="1"></circle>
+                <circle cx="20" cy="21" r="1"></circle>
+                <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+            </svg>
+            <span class="cart-badge-count">0</span>
+        </a>
+        <c:choose>
+            <c:when test="${not empty sessionScope.currentUser}">
+                <a href="<c:url value='/customer/profile'/>" class="header-login-link">Hồ sơ</a>
+                <c:if test="${sessionScope.currentUser.accountType == 'CUSTOMER'}">
+                    <a href="<c:url value='/customer/addresses'/>" class="header-login-link">Địa chỉ</a>
+                </c:if>
+                <form id="logoutForm" class="logout-form" action="<c:url value='/api/auth/logout'/>" method="post">
+                    <button class="nav-button" type="submit">Đăng xuất</button>
+                </form>
+            </c:when>
+            <c:otherwise>
+                <a href="<c:url value='/auth/login'/>" class="header-login-link">Đăng nhập</a>
+                <a href="<c:url value='/auth/register'/>" class="header-login-link">Đăng ký</a>
+            </c:otherwise>
+        </c:choose>
     </div>
 </header>
+<p id="logout-error" class="form-error header-message" role="alert" hidden></p>
+<noscript><p class="header-message">Vui lòng bật JavaScript để sử dụng chức năng tài khoản.</p></noscript>

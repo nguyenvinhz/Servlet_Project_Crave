@@ -71,7 +71,7 @@
                                             <label class="option-card">
                                                 <input type="radio" name="option_size" value="${opt.id}" data-extra="${opt.extraPrice}" onchange="updateTotalPrice()">
                                                 <span class="option-card-inner">
-                                                    <span class="opt-label">${opt.name}</span>
+                                                    <span class="opt-label"><c:out value="${opt.name}"/></span>
                                                     <span class="opt-price">+<fmt:formatNumber value="${opt.extraPrice}" type="number" groupingUsed="true"/> ₫</span>
                                                 </span>
                                             </label>
@@ -94,7 +94,7 @@
                                             <label class="option-card">
                                                 <input type="checkbox" name="option_topping" value="${opt.id}" data-extra="${opt.extraPrice}" onchange="updateTotalPrice()">
                                                 <span class="option-card-inner">
-                                                    <span class="opt-label">${opt.name}</span>
+                                                    <span class="opt-label"><c:out value="${opt.name}"/></span>
                                                     <span class="opt-price">+<fmt:formatNumber value="${opt.extraPrice}" type="number" groupingUsed="true"/> ₫</span>
                                                 </span>
                                             </label>
@@ -117,7 +117,7 @@
                                             <label class="option-card">
                                                 <input type="radio" name="option_sugar" value="${opt.id}" data-extra="${opt.extraPrice}" ${status.first ? 'checked' : ''} onchange="updateTotalPrice()">
                                                 <span class="option-card-inner">
-                                                    <span class="opt-label">${opt.name}</span>
+                                                    <span class="opt-label"><c:out value="${opt.name}"/></span>
                                                     <span class="opt-price">+<fmt:formatNumber value="${opt.extraPrice}" type="number" groupingUsed="true"/> ₫</span>
                                                 </span>
                                             </label>
@@ -140,7 +140,7 @@
                                             <label class="option-card">
                                                 <input type="radio" name="option_ice" value="${opt.id}" data-extra="${opt.extraPrice}" ${status.first ? 'checked' : ''} onchange="updateTotalPrice()">
                                                 <span class="option-card-inner">
-                                                    <span class="opt-label">${opt.name}</span>
+                                                    <span class="opt-label"><c:out value="${opt.name}"/></span>
                                                     <span class="opt-price">+<fmt:formatNumber value="${opt.extraPrice}" type="number" groupingUsed="true"/> ₫</span>
                                                 </span>
                                             </label>
@@ -163,7 +163,7 @@
                                             <label class="option-card">
                                                 <input type="checkbox" name="option_other" value="${opt.id}" data-extra="${opt.extraPrice}" onchange="updateTotalPrice()">
                                                 <span class="option-card-inner">
-                                                    <span class="opt-label">${opt.name}</span>
+                                                    <span class="opt-label"><c:out value="${opt.name}"/></span>
                                                     <span class="opt-price">+<fmt:formatNumber value="${opt.extraPrice}" type="number" groupingUsed="true"/> ₫</span>
                                                 </span>
                                             </label>
@@ -234,15 +234,73 @@ function updateTotalPrice() {
     }
 }
 
-function handleAddToCart() {
+async function handleAddToCart() {
     const btn = document.getElementById('addToCartBtn');
     const originalText = btn.innerHTML;
-    btn.innerHTML = '<span>✅ Đã thêm món vào giỏ!</span>';
-    btn.style.background = '#18794e';
-    setTimeout(() => {
+    btn.disabled = true;
+    btn.innerHTML = '<span>⏳ Đang thêm vào giỏ...</span>';
+
+    const foodId = '${food.id}';
+    const quantity = parseInt(document.getElementById('orderQuantity').value) || 1;
+    const optionIds = [];
+    document.querySelectorAll('#orderCustomizationForm input:checked').forEach(opt => {
+        if (opt.value && opt.value !== '0') {
+            optionIds.push(opt.value);
+        }
+    });
+
+    const ctx = typeof window.CONTEXT_PATH === 'string' ? window.CONTEXT_PATH : '';
+    const cartUrl = ctx + '/api/cart/items';
+
+    try {
+        const response = await fetch(cartUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify({ foodId, quantity, optionIds, note: '' })
+        });
+
+        if (response.status === 401) {
+            btn.innerHTML = '<span>⚠️ Vui lòng đăng nhập</span>';
+            btn.style.background = '#dc2626';
+            setTimeout(() => {
+                window.location.href = ctx + '/auth/login?returnTo=' + encodeURIComponent(window.location.pathname + window.location.search);
+            }, 800);
+            return;
+        }
+
+        const data = await response.json();
+        if (response.ok && data.success) {
+            btn.innerHTML = '<span>✅ Đã thêm món vào giỏ!</span>';
+            btn.style.background = '#18794e';
+            const badge = document.querySelector('.cart-badge-count');
+            if (badge) {
+                let currentCount = parseInt(badge.textContent) || 0;
+                badge.textContent = currentCount + quantity;
+                badge.style.display = 'inline-flex';
+            }
+            const dot = document.querySelector('.cart-badge-dot');
+            if (dot) dot.style.display = 'block';
+            setTimeout(() => {
+                btn.innerHTML = originalText;
+                btn.style.background = '';
+                btn.disabled = false;
+            }, 2000);
+        } else {
+            const msg = data.error?.message || data.message || 'Không thể thêm vào giỏ hàng.';
+            alert(msg);
+            btn.innerHTML = originalText;
+            btn.style.background = '';
+            btn.disabled = false;
+        }
+    } catch (e) {
+        alert('Lỗi kết nối khi thêm giỏ hàng: ' + e.message);
         btn.innerHTML = originalText;
         btn.style.background = '';
-    }, 2000);
+        btn.disabled = false;
+    }
 }
 </script>
 
