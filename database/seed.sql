@@ -55,7 +55,7 @@ VALUES
 ('TC12', 'MA20', 'TOPPING',     'Thêm hải sản',      50000);
 
 -- password_hash values are development placeholders; replace them with real
--- BCrypt/Argon2 hashes before testing authentication.
+-- supported PBKDF2 hashes before testing authentication, or register new accounts.
 INSERT INTO user_account
     (user_id, account_type, full_name, email, phone, password_hash)
 VALUES

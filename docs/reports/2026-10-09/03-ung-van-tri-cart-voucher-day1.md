@@ -56,3 +56,24 @@ Tách lại mã nguồn đã có theo phạm vi Ngày 1: domain, contract backen
 - Ngày 2 nối repository/service/API với dữ liệu thật và AJAX theo demo thêm món → sửa số lượng/tùy chọn → áp voucher → tính lại tổng.
 - Ngày 3 phụ trách chuyển tiếp cart → checkout và kiểm thử tích hợp; checkout/order của Nguyễn Đức Phát và tài khoản Ngày 2 của Nguyễn Quang Vinh là các phần việc riêng.
 - Báo cáo này không xác nhận Gate 1, Gate 2 hoặc Gate 3 của cả nhóm.
+
+## Tích hợp nhánh Ngày 1 vào main
+
+Main đã có cart/voucher hoạt động từ lần tích hợp trước. Khi merge nhánh Ngày 1, giữ nguyên API, repository/service, validator, JSP/JavaScript và các test chức năng hiện có; không thay chúng bằng scaffold hoặc xóa phần Ngày 2/Ngày 3 đã có.
+
+Sáu kiểm thử `501` của snapshot Ngày 1 được điều chỉnh cho main thành bốn kiểm tra JSON chung khi cart chưa xác thực và hai kiểm tra page servlet forward JSP. Kết quả 37 test/33 kiểm tra phía trên thuộc nhánh scaffold đã tách; kết quả sau khi tích hợp vào main được kiểm tra riêng:
+
+- Maven: 57 test đạt, 0 failure/error/skipped; tạo WAR thành công, gồm kiểm tra mapping với MySQL thật.
+- Tomcat tạm thời: 26 kiểm tra HTTP/JSP đạt.
+- Bộ manual test gốc chạy bằng Java với `-ea`: 11 ca đạt. Tài khoản database hiện tại thiếu quyền `EXECUTE` cho procedure nên phần tính giảm giá dùng Java fallback như giới hạn đã biết; không coi đây là kiểm chứng procedure thành công.
+- So sánh với main trước khi tích hợp: mã nguồn trong `backend/src/main`, `frontend` và `database` không thay đổi; phần tích hợp thêm báo cáo và kiểm thử contract phù hợp với main hiện có.
+
+Các kết quả này không xác nhận Gate của cả nhóm.
+
+## Đính chính source của Pull Request
+
+PR #17 trước đây được merge từ `fix/cart-voucher-day1-merge`, chưa đúng nhánh nguồn yêu cầu. Lần tích hợp sửa này dùng trực tiếp `feature/cart-voucher-split-day1`, sau commit revert thông thường của lần tích hợp trước; PR #17 vẫn là lịch sử.
+
+Mã runtime cart/voucher giữ nguyên trong quá trình này; nhánh tài khoản Ngày 2 không thay đổi. Nhánh đúng nguồn đưa lại hai file thực tế là `CartPromotionApiContractTest.java` và báo cáo này, không tạo một PR rỗng chỉ để đổi metadata.
+
+Đã kiểm tra lại trên nhánh feature đúng nguồn: Maven đạt 57 test, 0 failure/error/skipped, tạo WAR thành công và kiểm tra mapping với MySQL thật; Tomcat đạt 26 kiểm tra HTTP/JSP. Mã runtime backend/frontend/database khớp lần tích hợp trước và sáu contract test được đưa lại nguyên nội dung đã xác minh. Kết quả này không xác nhận Gate của cả nhóm.

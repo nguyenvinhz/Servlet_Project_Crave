@@ -1,5 +1,6 @@
 package com.foodordering.validator;
 
+import com.foodordering.entity.CustomerOrder;
 import com.foodordering.entity.Promotion;
 import com.foodordering.enums.ErrorCode;
 import com.foodordering.enums.PromotionStatus;
@@ -57,4 +58,15 @@ public class PromotionValidator {
         }
     }
 
+    /**
+     * Xác thực tính hợp lệ của mã khuyến mãi dựa trên thông tin CustomerOrder của khách hàng
+     * (lấy orderTime và subtotal trực tiếp từ CustomerOrder entity).
+     */
+    public static void validateApplicableForOrder(Promotion promotion, CustomerOrder order) {
+        if (order == null) {
+            validateApplicable(promotion, BigDecimal.ZERO, LocalDateTime.now());
+            return;
+        }
+        validateApplicable(promotion, order.getSubtotal(), order.getOrderTime());
+    }
 }

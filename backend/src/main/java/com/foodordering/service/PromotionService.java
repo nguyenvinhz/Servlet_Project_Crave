@@ -3,6 +3,7 @@ package com.foodordering.service;
 import com.foodordering.dto.PromotionDto;
 import com.foodordering.dto.PromotionValidationResultDto;
 import com.foodordering.dto.ValidatePromotionRequest;
+import com.foodordering.entity.CustomerOrder;
 import com.foodordering.entity.Promotion;
 import com.foodordering.enums.DiscountType;
 import com.foodordering.enums.ErrorCode;
@@ -47,7 +48,22 @@ public class PromotionService {
         if (request == null) {
             return new PromotionValidationResultDto(false, "Dữ liệu yêu cầu không được để trống", ErrorCode.BAD_REQUEST.getCode());
         }
-        return validatePromotion(request.getCode(), customerId, request.getSubtotal(), LocalDateTime.now());
+        BigDecimal verifiedSubtotal = customerId != null && !customerId.isBlank()
+                ? cartService.getVerifiedSubtotal(customerId)
+                : BigDecimal.ZERO;
+        return validatePromotionAtSubtotal(request.getCode(), verifiedSubtotal, LocalDateTime.now());
+    }
+
+    /**
+     * Xác thực voucher cho một đơn hàng cụ thể của khách hàng bằng cách lấy orderTime từ CustomerOrder.
+     */
+    public PromotionValidationResultDto validatePromotionForOrder(String code, CustomerOrder order) {
+        if (order == null) {
+            return validatePromotion(code, null, null, LocalDateTime.now());
+        }
+        BigDecimal subtotal = order.getSubtotal();
+        LocalDateTime orderTime = order.getOrderTime(); // Lấy orderTime của khách hàng từ CustomerOrder
+        return validatePromotionAtSubtotal(code, subtotal, orderTime);
     }
 
     /**
@@ -57,6 +73,16 @@ public class PromotionService {
      * - Tính toán chính xác theo loại % (có trần maximum_discount) hoặc số tiền cố định.
      */
     public PromotionValidationResultDto validatePromotion(String code, String customerId, BigDecimal requestedSubtotal, LocalDateTime orderTime) {
+        BigDecimal subtotal = requestedSubtotal;
+        if (subtotal == null || subtotal.compareTo(BigDecimal.ZERO) <= 0) {
+            subtotal = customerId != null && !customerId.isBlank()
+                    ? cartService.getVerifiedSubtotal(customerId)
+                    : BigDecimal.ZERO;
+        }
+        return validatePromotionAtSubtotal(code, subtotal, orderTime);
+    }
+
+    private PromotionValidationResultDto validatePromotionAtSubtotal(String code, BigDecimal subtotal, LocalDateTime orderTime) {
         try {
             PromotionValidator.validatePromotionCode(code);
         } catch (Exception e) {
@@ -69,16 +95,7 @@ public class PromotionService {
             return new PromotionValidationResultDto(false, "Mã khuyến mãi không tồn tại", ErrorCode.PROMOTION_NOT_FOUND.getCode());
         }
 
-        // 2. Xác định subtotal đáng tin cậy
-        BigDecimal subtotal = requestedSubtotal;
-        if (subtotal == null || subtotal.compareTo(BigDecimal.ZERO) <= 0) {
-            if (customerId != null && !customerId.trim().isEmpty()) {
-                subtotal = cartService.getVerifiedSubtotal(customerId);
-            } else {
-                subtotal = BigDecimal.ZERO;
-            }
-        }
-
+        subtotal = subtotal != null ? subtotal : BigDecimal.ZERO;
         LocalDateTime effectiveOrderTime = orderTime != null ? orderTime : LocalDateTime.now();
 
         // 3. Kiểm tra điều kiện áp dụng với orderTime

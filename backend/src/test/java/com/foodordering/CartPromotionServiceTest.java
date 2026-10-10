@@ -12,6 +12,7 @@ import com.foodordering.mapper.CartItemMapper;
 import com.foodordering.mapper.CartItemOptionMapper;
 import com.foodordering.mapper.CartMapper;
 import com.foodordering.mapper.PromotionMapper;
+import com.foodordering.repository.PromotionRepository;
 import com.foodordering.service.CartService;
 import com.foodordering.service.PromotionService;
 import com.foodordering.utils.JsonUtils;
@@ -39,7 +40,7 @@ public class CartPromotionServiceTest {
         testJsonUtilsJacksonDeserialization();
         testManualCartAndItemMappers();
         testManualPromotionMapper();
-
+        testCustomerOrderOrderTimeValidation();
 
         System.out.println("=== TẤT CẢ KIỂM THỬ ĐÃ CHẠY THÀNH CÔNG (PASSED) ===");
     }
@@ -78,7 +79,7 @@ public class CartPromotionServiceTest {
         p.setMinimumOrderValue(BigDecimal.ZERO);
         p.setMaximumDiscount(new BigDecimal("50000"));
 
-        PromotionService service = new PromotionService();
+        PromotionService service = offlinePromotionService();
         BigDecimal subtotal = new BigDecimal("200000"); // 200,000 đ
         BigDecimal discount = service.calculateDiscount(p, subtotal, LocalDateTime.now());
 
@@ -96,7 +97,7 @@ public class CartPromotionServiceTest {
         p.setMinimumOrderValue(BigDecimal.ZERO);
         p.setMaximumDiscount(new BigDecimal("50000"));
 
-        PromotionService service = new PromotionService();
+        PromotionService service = offlinePromotionService();
         BigDecimal subtotal = new BigDecimal("800000"); // 800,000 đ (10% = 80,000 đ > trần 50,000 đ)
         BigDecimal discount = service.calculateDiscount(p, subtotal, LocalDateTime.now());
 
@@ -112,7 +113,7 @@ public class CartPromotionServiceTest {
         p.setDiscountValue(new BigDecimal("20000"));
         p.setMinimumOrderValue(new BigDecimal("100000"));
 
-        PromotionService service = new PromotionService();
+        PromotionService service = offlinePromotionService();
         BigDecimal subtotal = new BigDecimal("150000");
         BigDecimal discount = service.calculateDiscount(p, subtotal, LocalDateTime.now());
 
@@ -258,4 +259,61 @@ public class CartPromotionServiceTest {
         System.out.println("   [PASSED] Chuyển đổi Promotion Entity -> DTO thủ công hoàn toàn chính xác");
     }
 
+    private static PromotionService offlinePromotionService() {
+        PromotionRepository repository = new PromotionRepository() {
+            @Override
+            public BigDecimal calculateDiscountViaDatabase(String promotionId, BigDecimal subtotal, LocalDateTime orderTime) {
+                return null;
+            }
+        };
+        return new PromotionService(repository, new CartService());
+    }
+
+    private static void testCustomerOrderOrderTimeValidation() {
+        System.out.println("-> Test 11: Xác thực thời gian đặt hàng (CustomerOrder.orderTime) với hạn của Promotion");
+        Promotion promo = new Promotion();
+        promo.setPromotionId("KM02");
+        promo.setCode("FLASH50");
+        promo.setStatus(PromotionStatus.ACTIVE);
+        LocalDateTime baseTime = LocalDateTime.of(2026, 10, 6, 10, 0, 0);
+        promo.setStartAt(baseTime.minusHours(2)); // Bắt đầu lúc 08:00
+        promo.setEndAt(baseTime.plusHours(2));   // Kết thúc lúc 12:00
+        promo.setMinimumOrderValue(new BigDecimal("100000"));
+        promo.setDiscountType(DiscountType.FIXED_AMOUNT);
+        promo.setDiscountValue(new BigDecimal("30000"));
+
+        Customer customer = new Customer("KH01");
+
+        // 1. Đơn hàng đặt trong khung giờ hợp lệ (lúc 09:30)
+        LocalDateTime validOrderTime = baseTime.minusMinutes(30);
+        CustomerOrder validOrder = new CustomerOrder("DH01", customer, new BigDecimal("150000"), validOrderTime);
+        assert validOrder.getOrderTime().equals(validOrderTime) : "Sai getOrderTime";
+        PromotionValidator.validateApplicableForOrder(promo, validOrder);
+
+        // 2. Đơn hàng đặt sau khi khuyến mãi đã hết hạn (lúc 13:00)
+        LocalDateTime expiredOrderTime = baseTime.plusHours(3);
+        CustomerOrder expiredOrder = new CustomerOrder("DH02", customer, new BigDecimal("150000"), expiredOrderTime);
+        boolean caughtExpired = false;
+        try {
+            PromotionValidator.validateApplicableForOrder(promo, expiredOrder);
+        } catch (PromotionValidationException e) {
+            caughtExpired = true;
+            assert e.getErrorCode() == ErrorCode.PROMOTION_EXPIRED : "Sai mã lỗi: " + e.getErrorCode();
+        }
+        assert caughtExpired : "Không phát hiện đơn hàng đặt sau khi mã hết hạn";
+
+        // 3. Đơn hàng đặt trước khi khuyến mãi bắt đầu (lúc 07:00)
+        LocalDateTime prematureOrderTime = baseTime.minusHours(3);
+        CustomerOrder prematureOrder = new CustomerOrder("DH03", customer, new BigDecimal("150000"), prematureOrderTime);
+        boolean caughtPremature = false;
+        try {
+            PromotionValidator.validateApplicableForOrder(promo, prematureOrder);
+        } catch (PromotionValidationException e) {
+            caughtPremature = true;
+            assert e.getErrorCode() == ErrorCode.PROMOTION_NOT_STARTED : "Sai mã lỗi: " + e.getErrorCode();
+        }
+        assert caughtPremature : "Không phát hiện đơn hàng đặt trước khi mã bắt đầu";
+
+        System.out.println("   [PASSED] Xác thực CustomerOrder.orderTime với [startAt, endAt] của Promotion chính xác");
+    }
 }
