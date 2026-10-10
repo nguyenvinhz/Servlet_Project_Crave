@@ -56,12 +56,12 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
                 throw new RuntimeException("Khách hàng không tồn tại");
             }
 
-            // Lấy Cart ID của khách
-            Query cartQuery = em.createNativeQuery("SELECT cart_id FROM cart WHERE customer_id = ?");
+            // Lấy Cart ID của khách và lock bằng FOR UPDATE để tránh checkout trùng
+            Query cartQuery = em.createNativeQuery("SELECT cart_id FROM cart WHERE customer_id = ? FOR UPDATE");
             cartQuery.setParameter(1, customerId);
             List<?> carts = cartQuery.getResultList();
             if (carts.isEmpty()) {
-                throw new RuntimeException("Giỏ hàng trống");
+                throw new RuntimeException("Giỏ hàng trống hoặc đang được xử lý");
             }
             String cartId = carts.get(0).toString();
 
@@ -129,12 +129,20 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
                 em.persist(detail);
             }
 
+            // Flush để các trigger và database xử lý discount_amount, subtotal và total_amount
+            em.flush();
+            // Refresh order để lấy lại giá trị từ DB
+            em.refresh(order);
+
             Payment payment = new Payment();
             payment.setId(generateId(12));
             payment.setOrder(order);
             payment.setPaymentMethod(request.getPaymentMethod());
             payment.setStatus(PaymentStatus.PENDING);
-            payment.setAmount(subtotal.add(order.getDeliveryFee())); // Rough calculation
+            
+            BigDecimal finalAmount = order.getTotalAmount() != null ? order.getTotalAmount() : 
+                    order.getSubtotal().add(order.getDeliveryFee()).subtract(order.getDiscountAmount());
+            payment.setAmount(finalAmount); 
             em.persist(payment);
 
             OrderStatusHistory history = new OrderStatusHistory();
@@ -161,23 +169,56 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
 
     @Override
     public OrderResponse getOrderById(String orderId) {
-        CustomerOrder order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new RuntimeException("Đơn hàng không tồn tại"));
-        return mapToResponse(order);
+        EntityManager em = DatabaseConfig.getEntityManagerFactory().createEntityManager();
+        try {
+            CustomerOrder order = em.find(CustomerOrder.class, orderId);
+            if (order == null) throw new RuntimeException("Đơn hàng không tồn tại");
+            // Kích hoạt lazy loading trong scope của em
+            if (order.getOrderDetails() != null) order.getOrderDetails().size();
+            if (order.getPayment() != null) order.getPayment().getId();
+            if (order.getStatusHistories() != null) order.getStatusHistories().size();
+            return mapToResponse(order);
+        } finally {
+            em.close();
+        }
     }
 
     @Override
     public List<OrderSummaryResponse> getOrdersByCustomer(String customerId) {
-        return orderRepository.findByCustomerId(customerId).stream()
-                .map(this::mapToSummaryResponse)
-                .collect(Collectors.toList());
+        EntityManager em = DatabaseConfig.getEntityManagerFactory().createEntityManager();
+        try {
+            String jpql = "SELECT o FROM CustomerOrder o WHERE o.customer.id = :customerId ORDER BY o.orderedAt DESC";
+            List<CustomerOrder> orders = em.createQuery(jpql, CustomerOrder.class)
+                    .setParameter("customerId", customerId)
+                    .getResultList();
+            for (CustomerOrder o : orders) {
+                if (o.getPayment() != null) o.getPayment().getId();
+            }
+            return orders.stream()
+                    .map(this::mapToSummaryResponse)
+                    .collect(Collectors.toList());
+        } finally {
+            em.close();
+        }
     }
 
     @Override
     public List<OrderResponse> getAllOrdersForAdmin() {
-        return orderRepository.findAll().stream()
-                .map(this::mapToResponse)
-                .collect(Collectors.toList());
+        EntityManager em = DatabaseConfig.getEntityManagerFactory().createEntityManager();
+        try {
+            String jpql = "SELECT o FROM CustomerOrder o ORDER BY o.orderedAt DESC";
+            List<CustomerOrder> orders = em.createQuery(jpql, CustomerOrder.class).getResultList();
+            for (CustomerOrder o : orders) {
+                if (o.getOrderDetails() != null) o.getOrderDetails().size();
+                if (o.getPayment() != null) o.getPayment().getId();
+                if (o.getStatusHistories() != null) o.getStatusHistories().size();
+            }
+            return orders.stream()
+                    .map(this::mapToResponse)
+                    .collect(Collectors.toList());
+        } finally {
+            em.close();
+        }
     }
 
     @Override
@@ -227,9 +268,9 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
         OrderSummaryResponse res = new OrderSummaryResponse();
         res.setOrderId(order.getId());
         res.setOrderedAt(order.getOrderedAt());
-        res.setFulfillmentType(order.getFulfillmentType().name());
+        res.setFulfillmentType(order.getFulfillmentType());
         res.setTotalAmount(order.getTotalAmount() != null ? order.getTotalAmount() : order.getSubtotal().add(order.getDeliveryFee()).subtract(order.getDiscountAmount()));
-        res.setStatus(order.getStatus().name());
+        res.setStatus(order.getStatus());
         if (order.getPayment() != null) {
             res.setPaymentStatus(order.getPayment().getStatus().name());
         }

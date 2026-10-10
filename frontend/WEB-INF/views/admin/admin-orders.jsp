@@ -34,67 +34,6 @@
         </table>
     </div>
 
-    <script>
-        // Note: Cần có endpoint /api/admin/orders (GET) để lấy tất cả đơn
-        // Tạm thời mockup vì OrderService chưa có get all orders
-        document.addEventListener('DOMContentLoaded', async () => {
-            const listEl = document.getElementById('adminOrderList');
-            try {
-                // Mock endpoint or real if implemented later
-                const res = await fetch('/crave/api/admin/orders?mock_employee=E001'); // Fetch from admin api
-                const data = await res.json();
-                
-                if (res.ok && data.success) {
-                    const orders = data.data;
-                    if (orders.length === 0) {
-                        listEl.innerHTML = '<tr><td colspan="6">Không có đơn hàng.</td></tr>';
-                        return;
-                    }
-                    
-                    listEl.innerHTML = orders.map(o => `
-                        <tr>
-                            <td>#${o.orderId}</td>
-                            <td>${o.receiverName}</td>
-                            <td>${new Date(o.orderedAt).toLocaleString('vi-VN')}</td>
-                            <td>${o.totalAmount ? o.totalAmount.toLocaleString('vi-VN') : 0} đ</td>
-                            <td>
-                                <select id="status_${o.orderId}" class="status-select">
-                                    <option value="PENDING_CONFIRMATION" ${o.status==='PENDING_CONFIRMATION'?'selected':''}>Chờ xác nhận</option>
-                                    <option value="PREPARING" ${o.status==='PREPARING'?'selected':''}>Đang chuẩn bị</option>
-                                    <option value="DELIVERING" ${o.status==='DELIVERING'?'selected':''}>Đang giao</option>
-                                    <option value="COMPLETED" ${o.status==='COMPLETED'?'selected':''}>Hoàn tất</option>
-                                    <option value="CANCELLED" ${o.status==='CANCELLED'?'selected':''}>Đã hủy</option>
-                                </select>
-                            </td>
-                            <td>
-                                <button class="btn-update" onclick="updateStatus('${o.orderId}')">Cập nhật</button>
-                            </td>
-                        </tr>
-                    `).join('');
-                }
-            } catch(e) {}
-        });
-
-        async function updateStatus(orderId) {
-            const status = document.getElementById('status_' + orderId).value;
-            const payload = { status: status, note: "Admin cập nhật" };
-            
-            try {
-                const res = await fetch('/crave/api/admin/orders/' + orderId + '?mock_employee=E001', {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-                const data = await res.json();
-                if (res.ok && data.success) {
-                    alert('Cập nhật thành công');
-                } else {
-                    alert('Lỗi: ' + data.message);
-                }
-            } catch (err) {
-                alert('Lỗi kết nối');
-            }
-        }
-    </script>
+    <script src="/crave/assets/js/admin-orders.js"></script>
 </body>
 </html>

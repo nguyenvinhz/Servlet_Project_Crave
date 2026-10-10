@@ -27,52 +27,6 @@
         </div>
     </div>
 
-    <script>
-        document.addEventListener('DOMContentLoaded', async () => {
-            const listEl = document.getElementById('orderList');
-            try {
-                const res = await fetch('/crave/api/orders?mock_customer=C001');
-                const data = await res.json();
-                
-                if (res.ok && data.success) {
-                    const orders = data.data;
-                    if (orders.length === 0) {
-                        listEl.innerHTML = '<p>Bạn chưa có đơn hàng nào.</p>';
-                        return;
-                    }
-                    
-                    listEl.innerHTML = orders.map(o => `
-                        <div class="order-card">
-                            <div class="order-info">
-                                <h4>Đơn hàng #${o.orderId}</h4>
-                                <p>Ngày đặt: ${new Date(o.orderedAt).toLocaleString('vi-VN')}</p>
-                                <p>Tổng tiền: <strong>${o.totalAmount.toLocaleString('vi-VN')} đ</strong></p>
-                            </div>
-                            <div class="order-actions" style="text-align: right">
-                                <span class="badge ${o.status}">${formatStatus(o.status)}</span>
-                                <br><br>
-                                <a href="/crave/orders/${o.orderId}" class="btn-view">Xem chi tiết</a>
-                            </div>
-                        </div>
-                    `).join('');
-                } else {
-                    listEl.innerHTML = `<p style="color:red">${data.message || 'Lỗi tải đơn hàng.'}</p>`;
-                }
-            } catch (err) {
-                listEl.innerHTML = '<p style="color:red">Lỗi kết nối máy chủ.</p>';
-            }
-        });
-
-        function formatStatus(status) {
-            const map = {
-                'PENDING_CONFIRMATION': 'Chờ xác nhận',
-                'PREPARING': 'Đang chuẩn bị',
-                'DELIVERING': 'Đang giao hàng',
-                'COMPLETED': 'Hoàn tất',
-                'CANCELLED': 'Đã hủy'
-            };
-            return map[status] || status;
-        }
-    </script>
+    <script src="/crave/assets/js/orders.js"></script>
 </body>
 </html>

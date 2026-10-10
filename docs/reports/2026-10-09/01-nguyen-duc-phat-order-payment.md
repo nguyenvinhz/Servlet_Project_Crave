@@ -8,33 +8,27 @@
 
 ### Backend
 - **Đồng bộ nhánh (Resolve Conflicts):** Đã resolve conflict giữa nhánh `feature/order-payment-day2` và `main` (chứa các bản vá giao diện từ Day 1). Giữ lại logic xử lý phức tạp của Day 2 và gộp với HTML/CSS của Day 1.
-- **Tích hợp Auth:** Thêm logic kiểm tra quyền truy cập `customerId` cho `OrderServlet` và `employeeId` cho `AdminOrderServlet`, `PaymentServlet` thông qua session. Để tránh việc các API này chặn toàn bộ request (báo lỗi 401 Unauthorized) trong thời gian chờ Team hoàn thiện và merge chức năng Đăng nhập, một fallback giả lập (`?mock_customer=C001` và `?mock_employee=E001`) đã được thêm tạm thời vào API để phục vụ cho việc test Frontend.
-- **Kiểm tra quyền sở hữu đơn hàng (Ownership Check):** Ở endpoint `GET /api/orders/{orderId}`, hệ thống sẽ so sánh ID chủ đơn hàng và ID người đang đăng nhập. Nếu không khớp sẽ trả về lỗi `403 Forbidden` nhằm bảo mật dữ liệu khách hàng.
-- **Validation dữ liệu đầu vào:** Ở luồng tạo đơn hàng mới, backend đã ràng buộc bắt buộc nhập tên, SĐT, và nếu chọn hình thức giao tận nơi thì bắt buộc phải có địa chỉ.
-- **State Machine cho trạng thái đơn:** Chặn đứng việc Admin cập nhật trạng thái đơn hàng sai luồng logic (ví dụ không thể chuyển từ COMPLETED về lại PREPARING).
-- **Hoàn thiện DTO Mapping:** Xử lý map toàn bộ dữ liệu từ Entity `CustomerOrder` sang `OrderResponse` và `OrderSummaryResponse`, bao gồm cả `items` (chi tiết món), `payment` (trạng thái thanh toán), và `history` (lịch sử cập nhật đơn).
-- **Phát triển Admin API:**
-  - Thêm phương thức `findAll()` trong `CustomerOrderRepository`.
-  - Cài đặt `getAllOrdersForAdmin()` trong `CustomerOrderServiceImpl`.
-  - Viết logic bắt method GET trong `AdminOrderServlet` để trả về danh sách đơn hàng cho dashboard quản lý và bổ sung tài liệu YAML cho endpoint này.
+- **Tích hợp Auth chính thức:** Đã xóa bỏ các mock query parameters (`mock_customer`, `mock_employee`) và áp dụng `SessionAuth` để xác thực qua Cookie/Session thật của hệ thống. Kế thừa `BaseApiServlet` để chuẩn hóa các lỗi `401 Unauthorized` và `403 Forbidden`.
+- **Sửa lỗi biên dịch (Compilation):** Khắc phục triệt để 36 lỗi biên dịch do TypeMismatch trong `CustomerOrderServiceImpl` (sai sót khi dùng `.name()` cho thuộc tính Enum lúc mapping DTO).
+- **Ngăn chặn Transaction Lazy Loading:** Đã bổ sung quản lý vòng đời `EntityManager` trực tiếp trong Service (`CustomerOrderServiceImpl`) thay vì dùng try-with-resources ngắn hạn ở Repository, qua đó khắc phục lỗi `LazyInitializationException` khi map collection (như `details`, `payment`, `history`) vào DTO.
+- **Xử lý bất đồng bộ (Concurrency Checkout):** Cập nhật phương thức `createOrder` sử dụng `FOR UPDATE` khóa row `cart` lại, phòng tránh triệt để lỗi submit đúp sinh ra nhiều đơn hàng từ một giỏ. 
+- **Hoàn thiện Logic Payment Amount:** Tiền thanh toán giờ đây được tính chính xác (bao gồm xử lý Subtotal, Delivery Fee, và tự động gọi Database trigger để áp Discount Amount qua Promotion ID), thay vì tính chay gây lệch giá trị.
 
 ### Frontend
-*(Lưu ý: Các endpoint ở Frontend hiện tại đều đang được gắn tạm query param `?mock_customer=C001` và `?mock_employee=E001` để vượt qua vòng kiểm tra Auth của Backend. Khi module Đăng nhập hoàn tất, Frontend cần xóa các tham số này để sử dụng Auth Session thật).*
-- **Thanh toán (checkout.jsp):** Cập nhật endpoint gọi POST request có kèm mock id để tạo đơn hàng. Đặc biệt, để lấy dữ liệu tổng tiền hiển thị lên màn hình, mình đã phải viết một đoạn script **gọi API Giỏ hàng giả lập** (`fetch('/crave/api/cart?mock_customer=C001')`) do module Cart của team chưa xong. Tương lai cần thay thế bằng API thật. Mình cũng cập nhật logic chuyển hướng để truyền mã đơn hàng qua tham số URL (`?new=ID`) khi thanh toán xong.
-- **Lịch sử đơn hàng (orders.jsp):** Đổ dữ liệu lịch sử mua hàng, format trạng thái và giá tiền chuẩn xác. (Có sử dụng mock id ở endpoint fetch).
-- **Chi tiết đơn hàng (order-detail.jsp):** Fix lỗi map data (`details` -> `items`), map đúng trường ngày tháng, chi phí và thêm mock id vào endpoint fetch chi tiết.
-- **Quản lý đơn hàng Admin (admin-orders.jsp):** Kết nối bảng dữ liệu với API GET `/api/admin/orders?mock_employee=E001`, tích hợp luồng cập nhật trạng thái đơn thông qua JS fetch PATCH request.
+- **Di dời Logic JavaScript (Fix HTTP 500):** Tách toàn bộ các block `<script>` nội tuyến khỏi `orders.jsp`, `order-detail.jsp`, `admin-orders.jsp` và `checkout.jsp` sang thư mục `frontend/assets/js/`. Nguyên nhân là do cú pháp JS Template Literal (dùng `${...}`) bị JSP Engine hiểu nhầm là Expression Language (EL), dẫn đến lỗi server khi render.
+- **Ngăn chặn Stored XSS:** Viết lại phương thức render DOM trong các file JavaScript, sử dụng `document.createElement` và `textContent` thay cho `innerHTML` khi chèn các dữ liệu từ người dùng (như `receiverName`, `customerNote`, `deliveryAddress`), đảm bảo chống tấn công Stored XSS triệt để.
+- **Thanh toán (checkout.jsp):** Đoạn gọi API lấy giỏ hàng (Cart API) và Promotion hiện đang là **giả lập/mock**. Hiện API Giỏ hàng và Khuyến mãi của team chưa hoàn thiện nên Frontend sẽ dùng fetch mock để mô phỏng dữ liệu và tính phí giao hàng. Báo cáo rõ đây chỉ là giả lập.
+- **Quản lý đơn hàng Admin:** Xóa logic gửi parameter giả lập, gọi đúng endpoint `PATCH /crave/api/admin/orders/{orderId}/status`.
 
 ## 2. Kết quả đạt được
-- Hệ thống đã liên kết hoàn chỉnh luồng từ Frontend -> API -> Service -> DB.
-- Có thể thao tác đặt hàng, xem danh sách đơn hàng (của khách) và cập nhật đơn hàng (của Admin) thành công.
-- Không phát sinh lỗi biên dịch hay runtime nghiêm trọng.
+- Hệ thống đã liên kết hoàn chỉnh luồng từ Frontend -> API -> Service -> DB, xác thực dựa vào `SessionAuth` thật 100%.
+- Không phát sinh bất kỳ lỗi biên dịch nào trên Maven (`mvn compile` success).
+- Hạn chế tối đa các lỗi bảo mật (Double submit, XSS, Lazy Loading exceptions).
 
 ## 3. Khó khăn / Vấn đề tồn đọng
-- Module Authentication vẫn chưa ghép nối xong nên việc cấp quyền đang phải dựa hoàn toàn vào các tham số phụ (mock params) được chèn cố định ở các file Frontend để test giao diện. Khi ghép Auth, chúng ta phải nhớ xóa toàn bộ `?mock_customer=C001` và `?mock_employee=E001` ở các file `.jsp` và test lại toàn bộ luồng.
-- Chức năng hiển thị tổng tiền ở trang thanh toán đang dùng API giả lập để gọi sang module Giỏ hàng (Cart). Khi Trí hoàn thành API Giỏ Hàng, cần đối soát lại tên endpoint và object trả về để sửa lại ở `checkout.jsp`.
+- Module Cart và Promotion (khuyến mãi) từ Trí chưa hoàn thành, do đó luồng Checkout phải tích hợp qua API giả lập tại JS (`fetch('/crave/api/cart')`). Khi các API này sẵn sàng, cần review lại schema JSON response để map cho khớp.
+- Chưa test End-to-End được sâu với Role Admin vì luồng Login tạo role đang đợi từ Vinh hoàn tất. 
 
 ## 4. Kế hoạch tiếp theo (Day 3)
-- Chuẩn bị code review và merge request.
-- Test kỹ lưỡng toàn bộ luồng với dữ liệu thực khi Auth đã sẵn sàng.
-- Refactor các phần hiển thị số liệu / tooltip.
+- Chuẩn bị code review, tạo Pull Request và merge.
+- Chạy tích hợp toàn bộ các branch để test end-to-end với dữ liệu Login và Session của team.

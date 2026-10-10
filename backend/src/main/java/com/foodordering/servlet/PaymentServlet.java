@@ -1,10 +1,13 @@
 package com.foodordering.servlet;
 
+import com.foodordering.api.BaseApiServlet;
 import com.foodordering.dto.ApiResponse;
-import com.foodordering.utils.JsonUtils;
+import com.foodordering.dto.ProfileResponse;
+import com.foodordering.enums.AccountType;
+import com.foodordering.exception.AccountException;
+import com.foodordering.security.SessionAuth;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
-import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
@@ -16,7 +19,7 @@ import com.foodordering.service.PaymentServiceImpl;
 import com.foodordering.repository.PaymentRepositoryImpl;
 
 @WebServlet(name = "PaymentServlet", urlPatterns = "/api/payments/*")
-public class PaymentServlet extends HttpServlet {
+public class PaymentServlet extends BaseApiServlet {
 
     private PaymentService paymentService;
 
@@ -34,37 +37,36 @@ public class PaymentServlet extends HttpServlet {
         }
     }
 
-    protected void doPatch(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+    private String requireEmployee(HttpServletRequest req) {
+        ProfileResponse user = SessionAuth.requireUser(req);
+        if (user.accountType() != AccountType.EMPLOYEE) {
+            throw new AccountException("FORBIDDEN", "Chỉ Admin/Nhân viên mới có quyền truy cập", 403);
+        }
+        return user.id();
+    }
+
+    protected void doPatch(HttpServletRequest req, HttpServletResponse resp) throws IOException {
         try {
+            String employeeId = requireEmployee(req);
+
             String pathInfo = req.getPathInfo();
-            if (pathInfo == null || pathInfo.length() <= 1) {
-                throw new IllegalArgumentException("Thiếu Payment ID");
+            if (pathInfo == null || !pathInfo.endsWith("/status")) {
+                badRequest(resp, "Invalid endpoint. Expected /{paymentId}/status");
+                return;
             }
             
-            String employeeId = (String) req.getSession().getAttribute("employeeId");
-            if (employeeId == null) {
-                employeeId = req.getParameter("mock_employee");
-                if (employeeId == null) {
-                    resp.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                    JsonUtils.writeJson(resp, ApiResponse.error("Chỉ Admin/Nhân viên mới có quyền truy cập"));
-                    return;
-                }
-            }
-
             // Format URL: /api/payments/{paymentId}/status
             String[] segments = pathInfo.substring(1).split("/");
             String paymentId = segments[0];
             
-            UpdatePaymentStatusRequest updateReq = JsonUtils.readJson(req, UpdatePaymentStatusRequest.class);
+            UpdatePaymentStatusRequest updateReq = readJson(req, UpdatePaymentStatusRequest.class);
             PaymentStatus status = PaymentStatus.valueOf(updateReq.getStatus());
             
             paymentService.updatePaymentStatus(paymentId, status, updateReq.getTransactionRef());
             
-            JsonUtils.writeJson(resp, ApiResponse.success("Cập nhật trạng thái thanh toán thành công"));
+            writeJson(resp, HttpServletResponse.SC_OK, ApiResponse.success("Cập nhật trạng thái thanh toán thành công"));
         } catch (Exception e) {
-            resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-            JsonUtils.writeJson(resp, ApiResponse.error(e.getMessage()));
+            handleError(resp, e);
         }
     }
 }
-

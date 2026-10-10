@@ -1,10 +1,13 @@
 package com.foodordering.servlet;
 
+import com.foodordering.api.BaseApiServlet;
 import com.foodordering.dto.ApiResponse;
-import com.foodordering.utils.JsonUtils;
+import com.foodordering.dto.ProfileResponse;
+import com.foodordering.enums.AccountType;
+import com.foodordering.exception.AccountException;
+import com.foodordering.security.SessionAuth;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
-import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
@@ -19,7 +22,7 @@ import com.foodordering.repository.CustomerOrderRepositoryImpl;
 import com.foodordering.repository.PaymentRepositoryImpl;
 
 @WebServlet(name = "AdminOrderServlet", urlPatterns = "/api/admin/orders/*")
-public class AdminOrderServlet extends HttpServlet {
+public class AdminOrderServlet extends BaseApiServlet {
 
     private CustomerOrderService orderService;
 
@@ -37,54 +40,44 @@ public class AdminOrderServlet extends HttpServlet {
         }
     }
 
+    private String requireEmployee(HttpServletRequest req) {
+        ProfileResponse user = SessionAuth.requireUser(req);
+        if (user.accountType() != AccountType.EMPLOYEE) {
+            throw new AccountException("FORBIDDEN", "Chỉ Admin/Nhân viên mới có quyền truy cập", 403);
+        }
+        return user.id();
+    }
+
     @Override
-    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
         try {
-            String employeeId = (String) req.getSession().getAttribute("employeeId");
-            if (employeeId == null) {
-                employeeId = req.getParameter("mock_employee");
-                if (employeeId == null) {
-                    resp.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                    JsonUtils.writeJson(resp, ApiResponse.error("Chỉ Admin/Nhân viên mới có quyền truy cập"));
-                    return;
-                }
-            }
+            String employeeId = requireEmployee(req);
             List<OrderResponse> orders = orderService.getAllOrdersForAdmin();
-            JsonUtils.writeJson(resp, ApiResponse.success(orders));
+            writeJson(resp, HttpServletResponse.SC_OK, ApiResponse.success(orders));
         } catch (Exception e) {
-            resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-            JsonUtils.writeJson(resp, ApiResponse.error(e.getMessage()));
+            handleError(resp, e);
         }
     }
 
-    protected void doPatch(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+    protected void doPatch(HttpServletRequest req, HttpServletResponse resp) throws IOException {
         try {
+            String employeeId = requireEmployee(req);
+
             String pathInfo = req.getPathInfo();
-            if (pathInfo == null || pathInfo.length() <= 1) {
-                throw new IllegalArgumentException("Thiếu Order ID");
+            if (pathInfo == null || !pathInfo.endsWith("/status")) {
+                badRequest(resp, "Invalid endpoint. Expected /{orderId}/status");
+                return;
             }
-            String orderId = pathInfo.substring(1);
+            String orderId = pathInfo.substring(1, pathInfo.length() - "/status".length());
             
-            String employeeId = (String) req.getSession().getAttribute("employeeId");
-            if (employeeId == null) {
-                employeeId = req.getParameter("mock_employee");
-                if (employeeId == null) {
-                    resp.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                    JsonUtils.writeJson(resp, ApiResponse.error("Chỉ Admin/Nhân viên mới có quyền truy cập"));
-                    return;
-                }
-            }
-            
-            UpdateOrderStatusRequest updateReq = JsonUtils.readJson(req, UpdateOrderStatusRequest.class);
+            UpdateOrderStatusRequest updateReq = readJson(req, UpdateOrderStatusRequest.class);
             OrderStatus status = OrderStatus.valueOf(updateReq.getStatus());
             
             orderService.updateOrderStatus(orderId, status, employeeId, updateReq.getNote());
             
-            JsonUtils.writeJson(resp, ApiResponse.success("Cập nhật trạng thái thành công"));
+            writeJson(resp, HttpServletResponse.SC_OK, ApiResponse.success("Cập nhật trạng thái thành công"));
         } catch (Exception e) {
-            resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-            JsonUtils.writeJson(resp, ApiResponse.error(e.getMessage()));
+            handleError(resp, e);
         }
     }
 }
-

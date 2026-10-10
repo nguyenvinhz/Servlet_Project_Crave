@@ -1,10 +1,11 @@
 package com.foodordering.servlet;
 
+import com.foodordering.api.BaseApiServlet;
 import com.foodordering.dto.ApiResponse;
-import com.foodordering.utils.JsonUtils;
+import com.foodordering.dto.ProfileResponse;
+import com.foodordering.security.SessionAuth;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
-import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
@@ -19,7 +20,7 @@ import com.foodordering.repository.CustomerOrderRepositoryImpl;
 import com.foodordering.repository.PaymentRepositoryImpl;
 
 @WebServlet(name = "OrderServlet", urlPatterns = "/api/orders/*")
-public class OrderServlet extends HttpServlet {
+public class OrderServlet extends BaseApiServlet {
 
     private CustomerOrderService orderService;
 
@@ -29,17 +30,10 @@ public class OrderServlet extends HttpServlet {
     }
 
     @Override
-    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
         try {
-            String customerId = (String) req.getSession().getAttribute("customerId");
-            if (customerId == null) {
-                customerId = req.getParameter("mock_customer"); // Mock for testing
-                if (customerId == null) {
-                    resp.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                    JsonUtils.writeJson(resp, ApiResponse.error("Bạn chưa đăng nhập"));
-                    return;
-                }
-            }
+            ProfileResponse customer = SessionAuth.requireCustomer(req);
+            String customerId = customer.id();
             
             // Xử lý route chi tiết đơn hàng /api/orders/{id} hoặc danh sách
             String pathInfo = req.getPathInfo();
@@ -47,41 +41,31 @@ public class OrderServlet extends HttpServlet {
                 String orderId = pathInfo.substring(1);
                 OrderResponse order = orderService.getOrderById(orderId);
                 if (!order.getCustomerId().equals(customerId)) {
-                    resp.setStatus(HttpServletResponse.SC_FORBIDDEN);
-                    JsonUtils.writeJson(resp, ApiResponse.error("Bạn không có quyền xem đơn hàng này"));
+                    writeJson(resp, HttpServletResponse.SC_FORBIDDEN, ApiResponse.error("Bạn không có quyền xem đơn hàng này", "FORBIDDEN"));
                     return;
                 }
-                JsonUtils.writeJson(resp, ApiResponse.success(order));
+                writeJson(resp, HttpServletResponse.SC_OK, ApiResponse.success(order));
             } else {
                 List<OrderSummaryResponse> orders = orderService.getOrdersByCustomer(customerId);
-                JsonUtils.writeJson(resp, ApiResponse.success(orders));
+                writeJson(resp, HttpServletResponse.SC_OK, ApiResponse.success(orders));
             }
         } catch (Exception e) {
-            resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-            JsonUtils.writeJson(resp, ApiResponse.error(e.getMessage()));
+            handleError(resp, e);
         }
     }
 
     @Override
-    protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+    protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws IOException {
         try {
-            String customerId = (String) req.getSession().getAttribute("customerId");
-            if (customerId == null) {
-                customerId = req.getParameter("mock_customer");
-                if (customerId == null) {
-                    resp.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                    JsonUtils.writeJson(resp, ApiResponse.error("Bạn chưa đăng nhập"));
-                    return;
-                }
-            }
-            OrderRequest request = JsonUtils.readJson(req, OrderRequest.class);
+            ProfileResponse customer = SessionAuth.requireCustomer(req);
+            String customerId = customer.id();
+
+            OrderRequest request = readJson(req, OrderRequest.class);
             OrderResponse response = orderService.createOrder(customerId, request);
             
-            resp.setStatus(HttpServletResponse.SC_CREATED);
-            JsonUtils.writeJson(resp, ApiResponse.success(response));
+            writeJson(resp, HttpServletResponse.SC_CREATED, ApiResponse.success(response));
         } catch (Exception e) {
-            resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-            JsonUtils.writeJson(resp, ApiResponse.error(e.getMessage()));
+            handleError(resp, e);
         }
     }
 }

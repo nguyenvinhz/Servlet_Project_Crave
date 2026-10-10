@@ -21,63 +21,6 @@
         <div id="orderContent">Đang tải...</div>
     </div>
 
-    <script>
-        document.addEventListener('DOMContentLoaded', async () => {
-            const container = document.getElementById('orderContent');
-            // Lấy orderId từ URL. Ví dụ /crave/orders/C12345
-            const pathSegments = window.location.pathname.split('/');
-            const orderId = pathSegments[pathSegments.length - 1];
-
-            try {
-                const res = await fetch('/crave/api/orders/' + orderId + '?mock_customer=C001');
-                const data = await res.json();
-
-                if (res.ok && data.success) {
-                    const o = data.data;
-                    container.innerHTML = `
-                        <div class="order-header">
-                            <h2>Đơn hàng #${o.orderId}</h2>
-                            <p>Trạng thái: <strong>${o.status}</strong></p>
-                            <p>Ngày đặt: ${new Date(o.orderedAt).toLocaleString('vi-VN')}</p>
-                        </div>
-                        <div class="info-grid">
-                            <div>
-                                <h4>Thông tin giao hàng</h4>
-                                <p>Tên: ${o.receiverName}</p>
-                                <p>SĐT: ${o.receiverPhone}</p>
-                                <p>Địa chỉ: ${o.deliveryAddress || 'Nhận tại quán'}</p>
-                            </div>
-                            <div>
-                                <h4>Thanh toán</h4>
-                                <p>Hình thức: ${o.fulfillmentType === 'DELIVERY' ? 'Giao tận nơi' : 'Lấy tại quán'}</p>
-                                <p>Ghi chú: ${o.customerNote || 'Không có'}</p>
-                            </div>
-                        </div>
-                        <div class="item-list">
-                            <h4>Danh sách món</h4>
-                            ${o.items ? o.items.map(item => `
-                                <div class="item-row">
-                                    <div class="item-details">
-                                        <strong>${item.quantity}x ${item.foodNameSnapshot}</strong>
-                                        <small>${item.note || ''}</small>
-                                    </div>
-                                    <div>${(item.unitPrice * item.quantity).toLocaleString('vi-VN')} đ</div>
-                                </div>
-                            `).join('') : '<p>Chưa có chi tiết món ăn</p>'}
-                        </div>
-                        <div class="totals">
-                            <p>Tạm tính: ${(o.subtotal || 0).toLocaleString('vi-VN')} đ</p>
-                            <p>Phí giao hàng: ${(o.deliveryFee || 0).toLocaleString('vi-VN')} đ</p>
-                            <h3>Tổng cộng: ${(o.totalAmount || (o.subtotal + o.deliveryFee)).toLocaleString('vi-VN')} đ</h3>
-                        </div>
-                    `;
-                } else {
-                    container.innerHTML = `<p style="color:red">${data.message}</p>`;
-                }
-            } catch (err) {
-                container.innerHTML = '<p style="color:red">Lỗi kết nối máy chủ.</p>';
-            }
-        });
-    </script>
+    <script src="/crave/assets/js/order-detail.js"></script>
 </body>
 </html>
