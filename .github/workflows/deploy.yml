@@ -3,12 +3,11 @@ name: CI/CD - main to EC2
 on:
   push:
     branches: [main]
-  workflow_dispatch:
 
 permissions:
   contents: read
 
-# Serialize the whole build/deploy cycle so an older build cannot deploy last.
+# Chạy tuần tự các lần build/deploy, giữ lần deploy đang chạy đến hết.
 concurrency:
   group: crave-production-${{ github.ref }}
   cancel-in-progress: false
@@ -16,12 +15,12 @@ concurrency:
 jobs:
   ci:
     name: CI
-    if: github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     uses: ./.github/workflows/ci.yml
 
   deploy:
     name: Deploy EC2
-    if: github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.ci.result == 'success'
     needs: ci
     # Only trusted main deployments use the production runner. PR CI is hosted.
     runs-on: [self-hosted, linux, x64, crave-production]
@@ -34,9 +33,17 @@ jobs:
       HEALTH_URL: ${{ vars.EC2_HEALTH_URL || 'http://127.0.0.1:8080/crave/api/health' }}
 
     steps:
+      - name: Kiểm tra runner production
+        run: |
+          if [[ "$RUNNER_NAME" != 'crave-ec2' ]]; then
+            printf 'CD yêu cầu runner crave-ec2, runner hiện tại: %s\n' "$RUNNER_NAME" >&2
+            exit 1
+          fi
+
       - name: Checkout deployment script
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.sha }}
           persist-credentials: false
 
       - name: Download the WAR that passed CI

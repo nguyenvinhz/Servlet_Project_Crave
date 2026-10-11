@@ -1,19 +1,24 @@
 # CI/CD từ main lên EC2
 
-Push hoặc merge vào `main` sẽ chạy CI, sau đó deploy WAR đã kiểm thử lên EC2.
-Pull request vào `main` chỉ chạy CI. Ứng dụng hiện có ở `/home/ubuntu/crave`,
-chạy bằng Docker Compose với service `app` và MySQL.
+Push hoặc merge vào `main` sẽ tự chạy CI, rồi deploy WAR lên EC2 khi CI thành công.
+Pull request vào `main` chỉ chạy CI trên GitHub-hosted runner. Trong thời gian
+chờ review hoặc đã Approve nhưng chưa merge, website giữ nguyên phiên bản hiện tại.
+Ứng dụng chạy trên EC2 Ubuntu 24.04 tại `/home/ubuntu/crave`, bằng Docker Compose
+với hai service `app` (Tomcat) và `mysql`.
 
 ## Luồng chạy
 
 ```text
-Pull request vào main ──> CI trên GitHub runner
+Tạo/cập nhật PR vào main ──> CI trên GitHub runner
+                             │
+                             v
+                       Chờ review / Approve ──> Chưa deploy
 
-Push/merge main ──> CI trên GitHub runner ──> artifact crave-war
+Merge PR / push main ──> CI thành công ──> artifact crave-war
                                            │
                                            v
-                           Runner EC2: backup WAR, thay WAR,
-                           recreate app, kiểm tra /api/health
+                           Runner crave-ec2: backup WAR, thay WAR,
+                           recreate app, kiểm tra /crave/api/health
                                            │
                               thất bại ──> khôi phục WAR cũ
 ```
@@ -22,14 +27,26 @@ Push/merge main ──> CI trên GitHub runner ──> artifact crave-war
   `clean verify`, assertion giỏ hàng/voucher, kiểm tra cú pháp JavaScript,
   kiểm thử trình duyệt và kiểm thử script deploy/rollback. Schema/seed chỉ được
   chạy trong database CI tạm thời.
-- [deploy.yml](../../.github/workflows/deploy.yml): gọi CI, tải đúng artifact của
-  cùng lần chạy rồi gọi [deploy-ec2.sh](../../scripts/deploy-ec2.sh) trên EC2.
+- [deploy.yml](../../.github/workflows/deploy.yml): chỉ nhận sự kiện `push` vào
+  `main`, bao gồm commit tạo khi merge PR và push trực tiếp. Gọi CI, chỉ khi CI
+  thành công mới tải artifact của cùng lần chạy rồi gọi
+  [deploy-ec2.sh](../../scripts/deploy-ec2.sh) trên EC2.
+- CD không nhận `pull_request`, `pull_request_target`, `pull_request_review`
+  hoặc `workflow_dispatch`. Approve PR không kích hoạt deploy. Code của PR chưa
+  merge chỉ chạy trong CI trên GitHub-hosted runner.
+- Job CD dùng environment `production` và các label
+  `self-hosted`, `linux`, `x64`, `crave-production`; kiểm tra runner có tên
+  `crave-ec2` trước khi checkout code từ commit mới trên `main`.
 - CD chỉ recreate service ứng dụng. Database, volume MySQL, `.env` và compose
   trên server được giữ nguyên. Migration database cần kế hoạch riêng.
 - Các lần deploy được tuần tự hóa và có khóa trên server. Lần đang deploy được
   chạy đến hết; GitHub có thể thay lần đang chờ bằng push mới nhất.
 
 ## Thiết lập một lần trên EC2
+
+Runner `crave-ec2`, label `crave-production` và environment `production` đã được
+cấu hình theo hệ thống hiện tại. Các bước dưới đây là tài liệu đối chiếu hoặc
+thiết lập lại; không cần thực hiện lại mỗi lần cập nhật ứng dụng.
 
 Runner EC2 nhận job từ GitHub qua HTTPS outbound 443. Giữ cấu hình SSH hiện có;
 không cần thêm SSH key vào GitHub Secrets. Xem [kết nối self-hosted runner](https://docs.github.com/en/actions/reference/runners/self-hosted-runners).
@@ -109,7 +126,9 @@ sudo ./svc.sh start
 sudo ./svc.sh status
 ```
 
-GitHub phải hiển thị runner **Idle** với label `crave-production`.
+GitHub phải hiển thị runner `crave-ec2` **Idle** với label `crave-production`.
+Label này cần dành cho runner EC2 production; workflow kiểm tra tên runner trước
+khi tải code và artifact để tránh deploy trên máy khác có cùng label.
 Tham khảo [thêm runner](https://docs.github.com/en/actions/how-tos/manage-runners/self-hosted-runners/add-runners)
 và [cài runner thành service](https://docs.github.com/en/actions/how-tos/manage-runners/self-hosted-runners/configure-the-application).
 
@@ -130,8 +149,10 @@ Vào **Settings → Environments → New environment**, tạo `production`.
 Trong **Deployment branches and tags**, chọn **Selected branches and tags**,
 thêm branch `main`.
 
-Nếu muốn deploy tự động sau mỗi push, không bật required reviewers cho
-environment này. Branch protection có thể yêu cầu CI thành công trước khi merge.
+Để CD tự chạy sau mỗi push vào `main`, environment này không được yêu cầu
+required reviewers hoặc wait timer. Approval của PR thuộc bước review trước
+khi merge; không phải approval deploy. Branch protection có thể yêu cầu CI
+thành công trước khi merge.
 
 Với cấu hình hiện tại, không cần tạo secret hay variable: các giá trị mặc định
 đã khớp EC2. Nếu thay đổi server, thêm **Environment variables**:
@@ -143,10 +164,12 @@ Với cấu hình hiện tại, không cần tạo secret hay variable: các gi�
 | `EC2_APP_SERVICE` | `app` | Tên service Tomcat |
 | `EC2_HEALTH_URL` | `http://127.0.0.1:8080/crave/api/health` | Endpoint health trên máy EC2 |
 
-## Bật workflow và kiểm tra lần đầu
+## Luồng cập nhật ứng dụng
 
-Đưa thay đổi CI/CD qua pull request vào `main`. Khi merge, workflow
-**CI/CD - main to EC2** tự chạy. Xem tab **Actions**:
+Đưa thay đổi CI/CD qua pull request vào `main`. Khi tạo hoặc cập nhật PR, chỉ
+workflow CI chạy; review và Approve không đổi website trên EC2. Sau khi merge,
+commit mới trên `main` tạo sự kiện `push`, workflow **CI/CD - main to EC2** tự
+chạy. Push trực tiếp vào `main` cũng dùng đúng luồng này. Xem tab **Actions**:
 
 1. `CI / Build and test` phải thành công và tạo artifact `crave-war`.
 2. `Deploy EC2` lấy artifact, lưu WAR hiện tại vào
@@ -155,8 +178,8 @@ Với cấu hình hiện tại, không cần tạo secret hay variable: các gi�
    `data.application: "UP"`, `data.database: "UP"` trong 180 giây.
 4. Khi thành công, summary ghi commit đã deploy. Mở website để kiểm tra chức năng.
 
-Có thể chạy lại bằng **Actions → CI/CD - main to EC2 → Run workflow → main**.
-Chạy thủ công ở branch khác sẽ bỏ qua cả CI và CD của workflow deploy.
+Không cần nhấn **Run workflow** hoặc SSH vào EC2 để deploy mỗi lần cập nhật.
+Nếu CI thất bại, CD không chạy và website tiếp tục dùng WAR hiện tại.
 
 Nếu recreate hoặc health check thất bại, script tự khôi phục WAR cũ và recreate
 `app` lần nữa. Workflow vẫn báo lỗi để người triển khai kiểm tra. Mỗi deploy
@@ -170,7 +193,8 @@ giám sát database liên tục.
 
 | Hiện tượng | Cách kiểm tra |
 |---|---|
-| `Deploy EC2` đang chờ runner | Runner phải online, đúng label `self-hosted`, `linux`, `x64`, `crave-production`; xem `sudo ./svc.sh status` |
+| `Deploy EC2` đang chờ runner | Runner `crave-ec2` phải online, đúng label `self-hosted`, `linux`, `x64`, `crave-production`; xem `sudo ./svc.sh status` |
+| Job báo sai tên runner | Kiểm tra tên runner là `crave-ec2` và label `crave-production` chỉ dành cho đúng máy production |
 | Job chờ approval | Kiểm tra required reviewers của environment `production` |
 | Không truy cập Docker | Thử `sudo -n docker info` dưới tài khoản `ubuntu` của service runner |
 | Báo thiếu app bind mount | Kiểm tra service `app` trong compose production và đường dẫn WAR ở bước 1 |
