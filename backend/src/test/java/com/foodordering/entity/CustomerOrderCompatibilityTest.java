@@ -52,6 +52,17 @@ class CustomerOrderCompatibilityTest {
     }
 
     @Test
+    void missingOrderCannotPassVoucherValidationWithNoMinimum() {
+        Promotion promotion = new Promotion();
+        promotion.setMinimumOrderValue(BigDecimal.ZERO);
+
+        PromotionValidationException missingOrder = assertThrows(PromotionValidationException.class,
+                () -> PromotionValidator.validateApplicableForOrder(promotion, null));
+
+        assertEquals(ErrorCode.BAD_REQUEST, missingOrder.getErrorCode());
+    }
+
+    @Test
     void legacyAndCartOrderIdsShareTheSameValue() {
         CustomerOrder order = new CustomerOrder("DH01");
         assertEquals("DH01", order.getId());

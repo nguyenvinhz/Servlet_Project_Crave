@@ -59,7 +59,7 @@ public class PromotionService {
      */
     public PromotionValidationResultDto validatePromotionForOrder(String code, CustomerOrder order) {
         if (order == null) {
-            return validatePromotion(code, null, null, LocalDateTime.now());
+            return new PromotionValidationResultDto(false, "Đơn hàng không được để trống", ErrorCode.BAD_REQUEST.getCode());
         }
         BigDecimal subtotal = order.getSubtotal();
         LocalDateTime orderTime = order.getOrderTime(); // Lấy orderTime của khách hàng từ CustomerOrder

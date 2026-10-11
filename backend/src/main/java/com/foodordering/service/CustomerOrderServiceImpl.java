@@ -5,10 +5,14 @@ import com.foodordering.dto.OrderRequest;
 import com.foodordering.dto.OrderResponse;
 import com.foodordering.dto.OrderSummaryResponse;
 import com.foodordering.entity.*;
+import com.foodordering.enums.ErrorCode;
 import com.foodordering.enums.OrderStatus;
 import com.foodordering.enums.PaymentStatus;
+import com.foodordering.exception.ApiException;
+import com.foodordering.exception.BadRequestException;
 import com.foodordering.repository.CustomerOrderRepository;
 import com.foodordering.repository.PaymentRepository;
+import com.foodordering.validator.PromotionValidator;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityTransaction;
 import jakarta.persistence.Query;
@@ -61,7 +65,7 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
             cartQuery.setParameter(1, customerId);
             List<?> carts = cartQuery.getResultList();
             if (carts.isEmpty()) {
-                throw new RuntimeException("Giỏ hàng trống hoặc đang được xử lý");
+                throw new BadRequestException(ErrorCode.CART_EMPTY);
             }
             String cartId = carts.get(0).toString();
 
@@ -70,8 +74,8 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
             subtotalQuery.setParameter(1, cartId);
             BigDecimal subtotal = (BigDecimal) subtotalQuery.getSingleResult();
 
-            if (subtotal == null || subtotal.compareTo(BigDecimal.ZERO) == 0) {
-                throw new RuntimeException("Giỏ hàng không có món ăn hợp lệ");
+            if (subtotal == null || subtotal.compareTo(BigDecimal.ZERO) <= 0) {
+                throw new BadRequestException(ErrorCode.CART_EMPTY);
             }
 
             CustomerOrder order = new CustomerOrder();
@@ -85,13 +89,9 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
             
             // Xác thực Promotion
             if (request.getPromotionId() != null && !request.getPromotionId().trim().isEmpty()) {
-                Query promoQuery = em.createNativeQuery("SELECT status FROM promotion WHERE promotion_id = ?");
-                promoQuery.setParameter(1, request.getPromotionId());
-                List<?> promoStatus = promoQuery.getResultList();
-                if (promoStatus.isEmpty() || !"ACTIVE".equals(promoStatus.get(0).toString())) {
-                    throw new RuntimeException("Voucher không tồn tại hoặc đã hết hạn/không hoạt động");
-                }
-                order.setPromotionId(request.getPromotionId());
+                Promotion promotion = em.find(Promotion.class, request.getPromotionId().trim());
+                PromotionValidator.validateApplicable(promotion, subtotal, order.getOrderedAt());
+                order.setPromotionId(promotion.getPromotionId());
             }
             
             order.setSubtotal(subtotal);
@@ -111,7 +111,8 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
             for (Object[] item : items) {
                 String foodStatus = (String) item[6];
                 if (!"AVAILABLE".equals(foodStatus)) {
-                    throw new RuntimeException("Món " + item[2] + " hiện không khả dụng");
+                    throw new BadRequestException(ErrorCode.FOOD_NOT_AVAILABLE,
+                            "Món " + item[2] + " hiện không khả dụng");
                 }
 
                 String cartItemId = (String) item[0];
@@ -125,7 +126,7 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
                 detail.setNote((String) item[5]);
 
                 // Copy tùy chọn (options)
-                Query optionsQuery = em.createNativeQuery("SELECT cio.option_id, fo.name, fo.extra_price " +
+                Query optionsQuery = em.createNativeQuery("SELECT cio.option_id, fo.name, fo.extra_price, fo.status, fo.food_id " +
                         "FROM cart_item_option cio JOIN food_option fo ON fo.option_id = cio.option_id " +
                         "WHERE cio.cart_item_id = ?");
                 optionsQuery.setParameter(1, cartItemId);
@@ -133,6 +134,9 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
 
                 BigDecimal optionTotal = BigDecimal.ZERO;
                 for (Object[] opt : options) {
+                    if (!"ACTIVE".equals(opt[3]) || !detail.getFoodId().equals(opt[4])) {
+                        throw new BadRequestException(ErrorCode.INVALID_OPTION);
+                    }
                     OrderDetailOption detailOpt = new OrderDetailOption();
                     detailOpt.setOrderDetail(detail);
                     detailOpt.setOptionId((String) opt[0]);
@@ -177,6 +181,9 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
 
             tx.commit();
             return getOrderById(order.getId());
+        } catch (ApiException e) {
+            if (tx.isActive()) tx.rollback();
+            throw e;
         } catch (Exception e) {
             if (tx.isActive()) tx.rollback();
             throw new RuntimeException("Lỗi tạo đơn hàng: " + e.getMessage(), e);
@@ -315,12 +322,18 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
             List<OrderResponse.OrderItemResponse> items = order.getOrderDetails().stream().map(detail -> {
                 OrderResponse.OrderItemResponse itemRes = new OrderResponse.OrderItemResponse();
                 itemRes.setFoodId(detail.getFoodId());
+                itemRes.setFoodName(detail.getFoodNameSnapshot());
                 itemRes.setFoodNameSnapshot(detail.getFoodNameSnapshot());
                 itemRes.setQuantity(detail.getQuantity());
                 itemRes.setUnitPrice(detail.getUnitPrice());
+                itemRes.setLineTotal(detail.getUnitPrice().multiply(BigDecimal.valueOf(detail.getQuantity())));
                 itemRes.setNote(detail.getNote());
-                
-                // Map options if needed (skipping option details in basic response for now or mapping it manually if needed)
+                itemRes.setOptions(detail.getOptions().stream().map(option -> {
+                    OrderResponse.OptionSnapshot snapshot = new OrderResponse.OptionSnapshot();
+                    snapshot.setOptionName(option.getOptionNameSnapshot());
+                    snapshot.setExtraPrice(option.getExtraPriceSnapshot());
+                    return snapshot;
+                }).collect(Collectors.toList()));
                 return itemRes;
             }).collect(Collectors.toList());
             res.setItems(items);

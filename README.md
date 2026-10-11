@@ -102,10 +102,25 @@ mvn -f backend/pom.xml clean verify
 Kiểm thử tích hợp cần MySQL với schema/seed hiện có. Các test Ngày 2 tạo dữ liệu
 riêng và dọn dữ liệu của mình sau khi chạy.
 
-Kiểm thử giao diện tài khoản bằng Node và Chrome/Edge (API giả lập):
+Kiểm thử giao diện tài khoản, giỏ hàng và checkout bằng Node 22+ và Chrome/Edge (API giả lập):
 
 ```powershell
 node frontend/tests/account-browser-smoke.cjs
 ```
 
 Nếu browser chưa được tìm thấy tự động, đặt `CHROME_PATH` tới file thực thi Chrome/Edge.
+
+## Demo cart/voucher Ngày 3 — Ung Văn Trí
+
+1. Đăng nhập, thêm món và tùy chọn vào giỏ, áp voucher còn hiệu lực.
+2. Đổi số lượng để kiểm tra voucher/tổng tiền được tính lại; giảm dưới mức tối thiểu
+   để kiểm tra thông báo và bỏ giảm giá không còn hợp lệ.
+3. Chuyển sang checkout; voucher được kiểm tra lại, tổng tiền lấy từ kết quả API.
+   Chọn giao tận nơi (15.000đ) hoặc nhận tại quán (0đ).
+4. Tạo đơn; kiểm tra tổng tiền/thanh toán và giỏ đã được xóa. Gửi lại request trên
+   giỏ đã checkout nhận `400 CART_EMPTY` và không tạo thêm đơn.
+5. Khóa voucher hoặc option sau khi thêm giỏ; checkout trả lỗi rõ và giữ giỏ
+   để khách sửa trước khi thử lại.
+
+Xem [báo cáo cart/voucher Ngày 3](docs/reports/cart-voucher/2026-10-09-ung-van-tri-cart-voucher-day3.md)
+để biết phạm vi và kết quả kiểm thử.

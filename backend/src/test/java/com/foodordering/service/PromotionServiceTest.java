@@ -96,6 +96,83 @@ class PromotionServiceTest {
     }
 
     @Test
+    void repeatedValidationRechecksTheCartInsteadOfReusingTheEarlierSubtotal() {
+        when(cartService.getVerifiedSubtotal("KH01"))
+                .thenReturn(new BigDecimal("150000"), new BigDecimal("80000"));
+        ValidatePromotionRequest request = request("150000");
+
+        assertTrue(service.validatePromotion(request, "KH01").isValid());
+        PromotionValidationResultDto result = service.validatePromotion(request, "KH01");
+
+        assertFalse(result.isValid());
+        assertEquals(ErrorCode.PROMOTION_MIN_ORDER_NOT_MET.getCode(), result.getErrorCode());
+        verify(cartService, times(2)).getVerifiedSubtotal("KH01");
+        verify(repository, times(2)).findByCode("SAVE20K");
+        verify(repository, times(1)).calculateDiscountViaDatabase(anyString(), any(), any());
+    }
+
+    @Test
+    void repeatedValidationRejectsAVoucherDisabledAfterItWasApplied() {
+        when(cartService.getVerifiedSubtotal("KH01")).thenReturn(new BigDecimal("150000"));
+        assertTrue(service.validatePromotion(request("150000"), "KH01").isValid());
+        promotion.setStatus(PromotionStatus.INACTIVE);
+
+        PromotionValidationResultDto result = service.validatePromotion(request("150000"), "KH01");
+
+        assertFalse(result.isValid());
+        assertEquals(ErrorCode.PROMOTION_INACTIVE.getCode(), result.getErrorCode());
+        verify(repository, times(2)).findByCode("SAVE20K");
+        verify(repository, times(1)).calculateDiscountViaDatabase(anyString(), any(), any());
+    }
+
+    @Test
+    void repeatedValidationRejectsAVoucherThatHasExpiredSinceItWasApplied() {
+        when(cartService.getVerifiedSubtotal("KH01")).thenReturn(new BigDecimal("150000"));
+        promotion.setStartAt(LocalDateTime.now().minusDays(1));
+        promotion.setEndAt(LocalDateTime.now().plusDays(1));
+        assertTrue(service.validatePromotion(request("150000"), "KH01").isValid());
+        promotion.setEndAt(LocalDateTime.now().minusSeconds(1));
+
+        PromotionValidationResultDto result = service.validatePromotion(request("150000"), "KH01");
+
+        assertFalse(result.isValid());
+        assertEquals(ErrorCode.PROMOTION_EXPIRED.getCode(), result.getErrorCode());
+        verify(repository, times(1)).calculateDiscountViaDatabase(anyString(), any(), any());
+    }
+
+    @Test
+    void orderValidationIncludesExactStartAndEndTimesAndRejectsOutsideTheWindow() {
+        LocalDateTime start = LocalDateTime.of(2026, 10, 6, 10, 0);
+        LocalDateTime end = start.plusHours(1);
+        promotion.setStartAt(start);
+        promotion.setEndAt(end);
+        CustomerOrder order = new CustomerOrder("DH01", new Customer("KH01"), new BigDecimal("150000"), start);
+
+        assertTrue(service.validatePromotionForOrder("SAVE20K", order).isValid());
+        order.setOrderTime(end);
+        assertTrue(service.validatePromotionForOrder("SAVE20K", order).isValid());
+        order.setOrderTime(start.minusSeconds(1));
+        assertEquals(ErrorCode.PROMOTION_NOT_STARTED.getCode(),
+                service.validatePromotionForOrder("SAVE20K", order).getErrorCode());
+        order.setOrderTime(end.plusSeconds(1));
+        assertEquals(ErrorCode.PROMOTION_EXPIRED.getCode(),
+                service.validatePromotionForOrder("SAVE20K", order).getErrorCode());
+        verifyNoInteractions(cartService);
+        verify(repository, times(2)).calculateDiscountViaDatabase(anyString(), any(), any());
+    }
+
+    @Test
+    void missingOrderCannotQualifyForAVoucherWithNoMinimum() {
+        promotion.setMinimumOrderValue(BigDecimal.ZERO);
+
+        PromotionValidationResultDto result = service.validatePromotionForOrder("SAVE20K", null);
+
+        assertFalse(result.isValid());
+        assertEquals(ErrorCode.BAD_REQUEST.getCode(), result.getErrorCode());
+        verifyNoInteractions(cartService, repository);
+    }
+
+    @Test
     void databaseResultTakesPrecedenceIncludingZeroDiscount() {
         LocalDateTime orderTime = LocalDateTime.of(2026, 10, 6, 10, 0);
         when(repository.calculateDiscountViaDatabase("KM01", new BigDecimal("150000"), orderTime))
