@@ -53,6 +53,10 @@ public class PromotionApiServlet extends BaseApiServlet {
         try {
             String customerId = SessionAuth.requireCustomer(req).id();
             ValidatePromotionRequest requestDto = readJson(req, ValidatePromotionRequest.class);
+            if (requestDto == null) {
+                badRequest(resp, "Request body must contain a promotion validation object.");
+                return;
+            }
             PromotionValidationResultDto result = promotionService.validatePromotion(requestDto, customerId);
             if (!result.isValid()) {
                 writeJson(resp, HttpServletResponse.SC_BAD_REQUEST, ApiResponse.error(result.getMessage(), result.getErrorCode()));

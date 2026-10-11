@@ -9,17 +9,13 @@ import com.foodordering.dto.FoodOptionResponse;
 import com.foodordering.dto.FoodRequest;
 import com.foodordering.dto.FoodStatusUpdateRequest;
 import com.foodordering.dto.FoodSummaryResponse;
-import com.foodordering.dto.ProfileResponse;
-import com.foodordering.enums.AccountType;
 import com.foodordering.enums.EmployeeRole;
 import com.foodordering.enums.FoodStatus;
-import com.foodordering.exception.ForbiddenException;
 import com.foodordering.security.SessionAuth;
 import com.foodordering.service.MenuService;
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import jakarta.servlet.http.HttpSession;
 
 import java.io.IOException;
 import java.util.List;
@@ -49,11 +45,7 @@ public class AdminMenuApiServlet extends BaseApiServlet {
     }
 
     private void checkAdminAccess(HttpServletRequest request) {
-        ProfileResponse user = SessionAuth.requireUser(request);
-        if (user.accountType() != AccountType.EMPLOYEE
-                || (user.role() != EmployeeRole.ADMIN && user.role() != EmployeeRole.MENU_MANAGER)) {
-            throw new ForbiddenException("Bạn không có quyền thực hiện thao tác quản lý menu.");
-        }
+        SessionAuth.requireEmployee(request, EmployeeRole.MENU_MANAGER);
     }
 
     @Override

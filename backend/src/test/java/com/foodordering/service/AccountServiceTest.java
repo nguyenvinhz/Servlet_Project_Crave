@@ -91,6 +91,84 @@ class AccountServiceTest {
     }
 
     @Test
+    void malformedContactTextIsRejectedBeforeHashingOrDatabaseAccess() {
+        AccountRepository guardedRepository = mock(AccountRepository.class);
+        PasswordHasher hasher = mock(PasswordHasher.class);
+        AccountService guarded = new AccountService(guardedRepository, hasher);
+
+        for (String email : List.of("vinh\u0000@example.com", "vinh\u0007@example.com",
+                "vinh\u007f@example.com", "vinh\u0085@example.com",
+                "vinh" + (char) 0xD800 + "@example.com", "vinh" + (char) 0xDC00 + "@example.com")) {
+            assertFieldValidation("email", assertThrows(AccountException.class, () -> guarded.register(
+                    new RegisterRequest("Audit User", email, "0912345678", "Password#123", "Password#123"))));
+            assertFieldValidation("email", assertThrows(AccountException.class, () -> guarded.login(
+                    new LoginRequest(email, "Password#123", false))));
+            assertFieldValidation("email", assertThrows(AccountException.class, () -> guarded.updateProfile("KH01",
+                    new ProfileUpdateRequest("Audit User", email, "0912345678"))));
+        }
+        for (String name : List.of("Audit " + (char) 0xD800, "Audit " + (char) 0xDC00)) {
+            assertFieldValidation("fullName", assertThrows(AccountException.class, () -> guarded.register(
+                    new RegisterRequest(name, "audit@example.com", "0912345678", "Password#123", "Password#123"))));
+            assertFieldValidation("fullName", assertThrows(AccountException.class, () -> guarded.updateProfile("KH01",
+                    new ProfileUpdateRequest(name, "audit@example.com", "0912345678"))));
+        }
+
+        verifyNoInteractions(guardedRepository, hasher);
+    }
+
+    @Test
+    void malformedAddressTextIsRejectedBeforePersistenceOrDefaultChanges() {
+        AccountRepository guardedRepository = mock(AccountRepository.class);
+        AccountService guarded = new AccountService(guardedRepository);
+
+        for (String invalid : List.of("Địa chỉ " + (char) 0xD800, "Địa chỉ " + (char) 0xDC00,
+                "Địa chỉ " + '\0')) {
+            AddressWriteRequest line = new AddressWriteRequest(invalid, "Cổng trước", true);
+            assertFieldValidation("addressLine", assertThrows(AccountException.class,
+                    () -> guarded.createAddress("KH01", line)));
+            assertFieldValidation("addressLine", assertThrows(AccountException.class,
+                    () -> guarded.updateAddress("KH01", "DC01", line)));
+            AddressWriteRequest note = new AddressWriteRequest("12 Nguyễn Trãi", invalid, true);
+            assertFieldValidation("note", assertThrows(AccountException.class,
+                    () -> guarded.createAddress("KH01", note)));
+            assertFieldValidation("note", assertThrows(AccountException.class,
+                    () -> guarded.updateAddress("KH01", "DC01", note)));
+        }
+
+        verifyNoInteractions(guardedRepository);
+    }
+
+    @Test
+    void contactAndAddressChangesPreserveVietnameseEmojiAndMultilineNotes() {
+        ProfileResponse registered = service.register(new RegisterRequest("  Nguyễn Quang Vinh 🍜  ",
+                " VĨNH@example.com ", "0912345678", "Password#123", "Password#123"));
+        assertEquals("Nguyễn Quang Vinh 🍜", registered.fullName());
+        assertEquals("vĩnh@example.com", registered.email());
+        assertEquals(registered, service.login(new LoginRequest("VĨNH@example.com", "Password#123", false)));
+
+        ProfileResponse updated = service.updateProfile(registered.id(),
+                new ProfileUpdateRequest("Nguyễn Vinh 🚀", "vĩnh.🍜@example.com", "0912345678"));
+        assertEquals("Nguyễn Vinh 🚀", updated.fullName());
+        assertEquals("vĩnh.🍜@example.com", updated.email());
+        String note = "Cổng trước 🚪\nGọi khi tới nơi 📞";
+        AddressResponse created = service.createAddress(registered.id(),
+                new AddressWriteRequest(" 12 Nguyễn Trãi 🏠 ", " " + note + " ", true));
+        assertEquals("12 Nguyễn Trãi 🏠", created.addressLine());
+        assertEquals(note, created.note());
+        AddressResponse revised = service.updateAddress(registered.id(), created.id(),
+                new AddressWriteRequest("34 Lê Lợi 🏡", note + "\nTầng 2", true));
+        assertEquals("34 Lê Lợi 🏡", revised.addressLine());
+        assertEquals(note + "\nTầng 2", revised.note());
+        assertTrue(revised.isDefault());
+    }
+
+    private static void assertFieldValidation(String field, AccountException exception) {
+        assertEquals(400, exception.getStatusCode());
+        assertEquals("VALIDATION_ERROR", exception.getErrorCode());
+        assertTrue(exception.getDetails().containsKey(field));
+    }
+
+    @Test
     void registrationAndLoginRejectMalformedPasswordTextBeforeHashingOrVerification() {
         PasswordHasher hasher = mock(PasswordHasher.class);
         AccountService guarded = new AccountService(repository, hasher);
