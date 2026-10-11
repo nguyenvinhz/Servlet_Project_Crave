@@ -49,11 +49,17 @@ thử lên server mà giữ nguyên database và cấu hình production.
   Chạy bằng Git Bash/Python thật, Docker/curl giả lập. Git Bash dùng shim `flock`
   nên kết quả này không xác minh khóa trên Linux hoặc deploy EC2 thực tế.
 - 36 liên kết Markdown nội bộ tồn tại; `git diff --check` đạt.
+- [CI thực tế trên GitHub](https://github.com/nguyenvinhz/Servlet_Project_Crave/actions/runs/38163598770)
+  của [draft PR #29](https://github.com/nguyenvinhz/Servlet_Project_Crave/pull/29)
+  đạt trên Ubuntu 24.04/JDK 17/Node.js 24/MySQL 8.4: 315 Maven tests, 11 Java
+  assertion cases, 76 browser scenarios và 19 deploy/rollback scenarios. WAR
+  và test reports đã upload thành công. Kiểm thử Linux dùng `flock` thật, nhưng
+  không mô phỏng deploy cạnh tranh hoặc server EC2 thực tế.
 
 ## Giới hạn và thiết lập còn lại
 
-- Chưa chạy workflow thực tế trên GitHub hoặc deploy lên EC2 trong task này.
-  Cần chủ repository cài runner trên EC2 và cấu hình environment `production`
+- Chưa deploy lên EC2 trong task này. Cần chủ repository cài runner trên EC2
+  và cấu hình environment `production`
   theo [hướng dẫn](../../project/ci-cd-ec2.md), rồi đưa workflow vào `main`.
 - Recreate Tomcat gây gián đoạn ngắn và mất session đăng nhập. Rollback khắc
   phục lỗi recreate/readiness; EC2 crash hoặc force kill cần xử lý trên server.
