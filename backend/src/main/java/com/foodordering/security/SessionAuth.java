@@ -138,7 +138,8 @@ public final class SessionAuth {
         ProfileResponse user = value instanceof ProfileResponse profile ? profile : null;
         return Objects.equals(before.revision(), before.session().getAttribute(AUTH_REVISION))
                 && (before.user() == null ? user == null : user != null
-                && before.user().id().equals(user.id()) && before.user().accountType() == user.accountType());
+                && before.user().id().equals(user.id()) && before.user().accountType() == user.accountType()
+                && Objects.equals(before.user().role(), user.role()));
     }
 
     private static String revision(HttpSession session) {
