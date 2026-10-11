@@ -1,0 +1,57 @@
+name: CI/CD - main to EC2
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Serialize the whole build/deploy cycle so an older build cannot deploy last.
+concurrency:
+  group: crave-production-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  ci:
+    name: CI
+    if: github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/ci.yml
+
+  deploy:
+    name: Deploy EC2
+    if: github.ref == 'refs/heads/main'
+    needs: ci
+    # Only trusted main deployments use the production runner. PR CI is hosted.
+    runs-on: [self-hosted, linux, x64, crave-production]
+    environment: production
+    timeout-minutes: 15
+    env:
+      DEPLOY_PATH: ${{ vars.EC2_DEPLOY_PATH || '/home/ubuntu/crave' }}
+      COMPOSE_FILE: ${{ vars.EC2_COMPOSE_FILE || 'compose.yaml' }}
+      APP_SERVICE: ${{ vars.EC2_APP_SERVICE || 'app' }}
+      HEALTH_URL: ${{ vars.EC2_HEALTH_URL || 'http://127.0.0.1:8080/crave/api/health' }}
+
+    steps:
+      - name: Checkout deployment script
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Download the WAR that passed CI
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ${{ needs.ci.outputs.artifact-name }}
+          path: ${{ runner.temp }}/crave-release-${{ github.run_id }}-${{ github.run_attempt }}
+
+      - name: Deploy and check application health
+        env:
+          WAR_SOURCE: ${{ runner.temp }}/crave-release-${{ github.run_id }}-${{ github.run_attempt }}/crave.war
+        run: bash scripts/deploy-ec2.sh "$WAR_SOURCE"
+
+      - name: Record deployment
+        env:
+          DEPLOY_COMMIT: ${{ github.sha }}
+        run: |
+          printf 'Deployed commit `%s` to EC2. Health check passed.\n' "$DEPLOY_COMMIT" >> "$GITHUB_STEP_SUMMARY"

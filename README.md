@@ -6,6 +6,13 @@ HikariCP và MySQL.
 Tài liệu được chia thành API, kế hoạch/quy ước làm việc và báo cáo theo chức năng.
 Xem [mục lục tài liệu](docs/README.md) để tìm đúng phần cần đọc.
 
+## CI/CD trên AWS EC2
+
+Pull request vào `main` chạy kiểm thử và build WAR. Push/merge `main` chạy CI rồi
+tự deploy ứng dụng vào `/home/ubuntu/crave` trên EC2, kiểm tra health và khôi phục
+WAR cũ nếu deploy lỗi. Cài runner EC2 một lần theo
+[hướng dẫn CI/CD](docs/project/ci-cd-ec2.md) để bật deploy tự động.
+
 ## Chạy môi trường phát triển
 
 Yêu cầu: JDK 17+, Maven 3.9+, Docker (nếu chưa có MySQL) và Tomcat 10.1+.
