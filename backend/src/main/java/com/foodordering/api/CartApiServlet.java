@@ -39,7 +39,7 @@ public class CartApiServlet extends BaseApiServlet {
         try {
             String customerId = resolveCustomerId(req);
             CartDto cart = cartService.getOrCreateCart(customerId);
-            writeResponse(resp, HttpServletResponse.SC_OK, new ApiResponse<>(true, "Lấy giỏ hàng thành công", cart, null));
+            writeJson(resp, HttpServletResponse.SC_OK, ApiResponse.success(cart));
         } catch (Exception e) {
             handleError(resp, e);
         }
@@ -117,13 +117,13 @@ public class CartApiServlet extends BaseApiServlet {
     private void handleAddItem(HttpServletRequest req, HttpServletResponse resp, String customerId) throws IOException {
         AddToCartRequest addReq = readAddToCartDto(req);
         CartDto cart = cartService.addItem(customerId, addReq);
-        writeResponse(resp, HttpServletResponse.SC_OK, new ApiResponse<>(true, "Thêm món vào giỏ hàng thành công", cart, null));
+        writeJson(resp, HttpServletResponse.SC_OK, ApiResponse.success(cart));
     }
 
     private void handleUpdateItem(HttpServletRequest req, HttpServletResponse resp, String customerId) throws IOException {
         UpdateCartItemRequest updateReq = readUpdateCartItemDto(req);
         CartDto cart = cartService.updateItem(customerId, updateReq);
-        writeResponse(resp, HttpServletResponse.SC_OK, new ApiResponse<>(true, "Cập nhật món trong giỏ hàng thành công", cart, null));
+        writeJson(resp, HttpServletResponse.SC_OK, ApiResponse.success(cart));
     }
 
     private void handleRemoveItem(HttpServletRequest req, HttpServletResponse resp, String customerId) throws IOException {
@@ -132,12 +132,12 @@ public class CartApiServlet extends BaseApiServlet {
             throw new BadRequestException(ErrorCode.BAD_REQUEST, "Mã mục giỏ hàng (cartItemId) không được để trống khi xóa món");
         }
         CartDto cart = cartService.removeItem(customerId, cartItemId.trim());
-        writeResponse(resp, HttpServletResponse.SC_OK, new ApiResponse<>(true, "Xóa món khỏi giỏ hàng thành công", cart, null));
+        writeJson(resp, HttpServletResponse.SC_OK, ApiResponse.success(cart));
     }
 
     private void handleClearCart(HttpServletRequest req, HttpServletResponse resp, String customerId) throws IOException {
         CartDto cart = cartService.clearCart(customerId);
-        writeResponse(resp, HttpServletResponse.SC_OK, new ApiResponse<>(true, "Xóa toàn bộ giỏ hàng thành công", cart, null));
+        writeJson(resp, HttpServletResponse.SC_OK, ApiResponse.success(cart));
     }
 
     private String resolveCustomerId(HttpServletRequest req) {
@@ -294,9 +294,5 @@ public class CartApiServlet extends BaseApiServlet {
             }
         }
         return null;
-    }
-
-    private void writeResponse(HttpServletResponse resp, int statusCode, ApiResponse<?> apiResponse) throws IOException {
-        writeJson(resp, statusCode, apiResponse);
     }
 }
