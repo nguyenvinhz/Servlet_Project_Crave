@@ -235,8 +235,9 @@ public class AccountService {
         String name = trim(fullName);
         String normalizedEmail = normalizeEmail(email);
         String normalizedPhone = trim(phone);
-        if (name.length() < 2 || name.length() > 100 || name.chars().anyMatch(Character::isISOControl)) {
-            errors.put("fullName", "Họ tên phải có từ 2 đến 100 ký tự.");
+        if (name.length() < 2 || name.length() > 100 || name.chars().anyMatch(Character::isISOControl)
+                || !isValidText(name)) {
+            errors.put("fullName", "Họ tên phải chứa văn bản hợp lệ và có từ 2 đến 100 ký tự.");
         }
         validateEmail(normalizedEmail, errors);
         if (normalizedPhone.length() < 9 || normalizedPhone.length() > 15
@@ -247,7 +248,8 @@ public class AccountService {
     }
 
     private static void validateEmail(String email, Map<String, String> errors) {
-        if (email.length() > 100 || !email.matches("[^\\s@]+@[^\\s@]+\\.[^\\s@]+")) {
+        if (email.length() > 100 || email.chars().anyMatch(Character::isISOControl)
+                || !isValidText(email) || !email.matches("[^\\s@]+@[^\\s@]+\\.[^\\s@]+")) {
             errors.put("email", "Email không đúng định dạng hoặc vượt quá 100 ký tự.");
         }
     }
@@ -265,11 +267,11 @@ public class AccountService {
         Map<String, String> errors = new LinkedHashMap<>();
         String addressLine = trim(request.addressLine());
         String note = request.note() == null ? null : request.note().strip();
-        if (addressLine.isEmpty() || addressLine.length() > 255) {
-            errors.put("addressLine", "Địa chỉ không được để trống và không vượt quá 255 ký tự.");
+        if (addressLine.isEmpty() || addressLine.length() > 255 || !isValidText(addressLine)) {
+            errors.put("addressLine", "Địa chỉ phải chứa văn bản hợp lệ, không để trống và không vượt quá 255 ký tự.");
         }
-        if (note != null && note.length() > 255) {
-            errors.put("note", "Ghi chú không vượt quá 255 ký tự.");
+        if (note != null && (note.length() > 255 || !isValidText(note))) {
+            errors.put("note", "Ghi chú phải chứa văn bản hợp lệ và không vượt quá 255 ký tự.");
         }
         if (request.isDefault() == null) {
             errors.put("isDefault", "Vui lòng chọn trạng thái địa chỉ mặc định.");
@@ -305,6 +307,24 @@ public class AccountService {
 
     private static String trim(String value) {
         return value == null ? "" : value.strip();
+    }
+
+    /** Reject NUL and lone UTF-16 surrogates before JDBC/JSON can replace or reject the text. */
+    private static boolean isValidText(String value) {
+        for (int i = 0; i < value.length(); i++) {
+            char character = value.charAt(i);
+            if (character == '\0') {
+                return false;
+            }
+            if (Character.isHighSurrogate(character)) {
+                if (++i >= value.length() || !Character.isLowSurrogate(value.charAt(i))) {
+                    return false;
+                }
+            } else if (Character.isLowSurrogate(character)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static String newId(String prefix, Predicate<String> exists) {

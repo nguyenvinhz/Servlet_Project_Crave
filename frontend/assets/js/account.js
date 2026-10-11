@@ -28,6 +28,9 @@ document.addEventListener("DOMContentLoaded", () => {
         showMessage(successBox, "");
     }
 
+    showMessage(errorBox, errorBox?.textContent.trim());
+    showMessage(successBox, successBox?.textContent.trim());
+
     function setBusy(container, busy) {
         if (busy) {
             if (busyStates.has(container)) return;
@@ -91,6 +94,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function loginRedirect() {
+        clearCheckoutVoucher();
         const returnTo = safeReturnTo(`${window.location.pathname}${window.location.search}`);
         const query = new URLSearchParams({reason: "session-expired"});
         if (returnTo) query.set("returnTo", returnTo);
@@ -127,8 +131,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function handleError(error, form, protectedPage = false) {
         if (error.status === 401 && protectedPage) return loginRedirect();
-        if (error.status === 403 && protectedPage && document.getElementById("addressForm")) {
-            clearForbiddenAddresses();
+        if (error.status === 403 && protectedPage) {
+            if (document.getElementById("addressForm")) clearForbiddenAddresses();
+            if (document.getElementById("profileForm")) {
+                profileForm.reset();
+                clearFieldErrors(profileForm);
+                profileFields.disabled = true;
+                document.getElementById("profile-readonly").hidden = true;
+                document.getElementById("profile-retry").hidden = false;
+            }
         }
         showMessage(errorBox, error.message);
         if (form) showFieldErrors(form, error.fieldErrors || {});
@@ -141,7 +152,7 @@ document.addEventListener("DOMContentLoaded", () => {
             payload[name] = input.type === "checkbox" ? input.checked
                 : input.type === "password" ? value : value.trim();
         });
-        form.querySelectorAll("input[type='checkbox'][name]").forEach((input) => {
+        form.querySelectorAll("input[type='checkbox'][name]:not(:disabled)").forEach((input) => {
             payload[input.name] = input.checked;
         });
         return payload;
@@ -150,7 +161,7 @@ document.addEventListener("DOMContentLoaded", () => {
     function validate(form, payload) {
         const errors = {};
         [...form.elements].forEach((input) => {
-            if (!input.name || input.disabled || input.type === "checkbox") return;
+            if (!input.name || input.matches(":disabled") || input.type === "checkbox") return;
             const value = payload[input.name] || "";
             if (input.required && !value) errors[input.name] = "Vui lòng nhập thông tin này.";
             else if (input.name === "email" && (!input.validity.valid || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value))) {
@@ -176,7 +187,7 @@ document.addEventListener("DOMContentLoaded", () => {
         form.noValidate = true;
         form.addEventListener("submit", async (event) => {
             event.preventDefault();
-            if (busyStates.has(form)) return;
+            if (busyStates.has(form) || form.querySelector("fieldset:disabled")) return;
             clearMessages();
             clearFieldErrors(form);
             const payload = formPayload(form);
@@ -194,9 +205,15 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     const loginForm = document.getElementById("loginForm");
+    const returnTo = safeReturnTo(new URLSearchParams(window.location.search).get("returnTo"));
+    document.querySelectorAll("[data-auth-switch]").forEach((link) => {
+        if (!returnTo) return;
+        const url = new URL(link.href, window.location.origin);
+        url.searchParams.set("returnTo", returnTo);
+        link.href = `${url.pathname}${url.search}`;
+    });
     bindForm(loginForm, () => {
-        const returnTo = new URLSearchParams(window.location.search).get("returnTo");
-        window.location.assign(safeReturnTo(returnTo) || localUrl("/customer/profile"));
+        window.location.assign(returnTo || localUrl("/customer/profile"));
     });
     if (loginForm) {
         const query = new URLSearchParams(window.location.search);
@@ -209,7 +226,9 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
     bindForm(document.getElementById("registerForm"), () => {
-        window.location.assign(`${localUrl("/auth/login")}?registered=1`);
+        const query = new URLSearchParams({registered: "1"});
+        if (returnTo) query.set("returnTo", returnTo);
+        window.location.assign(`${localUrl("/auth/login")}?${query}`);
     });
 
     const logoutForm = document.getElementById("logoutForm");
@@ -237,6 +256,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const profileForm = document.getElementById("profileForm");
     const profileFields = document.getElementById("profile-fields");
+    let profileLoadInProgress = false;
     function fillProfile(profile) {
         ["fullName", "email", "phone"].forEach((name) => {
             profileForm.elements.namedItem(name).value = profile[name] || "";
@@ -251,6 +271,9 @@ document.addEventListener("DOMContentLoaded", () => {
         showMessage(successBox, "Đã cập nhật hồ sơ.");
     }, true);
     async function loadProfile() {
+        if (profileLoadInProgress || busyStates.has(profileForm)) return;
+        profileLoadInProgress = true;
+        setBusy(profileForm, true);
         const retry = document.getElementById("profile-retry");
         retry.hidden = true;
         showMessage(errorBox, "");
@@ -260,6 +283,10 @@ document.addEventListener("DOMContentLoaded", () => {
             document.getElementById("profile-loading").hidden = true;
             retry.hidden = false;
             handleError(error, null, true);
+        }
+        finally {
+            setBusy(profileForm, false);
+            profileLoadInProgress = false;
         }
     }
     if (profileForm) {
@@ -305,13 +332,15 @@ document.addEventListener("DOMContentLoaded", () => {
         setBusy(addressList, true);
         setBusy(addressForm, true);
         refresh.disabled = true;
-        try { await action(); }
+        let focusTarget;
+        try { focusTarget = await action(); }
         catch (error) { handleError(error, null, true); }
         finally {
             setBusy(addressForm, false);
             setBusy(addressList, false);
             refresh.disabled = false;
             actionInProgress = false;
+            focusTarget?.focus();
         }
     }
 
@@ -357,7 +386,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 document.getElementById("address-form-title").textContent = "Sửa địa chỉ";
                 document.getElementById("address-submit").textContent = "Lưu địa chỉ";
                 cancel.hidden = false;
-                addressForm.scrollIntoView({behavior: "smooth", block: "center"});
+                const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+                addressForm.scrollIntoView({behavior: reducedMotion ? "auto" : "smooth", block: "center"});
+                return addressForm.elements.addressLine;
             }));
             if (!address.isDefault) actions.append(addressButton("Đặt mặc định", async () => {
                 const current = await request(addressUrl(address.id));
@@ -428,7 +459,11 @@ document.addEventListener("DOMContentLoaded", () => {
         url: editingId === null ? addressForm.action : addressUrl(editingId),
         method: editingId === null ? "POST" : "PUT"
     }));
-    cancel.addEventListener("click", () => { resetAddressForm(); clearMessages(); });
+    cancel.addEventListener("click", () => {
+        resetAddressForm();
+        clearMessages();
+        addressForm.elements.addressLine.focus();
+    });
     refresh.addEventListener("click", () => {
         if (actionInProgress || busyStates.has(addressForm)) return;
         clearMessages();

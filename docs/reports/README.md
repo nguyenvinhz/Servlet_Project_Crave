@@ -10,6 +10,7 @@ Báo cáo được nhóm theo chức năng; ngày trong tên file là ngày tạ
 |---|---|---|
 | 2026-10-04 | Dựng nền tài khoản Ngày 1; cập nhật sau review ngày 2026-10-07 | [Account foundation](account/2026-10-04-nguyen-quang-vinh-account-foundation.md) |
 | 2026-10-08 | Tài khoản, xác thực, hồ sơ và địa chỉ Ngày 2 | [Account Day 2](account/2026-10-08-nguyen-quang-vinh-account-day2.md) |
+| 2026-10-11 | Rà soát session/phân quyền, tích hợp auth và hoàn thiện giao diện Ngày 3 | [Account Day 3](account/2026-10-11-nguyen-quang-vinh-account-day3.md) |
 
 ## Giỏ hàng và khuyến mãi — Ung Văn Trí
 

@@ -10,6 +10,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.List;
+import java.util.Objects;
 
 import com.foodordering.dto.OrderRequest;
 import com.foodordering.dto.OrderResponse;
@@ -24,9 +25,18 @@ public class OrderServlet extends BaseApiServlet {
 
     private CustomerOrderService orderService;
 
+    public OrderServlet() {
+    }
+
+    public OrderServlet(CustomerOrderService orderService) {
+        this.orderService = Objects.requireNonNull(orderService);
+    }
+
     @Override
     public void init() throws ServletException {
-        orderService = new CustomerOrderServiceImpl(new CustomerOrderRepositoryImpl(), new PaymentRepositoryImpl());
+        if (orderService == null) {
+            orderService = new CustomerOrderServiceImpl(new CustomerOrderRepositoryImpl(), new PaymentRepositoryImpl());
+        }
     }
 
     @Override
@@ -40,7 +50,7 @@ public class OrderServlet extends BaseApiServlet {
             if (pathInfo != null && pathInfo.length() > 1) {
                 String orderId = pathInfo.substring(1);
                 OrderResponse order = orderService.getOrderById(orderId);
-                if (!order.getCustomerId().equals(customerId)) {
+                if (!customerId.equals(order.getCustomerId())) {
                     writeJson(resp, HttpServletResponse.SC_FORBIDDEN, ApiResponse.error("Bạn không có quyền xem đơn hàng này", "FORBIDDEN"));
                     return;
                 }
@@ -61,6 +71,10 @@ public class OrderServlet extends BaseApiServlet {
             String customerId = customer.id();
 
             OrderRequest request = readJson(req, OrderRequest.class);
+            if (request == null) {
+                badRequest(resp, "Request body must contain an order object.");
+                return;
+            }
             OrderResponse response = orderService.createOrder(customerId, request);
             
             writeJson(resp, HttpServletResponse.SC_CREATED, ApiResponse.success(response));

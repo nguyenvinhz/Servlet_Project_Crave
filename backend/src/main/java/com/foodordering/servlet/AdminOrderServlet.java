@@ -2,9 +2,7 @@ package com.foodordering.servlet;
 
 import com.foodordering.api.BaseApiServlet;
 import com.foodordering.dto.ApiResponse;
-import com.foodordering.dto.ProfileResponse;
-import com.foodordering.enums.AccountType;
-import com.foodordering.exception.AccountException;
+import com.foodordering.enums.EmployeeRole;
 import com.foodordering.security.SessionAuth;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
@@ -12,6 +10,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.List;
+import java.util.Objects;
 import com.foodordering.dto.OrderResponse;
 
 import com.foodordering.dto.UpdateOrderStatusRequest;
@@ -26,9 +25,18 @@ public class AdminOrderServlet extends BaseApiServlet {
 
     private CustomerOrderService orderService;
 
+    public AdminOrderServlet() {
+    }
+
+    public AdminOrderServlet(CustomerOrderService orderService) {
+        this.orderService = Objects.requireNonNull(orderService);
+    }
+
     @Override
     public void init() throws ServletException {
-        orderService = new CustomerOrderServiceImpl(new CustomerOrderRepositoryImpl(), new PaymentRepositoryImpl());
+        if (orderService == null) {
+            orderService = new CustomerOrderServiceImpl(new CustomerOrderRepositoryImpl(), new PaymentRepositoryImpl());
+        }
     }
 
     @Override
@@ -41,17 +49,13 @@ public class AdminOrderServlet extends BaseApiServlet {
     }
 
     private String requireEmployee(HttpServletRequest req) {
-        ProfileResponse user = SessionAuth.requireUser(req);
-        if (user.accountType() != AccountType.EMPLOYEE) {
-            throw new AccountException("FORBIDDEN", "Chỉ Admin/Nhân viên mới có quyền truy cập", 403);
-        }
-        return user.id();
+        return SessionAuth.requireEmployee(req, EmployeeRole.ORDER_STAFF).id();
     }
 
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
         try {
-            String employeeId = requireEmployee(req);
+            requireEmployee(req);
             List<OrderResponse> orders = orderService.getAllOrdersForAdmin();
             writeJson(resp, HttpServletResponse.SC_OK, ApiResponse.success(orders));
         } catch (Exception e) {
@@ -64,13 +68,17 @@ public class AdminOrderServlet extends BaseApiServlet {
             String employeeId = requireEmployee(req);
 
             String pathInfo = req.getPathInfo();
-            if (pathInfo == null || !pathInfo.endsWith("/status")) {
+            if (pathInfo == null || !pathInfo.matches("/[^/]+/status")) {
                 badRequest(resp, "Invalid endpoint. Expected /{orderId}/status");
                 return;
             }
             String orderId = pathInfo.substring(1, pathInfo.length() - "/status".length());
             
             UpdateOrderStatusRequest updateReq = readJson(req, UpdateOrderStatusRequest.class);
+            if (updateReq == null || updateReq.getStatus() == null || updateReq.getStatus().isBlank()) {
+                badRequest(resp, "Request body must contain an order status.");
+                return;
+            }
             OrderStatus status = OrderStatus.valueOf(updateReq.getStatus());
             
             orderService.updateOrderStatus(orderId, status, employeeId, updateReq.getNote());

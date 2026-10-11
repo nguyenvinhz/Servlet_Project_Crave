@@ -64,8 +64,18 @@ không hoạt động lên 7 ngày; cookie vẫn chỉ tồn tại trong phiên 
 
 Nhân viên đang làm việc có thể đăng nhập và xem hồ sơ; cập nhật hồ sơ và sổ địa chỉ
 dành cho khách hàng. Filter bảo vệ các route khách hàng và phân quyền route quản trị
-theo chức vụ. Các nghiệp vụ đơn hàng/thanh toán và quản trị menu vẫn thuộc phạm vi
-thành viên phụ trách và hiện giữ scaffold Ngày 1 (`501`).
+theo chức vụ. API quản trị menu yêu cầu `ADMIN`/`MENU_MANAGER`; API quản trị đơn và
+thanh toán yêu cầu `ADMIN`/`ORDER_STAFF`. Các servlet kiểm tra lại session và vai trò
+trước khi gọi service; ID khách hàng/nhân viên lấy từ session.
+
+Phần tài khoản Ngày 3 bổ sung kiểm thử tích hợp auth với cart/voucher/order/payment,
+validation Unicode cho dữ liệu tài khoản/địa chỉ và giao diện responsive với CSS
+riêng. Xem [báo cáo Ngày 3](docs/reports/account/2026-10-11-nguyen-quang-vinh-account-day3.md).
+
+Demo kiểm tra quyền: chưa đăng nhập gọi `/api/cart`, `/api/orders` hoặc
+`/api/admin/orders` nhận `401`; khách hàng gọi API quản trị nhận `403`; nhân viên
+quản lý menu gọi `/api/admin/orders` nhận `403`. Đổi chức vụ hoặc khóa tài khoản
+trong database sẽ áp dụng ở request bảo vệ tiếp theo.
 
 Nếu máy đang dùng Java 25/26, chọn JDK 17 hoặc 21 trước khi chạy Maven để tương thích
 với phiên bản Mockito/Byte Buddy hiện tại:

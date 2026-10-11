@@ -116,6 +116,9 @@
             }
             .site-header nav {
                 gap: 1rem;
+                flex-wrap: wrap;
+                min-width: 0;
+                max-width: 100%;
             }
             .header-actions-right {
                 gap: 14px;

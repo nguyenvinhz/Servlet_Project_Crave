@@ -376,19 +376,136 @@ cases.unshift(
  `}
 );
 
+// Day 3: account navigation, revoked access, loading and narrow viewport regressions.
+cases.push(
+ ...['auth/login','auth/register','customer/profile','customer/addresses'].map(page=>({
+ name:'account-empty-messages-hidden-'+page.split('/').pop(),page,
+ setup:`const fixtureFetch=async()=>reply(200,${page==='customer/addresses'?'[]':'profile'});`,run:`
+ await waitFor(()=>!document.getElementById('profile-loading')||document.getElementById('profile-loading').hidden);
+ assert(document.getElementById('form-error').hidden,'Empty error message is visible');
+ assert(!document.getElementById('form-success')||document.getElementById('form-success').hidden,'Empty success message is visible');
+ `})),
+ ...['auth/login','auth/register'].map(page=>({name:'auth-switch-preserves-return-'+page.split('/').pop(),page,
+ query:'returnTo='+encodeURIComponent('/crave/checkout?code=SAVE10'),
+ setup:`const fixtureFetch=async()=>reply(200,profile);`,run:`
+ const link=document.querySelector('[data-auth-switch]');
+ assert(new URL(link.href).searchParams.get('returnTo')==='/crave/checkout?code=SAVE10','Switching auth form lost checkout destination');
+ `})),
+ {name:'register-preserves-checkout-return',page:'auth/register',query:'returnTo='+encodeURIComponent('/crave/checkout?code=SAVE10'),
+ setup:`const fixtureFetch=async()=>reply(201,profile);`,run:`
+ setFields({fullName:'Nguyen Van A',email:'a@example.com',phone:'0901234567',password:'password1',confirmPassword:'password1'});submit('registerForm');`,
+ redirect:'/crave/auth/login?registered=1&returnTo=%2Fcrave%2Fcheckout%3Fcode%3DSAVE10'},
+ {name:'auth-switch-drops-external-return',page:'auth/login',query:'returnTo='+encodeURIComponent('https://evil.example'),
+ setup:`const fixtureFetch=async()=>reply(200,profile);`,run:`
+ assert(!new URL(document.querySelector('[data-auth-switch]').href).searchParams.has('returnTo'),'Unsafe return propagated into registration');
+ `},
+ {name:'register-rejects-email-control',page:'auth/register',setup:`const fixtureFetch=async()=>reply(201,profile);`,run:`
+ setFields({fullName:'Nguyen Van A',email:'a'+String.fromCharCode(0)+'@example.com',phone:'0901234567',password:'password1',confirmPassword:'password1'});submit('registerForm');
+ assert(calls.length===0&&document.getElementById('email-error'),'Email with a control reached API');
+ `},
+ {name:'profile-loading-serializes-retry-and-submit',page:'customer/profile',setup:`
+ let release;const fixtureFetch=async()=>new Promise(resolve=>{release=()=>resolve(reply(200,profile));});`,run:`
+ assert(document.getElementById('profileForm').getAttribute('aria-busy')==='true','Profile loading has no busy state');
+ document.getElementById('profile-retry').click();submit('profileForm');
+ assert(calls.length===1,'Loading profile permitted concurrent retry or write');
+ release();await waitFor(()=>!document.getElementById('profileForm').hasAttribute('aria-busy'));
+ assert(!document.getElementById('profile-fields').disabled&&document.getElementById('email').value===profile.email,'Profile did not restore after slow load');
+ `},
+ {name:'employee-disabled-profile-ignores-submit',page:'customer/profile',setup:`
+ const fixtureFetch=async()=>reply(200,{...profile,id:'NV01',accountType:'EMPLOYEE'});`,run:`
+ await waitFor(()=>document.getElementById('profile-loading').hidden&&!document.getElementById('profileForm').hasAttribute('aria-busy'));
+ submit('profileForm');assert(calls.length===1,'Disabled employee profile sent a write');
+ assert(!document.querySelector('.field-error'),'Disabled employee profile displays validation errors');
+ `},
+ {name:'profile-forbidden-save-clears-private-data-and-recovers',page:'customer/profile',setup:`
+ const fixtureFetch=async request=>request.method==='GET'?reply(200,profile):reply(403,null,{message:'Permission revoked'});`,run:`
+ await waitFor(()=>!document.getElementById('profile-fields').disabled&&!document.getElementById('profileForm').hasAttribute('aria-busy'));
+ setFields({fullName:'Private draft'});submit('profileForm');
+ await waitFor(()=>document.getElementById('form-error').textContent==='Permission revoked');
+ assert(document.getElementById('profile-fields').disabled,'Revoked profile remains writable');
+ assert(['fullName','email','phone'].every(id=>document.getElementById(id).value===''),'Revoked profile retains private values');
+ assert(!document.getElementById('profile-retry').hidden,'Revoked profile has no recovery action');
+ document.getElementById('profile-retry').click();
+ await waitFor(()=>!document.getElementById('profile-fields').disabled&&!document.getElementById('profileForm').hasAttribute('aria-busy'));
+ assert(document.getElementById('email').value===profile.email&&document.getElementById('form-error').hidden,'Retry did not restore authorized profile');
+ `},
+ {name:'address-edit-and-cancel-move-keyboard-focus',page:'customer/addresses',setup:addressFixture,run:addressHelpers+`
+ button(0,'Sửa').click();await waitFor(()=>!document.getElementById('address-cancel').hidden&&idle());
+ assert(document.activeElement.id==='addressLine','Edit did not move focus to address field');
+ document.getElementById('address-cancel').click();
+ assert(document.activeElement.id==='addressLine'&&document.getElementById('address-cancel').hidden,'Cancel did not restore focus to add form');
+ `},
+ {name:'profile-session-expiry-clears-checkout-voucher',page:'customer/profile',setup:`
+ sessionStorage.setItem('crave_applied_voucher','private previous voucher');
+ const fixtureFetch=async()=>reply(401,null,{message:'Unauthorized'});`,run:``,
+ redirect:'/crave/auth/login?reason=session-expired&returnTo=%2Fcrave%2Fcustomer%2Fprofile',
+ redirectCheck:`if(sessionStorage.getItem('crave_applied_voucher')!==null)throw new Error('Expired account retained checkout voucher');`},
+ ...[
+ {page:'auth/login'}, {page:'auth/register'},
+ {page:'customer/profile',accountType:'CUSTOMER'}, {page:'customer/addresses',accountType:'CUSTOMER'},
+ {page:'customer/profile',accountType:'EMPLOYEE',role:'ADMIN'},
+ {page:'customer/profile',accountType:'EMPLOYEE',role:'MENU_MANAGER'}
+ ].map(({page,accountType,role})=>({
+ name:'account-mobile-layout-'+page.split('/').pop()+(role?'-'+role.toLowerCase():''),page,viewport:320,realHeader:true,accountType,role,
+ setup:`const fixtureFetch=async()=>reply(200,${page==='customer/addresses'?'[{id:"DC01",addressLine:"x".repeat(255),note:"y".repeat(255),isDefault:true}]':`{...profile,accountType:${JSON.stringify(accountType||'CUSTOMER')},role:${JSON.stringify(role||null)}}`});`,run:`
+ await waitFor(()=>!document.getElementById('profile-loading')||document.getElementById('profile-loading').hidden);
+ await waitFor(()=>!document.getElementById('address-loading')||document.getElementById('address-loading').hidden);
+ // Chromium on Windows may clamp its outer window to 500px; an iframe gives an exact 320px CSS viewport.
+ const frame=document.createElement('iframe');frame.style.cssText='width:320px;height:900px;border:0';
+ const loaded=new Promise(resolve=>frame.addEventListener('load',resolve,{once:true}));
+ const head=[...document.head.querySelectorAll('link[rel=stylesheet],style')].map(element=>element.outerHTML).join('');
+ frame.srcdoc='<!doctype html><html><head>'+head+'<link rel="stylesheet" href="'+location.origin+'/crave/assets/css/account.css"></head><body class="crave-body">'+document.querySelector('header').outerHTML+document.querySelector('main').outerHTML+document.querySelector('footer').outerHTML+'</body></html>';
+ document.body.append(frame);await loaded;
+ const screen=frame.contentWindow,doc=frame.contentDocument,main=doc.querySelector('main');
+ assert(screen.innerWidth===320,'Fixture did not use exact 320px viewport');
+ assert(doc.querySelectorAll('header nav a').length===${role?5:3},'Fixture did not render expected role navigation');
+ if(${Boolean(role)})assert(screen.getComputedStyle(doc.querySelector('header nav')).flexWrap==='wrap','Staff navigation does not wrap onto rows');
+ assert(main.getBoundingClientRect().right<=screen.innerWidth,'Account layout extends beyond viewport');
+ assert(doc.documentElement.scrollWidth<=screen.innerWidth,'Full account document including header has horizontal overflow: '+doc.documentElement.scrollWidth+'px');
+ assert(screen.getComputedStyle(main).gridTemplateColumns.split(' ').length===1,'Mobile account grid did not collapse');
+ const input=doc.querySelector('main input:not([type=checkbox]),main textarea');
+ assert(input.getBoundingClientRect().width>=180,'Mobile form input is too narrow');
+ assert(doc.querySelector('main button[type=submit]').getBoundingClientRect().height>=44,'Submit target is too small');
+ `}))
+);
+
 const selectedCases = cases.filter(test => !process.argv[2] || new RegExp(process.argv[2]).test(test.name));
 if (!selectedCases.length) throw new Error('No browser cases matched.');
 let current;
+function renderTags(source) {
+ return source.replace(/<%@[^]*?%>/g,'').replace(/<c:url value='([^']*)'\s*\/>/g,(_,p)=>(current.context||'/crave')+p)
+ .replace(/<c:out[^]*?\/>/g,'').replace(/<\/?c:if[^>]*>/g,'')
+ .replace(/\$\{empty (?:error|message) \? 'hidden' : ''\}/g,'hidden');
+}
 function markup(page) {
- const file=path.join(project,'frontend/WEB-INF/views',page+'.jsp');
- return fs.readFileSync(file,'utf8').replace(/<%@[^]*?%>/g,'').replace(/<c:url value='([^']*)'\s*\/>/g,(_,p)=>(current.context||'/crave')+p)
- .replace(/<c:out[^]*?\/>/g,'').replace(/<\/?c:if[^>]*>/g,'');
+ return renderTags(fs.readFileSync(path.join(project,'frontend/WEB-INF/views',page+'.jsp'),'utf8'));
+}
+function headerMarkup() {
+ const context=current.context||'/crave';
+ const source=fs.readFileSync(path.join(project,'frontend/WEB-INF/views/components/header.jspf'),'utf8')
+ .replace(/<c:if test="\$\{([^}]+)\}">([^]*?)<\/c:if>/g,(_,condition,content)=>{
+   if(condition.includes('currentUser.role'))return ['ADMIN','MENU_MANAGER'].includes(current.role)?content:'';
+   if(condition.includes('currentUser.accountType'))return current.accountType==='CUSTOMER'?content:'';
+   throw new Error('Unrecognized header condition: '+condition);
+ })
+ .replace(/<c:choose>\s*<c:when[^>]*>([^]*?)<\/c:when>\s*<c:otherwise>([^]*?)<\/c:otherwise>\s*<\/c:choose>/g,(_,signedIn,guest)=>current.accountType?signedIn:guest)
+ .replace(/<c:out value='\$\{pageContext.request.contextPath\}'\s*\/>/g,context)
+ .replace(/\$\{pageContext.request.contextPath\}/g,context)
+ .replace(/\$\{pageTitle[^}]*\}/g,'')
+ // Keep local/inline styles deterministic; external web fonts are outside this fixture's scope.
+ .replace(/<link[^>]*href="https:\/\/[^>]*>/g,'');
+ return renderTags(source);
+}
+function footerMarkup() {
+ return renderTags(fs.readFileSync(path.join(project,'frontend/WEB-INF/views/components/footer.jspf'),'utf8')
+ .replace(/<script[^]*?<\/script>/g,'').replace(/<\/body>|<\/html>/g,''));
 }
 const server=http.createServer((req,res)=>{
  const context=current.context||'/crave';
  const script=/\/assets\/js\/(account|cart)\.js$/.exec(req.url);
  if(script){res.setHeader('Content-Type','text/javascript; charset=utf-8');res.end(fs.readFileSync(path.join(project,'frontend/assets/js',script[1]+'.js')));return;}
- if(req.url.endsWith('/assets/css/cart.css')){res.setHeader('Content-Type','text/css; charset=utf-8');res.end(fs.readFileSync(path.join(project,'frontend/assets/css/cart.css')));return;}
+ const stylesheet=/\/assets\/css\/(styles|account|cart)\.css$/.exec(req.url);
+ if(stylesheet){res.setHeader('Content-Type','text/css; charset=utf-8');res.end(fs.readFileSync(path.join(project,'frontend/assets/css',stylesheet[1]+'.css')));return;}
  if(req.url==='/assets/images/fixture.svg'){res.setHeader('Content-Type','image/svg+xml');res.end('<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"></svg>');return;}
  res.setHeader('Content-Type','text/html; charset=utf-8');
  const expectedInitial=context+'/'+(current.route||current.page)+(current.query?'?'+current.query:'');
@@ -396,14 +513,15 @@ const server=http.createServer((req,res)=>{
  if(req.url!==current.redirect){res.end(`<pre id="smoke-result">FAIL unexpected redirect ${req.url} expected ${current.redirect}</pre>`);return;}
  res.end(`<!doctype html><html><body><script>try{${current.redirectCheck||''}document.body.innerHTML='<pre id="smoke-result">PASS ${current.name}</pre>';}catch(e){document.body.innerHTML='<pre id="smoke-result">FAIL '+e.message+'</pre>';}</script></body></html>`);return;}
  const run=current.redirect?current.run:current.run+`finish('PASS ${current.name}');`;
- res.end(`<!doctype html><html><head><meta charset="utf-8"></head><body data-context-path="${context}">${markup(current.page)}
- <form id="logoutForm" action="${context}/api/auth/logout"><button type="submit">Logout</button></form><p id="logout-error"></p>
+ const shell=current.realHeader?headerMarkup():`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="${context}/assets/css/styles.css"></head><body data-context-path="${context}">`;
+ const footer=current.realHeader?footerMarkup():`<form id="logoutForm" action="${context}/api/auth/logout"><button type="submit">Logout</button></form><p id="logout-error"></p>`;
+ res.end(`${shell}${markup(current.page)}${footer}
  <script>${common}${current.setup}</script><script src="${context}/assets/js/account.js"></script>
  <script>document.addEventListener('DOMContentLoaded',async()=>{try{${run}}catch(e){finish('FAIL '+e.message);}});</script></body></html>`);
 });
 async function browser(url,index){
  return await new Promise((resolve,reject)=>{
- const child=spawn(chrome,['--headless=new','--no-sandbox','--disable-gpu','--disable-background-networking','--disable-extensions','--no-first-run','--no-default-browser-check','--user-data-dir='+path.join(work,'profile-'+index),'--dump-dom','--virtual-time-budget=12000',url],{windowsHide:true});
+ const child=spawn(chrome,['--headless=new','--no-sandbox','--disable-gpu','--disable-background-networking','--disable-extensions','--no-first-run','--no-default-browser-check','--window-size='+(current.viewport||1280)+',900','--user-data-dir='+path.join(work,'profile-'+index),'--dump-dom','--virtual-time-budget=12000',url],{windowsHide:true});
  let output='';child.stdout.on('data',d=>output+=d);child.stderr.resume();child.on('error',reject);
  const timer=setTimeout(()=>{child.kill();reject(new Error('Browser timeout'));},25000);
  child.on('close',()=>{clearTimeout(timer);resolve(output);});
