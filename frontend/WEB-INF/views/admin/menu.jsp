@@ -70,7 +70,7 @@
                 <select name="categoryId" onchange="this.form.submit()" aria-label="Lọc theo danh mục">
                     <option value="">Tất cả danh mục</option>
                     <c:forEach var="cat" items="${categories}">
-                        <option value="${cat.id}" ${currentCategoryId == cat.id ? 'selected' : ''}>${cat.name} (${cat.foodCount})</option>
+                        <option value="<c:out value='${cat.id}'/>" ${currentCategoryId == cat.id ? 'selected' : ''}><c:out value="${cat.name}"/> (<c:out value="${cat.foodCount}"/>)</option>
                     </c:forEach>
                 </select>
             </div>
@@ -116,41 +116,53 @@
                         </tr>
                     </c:if>
                     <c:forEach var="food" items="${foods}">
-                        <tr id="foodRow-${food.id}">
+                        <tr id="foodRow-<c:out value='${food.id}'/>">
                             <td>
-                                <img src="${not empty food.imageUrl ? food.imageUrl : pageContext.request.contextPath.concat('/assets/images/placeholder.jpg')}"
-                                     alt="${food.name}"
+                                <img src="<c:out value='${not empty food.imageUrl ? food.imageUrl : pageContext.request.contextPath.concat(\"/assets/images/placeholder.jpg\")}'/>"
+                                     alt="<c:out value='${food.name}'/>"
                                      class="admin-thumb"
                                      onerror="this.onerror=null;this.src='https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=120&q=80';">
                             </td>
-                            <td><code>${food.id}</code></td>
+                            <td><code><c:out value="${food.id}"/></code></td>
                             <td>
                                 <div class="food-name-cell">
-                                    <strong>${food.name}</strong>
-                                    <small class="text-muted line-clamp">${food.description}</small>
+                                    <strong><c:out value="${food.name}"/></strong>
+                                    <small class="text-muted line-clamp"><c:out value="${food.description}"/></small>
                                 </div>
                             </td>
-                            <td><span class="badge category-badge">${food.categoryName}</span></td>
+                            <td><span class="badge category-badge"><c:out value="${food.categoryName}"/></span></td>
                             <td><strong class="price-text"><fmt:formatNumber value="${food.price}" type="number" groupingUsed="true"/> ₫</strong></td>
                             <td>
                                 <button type="button"
                                         class="status-toggle-btn ${food.status == 'AVAILABLE' ? 'btn-status-available' : 'btn-status-unavailable'}"
-                                        onclick="toggleFoodStatus('${food.id}', '${food.status}')"
+                                        data-food-id="<c:out value='${food.id}'/>"
+                                        data-status="<c:out value='${food.status}'/>"
+                                        onclick="handleToggleStatusClick(this)"
                                         title="Nhấp để đổi trạng thái">
                                     ${food.status == 'AVAILABLE' ? '● Đang bán' : '○ Tạm hết'}
                                 </button>
                             </td>
                             <td>
-                                <button type="button" class="btn-sm outline" onclick="openOptionsModal('${food.id}', '${food.name}')">
+                                <button type="button" class="btn-sm outline"
+                                        data-food-id="<c:out value='${food.id}'/>"
+                                        data-food-name="<c:out value='${food.name}'/>"
+                                        onclick="handleOpenOptionsClick(this)">
                                     ⚙ Tùy chọn
                                 </button>
                             </td>
                             <td style="text-align: right;">
                                 <div class="row-actions">
-                                    <button type="button" class="action-btn edit-btn" onclick="openEditFoodModal('${food.id}')" title="Sửa món">
+                                    <button type="button" class="action-btn edit-btn"
+                                            data-food-id="<c:out value='${food.id}'/>"
+                                            onclick="handleEditFoodClick(this)"
+                                            title="Sửa món">
                                         ✏️ Sửa
                                     </button>
-                                    <button type="button" class="action-btn delete-btn" onclick="deleteFood('${food.id}', '${food.name}')" title="Xóa món">
+                                    <button type="button" class="action-btn delete-btn"
+                                            data-food-id="<c:out value='${food.id}'/>"
+                                            data-food-name="<c:out value='${food.name}'/>"
+                                            onclick="handleDeleteFoodClick(this)"
+                                            title="Xóa món">
                                         🗑️ Xóa
                                     </button>
                                 </div>
@@ -180,7 +192,7 @@
                     <select id="foodCategorySelect" required>
                         <option value="">-- Chọn danh mục --</option>
                         <c:forEach var="c" items="${categories}">
-                            <option value="${c.id}">${c.name}</option>
+                            <option value="<c:out value='${c.id}'/>"><c:out value="${c.name}"/></option>
                         </c:forEach>
                     </select>
                 </div>

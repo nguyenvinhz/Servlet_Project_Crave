@@ -1,10 +1,14 @@
 package com.foodordering.service;
 
+import com.foodordering.dto.CartConsistencyItemRequest;
+import com.foodordering.dto.CartConsistencyItemResult;
+import com.foodordering.dto.CartConsistencyReport;
 import com.foodordering.dto.CategoryRequest;
 import com.foodordering.dto.CategoryResponse;
 import com.foodordering.dto.FoodDetailResponse;
 import com.foodordering.dto.FoodOptionRequest;
 import com.foodordering.dto.FoodOptionResponse;
+import com.foodordering.dto.FoodOptionValidationResult;
 import com.foodordering.dto.FoodRequest;
 import com.foodordering.dto.FoodSummaryResponse;
 import com.foodordering.entity.Category;
@@ -12,6 +16,7 @@ import com.foodordering.entity.Food;
 import com.foodordering.entity.FoodOption;
 import com.foodordering.enums.FoodStatus;
 import com.foodordering.enums.OptionStatus;
+import com.foodordering.enums.OptionType;
 import com.foodordering.exception.ConflictException;
 import com.foodordering.exception.ResourceNotFoundException;
 import com.foodordering.exception.ValidationException;
@@ -27,6 +32,7 @@ import com.foodordering.validator.MenuValidator;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
@@ -191,7 +197,183 @@ public class MenuService {
         if (!foodRepository.existsById(id)) {
             throw new ResourceNotFoundException("Không tìm thấy món ăn với mã: " + id);
         }
-        foodRepository.deleteById(id);
+        try {
+            foodRepository.deleteById(id);
+        } catch (Exception e) {
+            throw new ConflictException("Không thể xóa món ăn đang tồn tại trong đơn hàng hoặc giỏ hàng. Hãy chuyển trạng thái món sang Tạm hết món (UNAVAILABLE).");
+        }
+    }
+
+    /**
+     * Xác thực món ăn tồn tại và đang trong trạng thái phục vụ (AVAILABLE).
+     */
+    public Food validateFoodAvailable(String foodId) {
+        if (foodId == null || foodId.isBlank()) {
+            throw new ValidationException("Mã món ăn không được để trống.");
+        }
+        Food food = foodRepository.findById(foodId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy món ăn với mã: " + foodId));
+        if (food.getStatus() != FoodStatus.AVAILABLE) {
+            throw new ValidationException("Món ăn '" + food.getName() + "' hiện đang tạm ngưng phục vụ.");
+        }
+        return food;
+    }
+
+    /**
+     * Xác thực các tùy chọn của món ăn, kiểm tra trạng thái ACTIVE, kiểm tra xung đột nhóm và tính giá chuẩn xác từ máy chủ.
+     */
+    public FoodOptionValidationResult validateFoodOptions(String foodId, List<String> optionIds) {
+        Food food = validateFoodAvailable(foodId);
+        BigDecimal basePrice = food.getPrice() != null ? food.getPrice() : BigDecimal.ZERO;
+        BigDecimal optionsTotal = BigDecimal.ZERO;
+        List<FoodOption> validatedOptions = new ArrayList<>();
+
+        if (optionIds != null && !optionIds.isEmpty()) {
+            int sizeCount = 0;
+            int sugarCount = 0;
+            int iceCount = 0;
+
+            for (String optionId : optionIds) {
+                if (optionId == null || optionId.isBlank() || "0".equals(optionId)) {
+                    continue;
+                }
+                FoodOption option = foodOptionRepository.findById(optionId)
+                        .orElseThrow(() -> new ValidationException("Tùy chọn với mã '" + optionId + "' không tồn tại trong hệ thống."));
+
+                if (option.getFood() == null || !foodId.equals(option.getFood().getId())) {
+                    throw new ValidationException("Tùy chọn '" + option.getName() + "' không thuộc về món ăn này.");
+                }
+
+                if (option.getStatus() != OptionStatus.ACTIVE) {
+                    throw new ValidationException("Tùy chọn '" + option.getName() + "' hiện đã ngừng áp dụng.");
+                }
+
+                if (option.getOptionType() == OptionType.SIZE) {
+                    sizeCount++;
+                    if (sizeCount > 1) {
+                        throw new ValidationException("Chỉ được chọn tối đa 1 kích cỡ (Size) cho món ăn.");
+                    }
+                } else if (option.getOptionType() == OptionType.SUGAR_LEVEL) {
+                    sugarCount++;
+                    if (sugarCount > 1) {
+                        throw new ValidationException("Chỉ được chọn tối đa 1 mức đường cho món ăn.");
+                    }
+                } else if (option.getOptionType() == OptionType.ICE_LEVEL) {
+                    iceCount++;
+                    if (iceCount > 1) {
+                        throw new ValidationException("Chỉ được chọn tối đa 1 mức đá cho món ăn.");
+                    }
+                }
+
+                if (option.getExtraPrice() != null) {
+                    optionsTotal = optionsTotal.add(option.getExtraPrice());
+                }
+                validatedOptions.add(option);
+            }
+        }
+
+        BigDecimal calculatedUnitPrice = basePrice.add(optionsTotal);
+        return new FoodOptionValidationResult(food, validatedOptions, basePrice, optionsTotal, calculatedUnitPrice);
+    }
+
+    /**
+     * Kiểm tra tính nhất quán giữa dữ liệu món trong giỏ hàng và thực đơn thực tế (giá, trạng thái món, trạng thái option).
+     */
+    public CartConsistencyReport checkMenuCartConsistency(List<CartConsistencyItemRequest> items) {
+        if (items == null || items.isEmpty()) {
+            return new CartConsistencyReport(true, 0, 0, List.of());
+        }
+
+        List<CartConsistencyItemResult> results = new ArrayList<>();
+        int invalidCount = 0;
+
+        for (CartConsistencyItemRequest item : items) {
+            String foodId = item.foodId();
+            Optional<Food> foodOpt = foodRepository.findById(foodId);
+
+            if (foodOpt.isEmpty()) {
+                invalidCount++;
+                results.add(new CartConsistencyItemResult(
+                        foodId,
+                        "Món không xác định",
+                        false,
+                        false,
+                        FoodStatus.UNAVAILABLE,
+                        false,
+                        List.of(),
+                        false,
+                        BigDecimal.ZERO,
+                        item.expectedUnitPrice(),
+                        "Món ăn không tồn tại hoặc đã bị xóa khỏi thực đơn."
+                ));
+                continue;
+            }
+
+            Food food = foodOpt.get();
+            boolean available = food.getStatus() == FoodStatus.AVAILABLE;
+            BigDecimal basePrice = food.getPrice() != null ? food.getPrice() : BigDecimal.ZERO;
+
+            boolean optionsValid = true;
+            List<String> invalidOptionNames = new ArrayList<>();
+            BigDecimal optionsExtraTotal = BigDecimal.ZERO;
+
+            if (item.optionIds() != null && !item.optionIds().isEmpty()) {
+                for (String optId : item.optionIds()) {
+                    if (optId == null || optId.isBlank() || "0".equals(optId)) {
+                        continue;
+                    }
+                    Optional<FoodOption> opt = foodOptionRepository.findById(optId);
+                    if (opt.isEmpty() || opt.get().getFood() == null || !foodId.equals(opt.get().getFood().getId())
+                            || opt.get().getStatus() != OptionStatus.ACTIVE) {
+                        optionsValid = false;
+                        String optName = opt.map(FoodOption::getName).orElse("Mã " + optId);
+                        invalidOptionNames.add(optName);
+                    } else {
+                        if (opt.get().getExtraPrice() != null) {
+                            optionsExtraTotal = optionsExtraTotal.add(opt.get().getExtraPrice());
+                        }
+                    }
+                }
+            }
+
+            BigDecimal currentUnitPrice = basePrice.add(optionsExtraTotal);
+            boolean priceConsistent = item.expectedUnitPrice() == null
+                    || item.expectedUnitPrice().compareTo(currentUnitPrice) == 0;
+
+            boolean consistent = available && optionsValid && priceConsistent;
+            if (!consistent) {
+                invalidCount++;
+            }
+
+            StringBuilder issueMsg = new StringBuilder();
+            if (!available) {
+                issueMsg.append("Món ăn hiện tạm hết/ngưng phục vụ. ");
+            }
+            if (!optionsValid) {
+                issueMsg.append("Tùy chọn không hợp lệ hoặc đã ngừng áp dụng: ")
+                        .append(String.join(", ", invalidOptionNames)).append(". ");
+            }
+            if (!priceConsistent) {
+                issueMsg.append("Giá món ăn đã cập nhật (hiện tại: ")
+                        .append(currentUnitPrice).append(" ₫). ");
+            }
+
+            results.add(new CartConsistencyItemResult(
+                    foodId,
+                    food.getName(),
+                    consistent,
+                    available,
+                    food.getStatus(),
+                    optionsValid,
+                    invalidOptionNames,
+                    priceConsistent,
+                    currentUnitPrice,
+                    item.expectedUnitPrice(),
+                    issueMsg.toString().trim()
+            ));
+        }
+
+        return new CartConsistencyReport(invalidCount == 0, items.size(), invalidCount, results);
     }
 
     // ==========================================
@@ -258,10 +440,26 @@ public class MenuService {
         return MenuMapper.toFoodOptionResponse(updated);
     }
 
+    public FoodOptionResponse updateFoodOptionStatus(String optionId, OptionStatus newStatus) {
+        if (newStatus == null) {
+            throw new ValidationException("Trạng thái tùy chọn không được để trống.");
+        }
+        FoodOption option = foodOptionRepository.findById(optionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy tùy chọn với mã: " + optionId));
+
+        option.setStatus(newStatus);
+        FoodOption updated = foodOptionRepository.update(option);
+        return MenuMapper.toFoodOptionResponse(updated);
+    }
+
     public void deleteFoodOption(String optionId) {
         if (!foodOptionRepository.existsById(optionId)) {
             throw new ResourceNotFoundException("Không tìm thấy tùy chọn với mã: " + optionId);
         }
-        foodOptionRepository.deleteById(optionId);
+        try {
+            foodOptionRepository.deleteById(optionId);
+        } catch (Exception e) {
+            throw new ConflictException("Không thể xóa tùy chọn đang tồn tại trong đơn hàng hoặc giỏ hàng. Hãy chuyển trạng thái tùy chọn sang Không áp dụng (INACTIVE).");
+        }
     }
 }

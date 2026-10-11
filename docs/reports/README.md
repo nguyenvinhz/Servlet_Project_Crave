@@ -27,6 +27,8 @@ Báo cáo được nhóm theo chức năng; ngày trong tên file là ngày tạ
 |---|---|---|
 | 2026-10-04 | Nền menu và quản lý món Ngày 1 | [Menu management Day 1](menu-management/2026-10-04-nguyen-minh-huan-menu-management-day1.md) |
 | 2026-10-08 | Đánh giá nhánh menu Ngày 1 | [Review menu Day 1](menu-management/2026-10-08-nguyen-minh-huan-menu-management-day1-review.md) |
+| 2026-10-10 | Menu và quản lý món Ngày 2 | [Menu management Day 2](2026-10-10/02-nguyen-minh-huan-menu-management-day2.md) |
+| 2026-10-11 | Tích hợp, kiểm thử và hoàn thiện Menu Ngày 3 | [Menu management Day 3](menu-management/2026-10-11-nguyen-minh-huan-menu-management-day3.md) |
 
 ## Đơn hàng và thanh toán — Nguyễn Đức Phát
 

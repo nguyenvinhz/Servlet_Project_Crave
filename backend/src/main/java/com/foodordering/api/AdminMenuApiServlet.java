@@ -6,6 +6,7 @@ import com.foodordering.dto.CategoryResponse;
 import com.foodordering.dto.FoodDetailResponse;
 import com.foodordering.dto.FoodOptionRequest;
 import com.foodordering.dto.FoodOptionResponse;
+import com.foodordering.dto.FoodOptionStatusUpdateRequest;
 import com.foodordering.dto.FoodRequest;
 import com.foodordering.dto.FoodStatusUpdateRequest;
 import com.foodordering.dto.FoodSummaryResponse;
@@ -127,6 +128,7 @@ public class AdminMenuApiServlet extends BaseApiServlet {
             if ("/api/admin/categories".equals(servletPath)) {
                 CategoryRequest categoryRequest = readJson(request, CategoryRequest.class);
                 CategoryResponse created = menuService.createCategory(categoryRequest);
+                checkAdminAccess(request);
                 writeJson(response, HttpServletResponse.SC_CREATED, ApiResponse.success(created));
                 return;
             }
@@ -135,11 +137,13 @@ public class AdminMenuApiServlet extends BaseApiServlet {
                 if (segments.length == 0) {
                     FoodRequest foodRequest = readJson(request, FoodRequest.class);
                     FoodDetailResponse created = menuService.createFood(foodRequest);
+                    checkAdminAccess(request);
                     writeJson(response, HttpServletResponse.SC_CREATED, ApiResponse.success(created));
                 } else if (segments.length == 2 && "options".equalsIgnoreCase(segments[1])) {
                     String foodId = segments[0];
                     FoodOptionRequest optionRequest = readJson(request, FoodOptionRequest.class);
                     FoodOptionResponse created = menuService.createFoodOption(foodId, optionRequest);
+                    checkAdminAccess(request);
                     writeJson(response, HttpServletResponse.SC_CREATED, ApiResponse.success(created));
                 } else {
                     badRequest(response, "Đường dẫn POST không hợp lệ: " + pathInfo);
@@ -152,6 +156,7 @@ public class AdminMenuApiServlet extends BaseApiServlet {
                     String foodId = segments[0];
                     FoodOptionRequest optionRequest = readJson(request, FoodOptionRequest.class);
                     FoodOptionResponse created = menuService.createFoodOption(foodId, optionRequest);
+                    checkAdminAccess(request);
                     writeJson(response, HttpServletResponse.SC_CREATED, ApiResponse.success(created));
                 } else {
                     FoodOptionRequest optionRequest = readJson(request, FoodOptionRequest.class);
@@ -160,6 +165,7 @@ public class AdminMenuApiServlet extends BaseApiServlet {
                         return;
                     }
                     FoodOptionResponse created = menuService.createFoodOption(optionRequest.foodId(), optionRequest);
+                    checkAdminAccess(request);
                     writeJson(response, HttpServletResponse.SC_CREATED, ApiResponse.success(created));
                 }
                 return;
@@ -184,6 +190,7 @@ public class AdminMenuApiServlet extends BaseApiServlet {
                     String categoryId = segments[0];
                     CategoryRequest categoryRequest = readJson(request, CategoryRequest.class);
                     CategoryResponse updated = menuService.updateCategory(categoryId, categoryRequest);
+                    checkAdminAccess(request);
                     writeJson(response, HttpServletResponse.SC_OK, ApiResponse.success(updated));
                 } else {
                     badRequest(response, "Cần cung cấp mã danh mục: /api/admin/categories/{id}");
@@ -196,11 +203,19 @@ public class AdminMenuApiServlet extends BaseApiServlet {
                     String foodId = segments[0];
                     FoodRequest foodRequest = readJson(request, FoodRequest.class);
                     FoodDetailResponse updated = menuService.updateFood(foodId, foodRequest);
+                    checkAdminAccess(request);
                     writeJson(response, HttpServletResponse.SC_OK, ApiResponse.success(updated));
                 } else if (segments.length == 2 && "status".equalsIgnoreCase(segments[1])) {
                     String foodId = segments[0];
                     FoodStatusUpdateRequest statusRequest = readJson(request, FoodStatusUpdateRequest.class);
                     FoodDetailResponse updated = menuService.updateFoodStatus(foodId, statusRequest.status());
+                    checkAdminAccess(request);
+                    writeJson(response, HttpServletResponse.SC_OK, ApiResponse.success(updated));
+                } else if (segments.length == 4 && "options".equalsIgnoreCase(segments[1]) && "status".equalsIgnoreCase(segments[3])) {
+                    String optionId = segments[2];
+                    FoodOptionStatusUpdateRequest statusRequest = readJson(request, FoodOptionStatusUpdateRequest.class);
+                    FoodOptionResponse updated = menuService.updateFoodOptionStatus(optionId, statusRequest.status());
+                    checkAdminAccess(request);
                     writeJson(response, HttpServletResponse.SC_OK, ApiResponse.success(updated));
                 } else {
                     badRequest(response, "Đường dẫn PUT món ăn không hợp lệ: " + pathInfo);
@@ -213,6 +228,13 @@ public class AdminMenuApiServlet extends BaseApiServlet {
                     String optionId = segments[0];
                     FoodOptionRequest optionRequest = readJson(request, FoodOptionRequest.class);
                     FoodOptionResponse updated = menuService.updateFoodOption(optionId, optionRequest);
+                    checkAdminAccess(request);
+                    writeJson(response, HttpServletResponse.SC_OK, ApiResponse.success(updated));
+                } else if (segments.length == 2 && "status".equalsIgnoreCase(segments[1])) {
+                    String optionId = segments[0];
+                    FoodOptionStatusUpdateRequest statusRequest = readJson(request, FoodOptionStatusUpdateRequest.class);
+                    FoodOptionResponse updated = menuService.updateFoodOptionStatus(optionId, statusRequest.status());
+                    checkAdminAccess(request);
                     writeJson(response, HttpServletResponse.SC_OK, ApiResponse.success(updated));
                 } else {
                     badRequest(response, "Cần cung cấp mã tùy chọn: /api/admin/options/{id}");
@@ -238,6 +260,7 @@ public class AdminMenuApiServlet extends BaseApiServlet {
                 if (segments.length == 1) {
                     String categoryId = segments[0];
                     menuService.deleteCategory(categoryId);
+                    checkAdminAccess(request);
                     writeJson(response, HttpServletResponse.SC_OK,
                             ApiResponse.success(Map.of("message", "Đã xóa danh mục thành công.", "id", categoryId)));
                 } else {
@@ -250,6 +273,7 @@ public class AdminMenuApiServlet extends BaseApiServlet {
                 if (segments.length == 1) {
                     String foodId = segments[0];
                     menuService.deleteFood(foodId);
+                    checkAdminAccess(request);
                     writeJson(response, HttpServletResponse.SC_OK,
                             ApiResponse.success(Map.of("message", "Đã xóa món ăn thành công.", "id", foodId)));
                 } else {
@@ -262,6 +286,7 @@ public class AdminMenuApiServlet extends BaseApiServlet {
                 if (segments.length == 1) {
                     String optionId = segments[0];
                     menuService.deleteFoodOption(optionId);
+                    checkAdminAccess(request);
                     writeJson(response, HttpServletResponse.SC_OK,
                             ApiResponse.success(Map.of("message", "Đã xóa tùy chọn thành công.", "id", optionId)));
                 } else {

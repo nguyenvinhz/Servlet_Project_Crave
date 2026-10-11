@@ -107,22 +107,27 @@
 
         <c:if test="${empty foods}">
             <div class="empty-state">
-                <span>🍽️</span>
-                <h3>No dishes found</h3>
-                <p>Try searching with another keyword or explore other categories.</p>
-                <a href="<c:url value='/menu#catalogSection'/>" class="button primary empty-btn">View all foods</a>
+                <span class="empty-icon-art">🍽️</span>
+                <h3 class="empty-title">Không tìm thấy món ăn phù hợp</h3>
+                <p class="empty-desc">Hãy thử tìm kiếm với từ khóa khác hoặc bấm xem tất cả danh mục món ăn thơm ngon của Crave.</p>
+                <div class="empty-actions">
+                    <a href="<c:url value='/menu#catalogSection'/>" class="button primary empty-btn">Xem tất cả món ăn</a>
+                </div>
             </div>
         </c:if>
 
         <c:if test="${not empty foods}">
             <div class="clean-food-grid">
                 <c:forEach var="food" items="${foods}">
-                    <article class="clean-food-card" onclick="location.href='<c:url value='/menu/detail?id=${food.id}'/>'">
+                    <article class="clean-food-card ${food.status == 'UNAVAILABLE' ? 'food-card-unavailable' : ''}" onclick="location.href='<c:url value='/menu/detail?id=${food.id}'/>'">
                         <div class="clean-card-image-wrap">
                             <img src="${not empty food.imageUrl ? food.imageUrl : pageContext.request.contextPath.concat('/assets/images/placeholder.jpg')}"
                                  alt="${food.name}"
                                  loading="lazy"
                                  onerror="this.onerror=null;this.src='https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=600&q=80';">
+                            <c:if test="${food.status == 'UNAVAILABLE'}">
+                                <span class="card-status-badge badge-unavailable">Tạm hết</span>
+                            </c:if>
                         </div>
 
                         <div class="clean-card-body">

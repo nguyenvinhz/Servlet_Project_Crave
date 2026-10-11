@@ -4,52 +4,74 @@
 <%@ include file="/WEB-INF/views/components/header.jspf" %>
 
 <main class="page-container product-detail-page">
-    <nav class="breadcrumb-nav" aria-label="Đường dẫn trang">
-        <a href="<c:url value='/menu'/>">Thực đơn</a>
-        <span class="sep">/</span>
-        <a href="<c:url value='/menu?categoryId=${food.categoryId}'/>">${food.categoryName}</a>
-        <span class="sep">/</span>
-        <span class="current">${food.name}</span>
-    </nav>
-
-    <div class="product-detail-layout" id="productDetail">
-        <div class="product-media-panel">
-            <div class="product-image-container">
-                <img id="foodImage"
-                     src="${not empty food.imageUrl ? food.imageUrl : pageContext.request.contextPath.concat('/assets/images/placeholder.jpg')}"
-                     alt="${food.name}"
-                     onerror="this.onerror=null;this.src='https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=600&q=80';">
-                <div class="product-media-badges">
-                    <span class="category-pill">${food.categoryName}</span>
-                    <span class="status-pill ${food.status == 'AVAILABLE' ? 'available' : 'unavailable'}">
-                        ${food.status == 'AVAILABLE' ? 'Đang phục vụ' : 'Tạm hết món'}
-                    </span>
-                </div>
+    <c:if test="${empty food}">
+        <div class="empty-state not-found-detail">
+            <span class="empty-icon-art">🍽️</span>
+            <h2 class="empty-title">Không tìm thấy món ăn</h2>
+            <p class="empty-desc">Món ăn bạn đang tìm kiếm không tồn tại hoặc đã được gỡ bỏ khỏi thực đơn.</p>
+            <div class="empty-actions">
+                <a href="<c:url value='/menu'/>" class="button primary empty-btn">Quay lại thực đơn</a>
             </div>
         </div>
+    </c:if>
 
-        <div class="product-info-panel">
-            <header class="product-heading">
-                <p class="eyebrow">${food.categoryName}</p>
-                <h1 id="foodName" class="food-heading-title">${food.name}</h1>
-                <div class="price-hero">
-                    <span class="price-amount" id="basePriceDisplay" data-base-price="${food.price}">
-                        <fmt:formatNumber value="${food.price}" type="number" groupingUsed="true"/>
-                    </span>
-                    <span class="price-curr">₫</span>
-                    <span class="price-note">Giá cơ bản</span>
+    <c:if test="${not empty food}">
+        <nav class="breadcrumb-nav" aria-label="Đường dẫn trang">
+            <a href="<c:url value='/menu'/>">Thực đơn</a>
+            <span class="sep">/</span>
+            <a href="<c:url value='/menu'><c:param name='categoryId' value='${food.categoryId}'/></c:url>"><c:out value="${food.categoryName}"/></a>
+            <span class="sep">/</span>
+            <span class="current"><c:out value="${food.name}"/></span>
+        </nav>
+
+        <div class="product-detail-layout" id="productDetail">
+            <div class="product-media-panel">
+                <div class="product-image-container">
+                    <img id="foodImage"
+                         src="<c:out value='${not empty food.imageUrl ? food.imageUrl : pageContext.request.contextPath.concat(\"/assets/images/placeholder.jpg\")}'/>"
+                         alt="<c:out value='${food.name}'/>"
+                         onerror="this.onerror=null;this.src='https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=600&q=80';">
+                    <div class="product-media-badges">
+                        <span class="category-pill"><c:out value="${food.categoryName}"/></span>
+                        <span class="status-pill ${food.status == 'AVAILABLE' ? 'available' : 'unavailable'}">
+                            ${food.status == 'AVAILABLE' ? 'Đang phục vụ' : 'Tạm hết món'}
+                        </span>
+                    </div>
                 </div>
-            </header>
-
-            <div class="product-description-box">
-                <h3>Mô tả món ăn</h3>
-                <p id="foodDesc">${not empty food.description ? food.description : 'Món ăn thơm ngon được chế biến từ những nguyên liệu tươi mới nhất mỗi ngày.'}</p>
             </div>
 
-            <form id="orderCustomizationForm" class="customization-form" onsubmit="event.preventDefault(); handleAddToCart();">
-                <c:if test="${not empty food.options}">
-                    <section class="options-container" id="foodOptionsContainer">
-                        <h3 class="options-title">Tùy chọn & Thêm món</h3>
+            <div class="product-info-panel">
+                <header class="product-heading">
+                    <p class="eyebrow"><c:out value="${food.categoryName}"/></p>
+                    <h1 id="foodName" class="food-heading-title"><c:out value="${food.name}"/></h1>
+                    <div class="price-hero">
+                        <span class="price-amount" id="basePriceDisplay" data-base-price="<c:out value='${food.price}'/>">
+                            <fmt:formatNumber value="${food.price}" type="number" groupingUsed="true"/>
+                        </span>
+                        <span class="price-curr">₫</span>
+                        <span class="price-note">Giá cơ bản</span>
+                    </div>
+                </header>
+
+                <c:if test="${food.status == 'UNAVAILABLE'}">
+                    <div class="unavailable-notice-banner" role="alert">
+                        <span class="notice-icon">⚠️</span>
+                        <div class="notice-text">
+                            <strong>Món ăn hiện đang tạm ngưng phục vụ</strong>
+                            <p>Món này hiện đang tạm hết nguyên liệu hoặc đã ngưng bán hôm nay. Quý khách vui lòng chọn món khác trong thực đơn.</p>
+                        </div>
+                    </div>
+                </c:if>
+
+                <div class="product-description-box">
+                    <h3>Mô tả món ăn</h3>
+                    <p id="foodDesc"><c:out value="${not empty food.description ? food.description : 'Món ăn thơm ngon được chế biến từ những nguyên liệu tươi mới nhất mỗi ngày.'}"/></p>
+                </div>
+
+                <form id="orderCustomizationForm" class="customization-form" data-food-id="<c:out value='${food.id}'/>" onsubmit="event.preventDefault(); handleAddToCart();">
+                    <c:if test="${not empty food.options}">
+                        <section class="options-container" id="foodOptionsContainer">
+                            <h3 class="options-title">Tùy chọn & Thêm món</h3>
 
                         <c:set var="hasSize" value="false" />
                         <c:forEach var="opt" items="${food.options}">
@@ -69,7 +91,7 @@
                                     <c:forEach var="opt" items="${food.options}">
                                         <c:if test="${opt.optionType == 'SIZE'}">
                                             <label class="option-card">
-                                                <input type="radio" name="option_size" value="${opt.id}" data-extra="${opt.extraPrice}" onchange="updateTotalPrice()">
+                                                <input type="radio" name="option_size" value="<c:out value='${opt.id}'/>" data-extra="<c:out value='${opt.extraPrice}'/>" onchange="updateTotalPrice()">
                                                 <span class="option-card-inner">
                                                     <span class="opt-label"><c:out value="${opt.name}"/></span>
                                                     <span class="opt-price">+<fmt:formatNumber value="${opt.extraPrice}" type="number" groupingUsed="true"/> ₫</span>
@@ -92,7 +114,7 @@
                                     <c:forEach var="opt" items="${food.options}">
                                         <c:if test="${opt.optionType == 'TOPPING'}">
                                             <label class="option-card">
-                                                <input type="checkbox" name="option_topping" value="${opt.id}" data-extra="${opt.extraPrice}" onchange="updateTotalPrice()">
+                                                <input type="checkbox" name="option_topping" value="<c:out value='${opt.id}'/>" data-extra="<c:out value='${opt.extraPrice}'/>" onchange="updateTotalPrice()">
                                                 <span class="option-card-inner">
                                                     <span class="opt-label"><c:out value="${opt.name}"/></span>
                                                     <span class="opt-price">+<fmt:formatNumber value="${opt.extraPrice}" type="number" groupingUsed="true"/> ₫</span>
@@ -115,7 +137,7 @@
                                     <c:forEach var="opt" items="${food.options}" varStatus="status">
                                         <c:if test="${opt.optionType == 'SUGAR_LEVEL'}">
                                             <label class="option-card">
-                                                <input type="radio" name="option_sugar" value="${opt.id}" data-extra="${opt.extraPrice}" ${status.first ? 'checked' : ''} onchange="updateTotalPrice()">
+                                                <input type="radio" name="option_sugar" value="<c:out value='${opt.id}'/>" data-extra="<c:out value='${opt.extraPrice}'/>" ${status.first ? 'checked' : ''} onchange="updateTotalPrice()">
                                                 <span class="option-card-inner">
                                                     <span class="opt-label"><c:out value="${opt.name}"/></span>
                                                     <span class="opt-price">+<fmt:formatNumber value="${opt.extraPrice}" type="number" groupingUsed="true"/> ₫</span>
@@ -138,7 +160,7 @@
                                     <c:forEach var="opt" items="${food.options}" varStatus="status">
                                         <c:if test="${opt.optionType == 'ICE_LEVEL'}">
                                             <label class="option-card">
-                                                <input type="radio" name="option_ice" value="${opt.id}" data-extra="${opt.extraPrice}" ${status.first ? 'checked' : ''} onchange="updateTotalPrice()">
+                                                <input type="radio" name="option_ice" value="<c:out value='${opt.id}'/>" data-extra="<c:out value='${opt.extraPrice}'/>" ${status.first ? 'checked' : ''} onchange="updateTotalPrice()">
                                                 <span class="option-card-inner">
                                                     <span class="opt-label"><c:out value="${opt.name}"/></span>
                                                     <span class="opt-price">+<fmt:formatNumber value="${opt.extraPrice}" type="number" groupingUsed="true"/> ₫</span>
@@ -161,7 +183,7 @@
                                     <c:forEach var="opt" items="${food.options}">
                                         <c:if test="${opt.optionType == 'OTHER'}">
                                             <label class="option-card">
-                                                <input type="checkbox" name="option_other" value="${opt.id}" data-extra="${opt.extraPrice}" onchange="updateTotalPrice()">
+                                                <input type="checkbox" name="option_other" value="<c:out value='${opt.id}'/>" data-extra="<c:out value='${opt.extraPrice}'/>" onchange="updateTotalPrice()">
                                                 <span class="option-card-inner">
                                                     <span class="opt-label"><c:out value="${opt.name}"/></span>
                                                     <span class="opt-price">+<fmt:formatNumber value="${opt.extraPrice}" type="number" groupingUsed="true"/> ₫</span>
@@ -200,6 +222,7 @@
             </form>
         </div>
     </div>
+    </c:if>
 </main>
 
 <script>
@@ -236,11 +259,13 @@ function updateTotalPrice() {
 
 async function handleAddToCart() {
     const btn = document.getElementById('addToCartBtn');
+    if (!btn || btn.disabled) return;
     const originalText = btn.innerHTML;
     btn.disabled = true;
     btn.innerHTML = '<span>⏳ Đang thêm vào giỏ...</span>';
 
-    const foodId = '${food.id}';
+    const form = document.getElementById('orderCustomizationForm');
+    const foodId = form ? form.dataset.foodId : '';
     const quantity = parseInt(document.getElementById('orderQuantity').value) || 1;
     const optionIds = [];
     document.querySelectorAll('#orderCustomizationForm input:checked').forEach(opt => {
@@ -255,6 +280,7 @@ async function handleAddToCart() {
     try {
         const response = await fetch(cartUrl, {
             method: 'POST',
+            credentials: 'same-origin',
             headers: {
                 'Content-Type': 'application/json',
                 'Accept': 'application/json'
@@ -265,9 +291,18 @@ async function handleAddToCart() {
         if (response.status === 401) {
             btn.innerHTML = '<span>⚠️ Vui lòng đăng nhập</span>';
             btn.style.background = '#dc2626';
+            const returnTo = encodeURIComponent(window.location.pathname + window.location.search);
             setTimeout(() => {
-                window.location.href = ctx + '/auth/login?returnTo=' + encodeURIComponent(window.location.pathname + window.location.search);
+                window.location.href = ctx + '/auth/login?reason=session-expired&returnTo=' + returnTo;
             }, 800);
+            return;
+        }
+
+        if (response.status === 403) {
+            alert('Tài khoản nhân viên hoặc quản trị không thể mua hàng. Vui lòng đăng nhập bằng tài khoản khách hàng.');
+            btn.innerHTML = originalText;
+            btn.style.background = '';
+            btn.disabled = false;
             return;
         }
 
