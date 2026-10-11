@@ -1,6 +1,7 @@
 <%@ page contentType="text/html;charset=UTF-8" pageEncoding="UTF-8" %>
 <%@ include file="../components/header.jspf" %>
-<main class="page auth-page">
+<link rel="stylesheet" href="<c:url value='/assets/css/account.css'/>">
+<main class="page auth-page account-ui">
     <section class="intro-panel">
         <p class="eyebrow">Thành viên mới</p>
         <h1>Tạo tài khoản trong một phút.</h1>
@@ -13,7 +14,7 @@
             <h2 id="register-title">Đăng ký</h2>
         </div>
 
-        <div id="form-error" class="form-error" role="alert" aria-live="polite">
+        <div id="form-error" class="form-error" role="alert" aria-live="polite" ${empty error ? 'hidden' : ''}>
             <c:out value="${error}"/>
         </div>
 
@@ -53,7 +54,7 @@
         </form>
 
         <p class="card-footnote">Đã có tài khoản?
-            <a href="<c:url value='/auth/login'/>">Đăng nhập</a>
+            <a data-auth-switch href="<c:url value='/auth/login'/>">Đăng nhập</a>
         </p>
     </section>
 </main>

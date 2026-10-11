@@ -387,7 +387,8 @@ SELECT discount_type, discount_value, minimum_order_value,
 INTO v_discount_type, v_discount_value, v_minimum_order_value,
     v_maximum_discount, v_start_at, v_end_at
 FROM promotion
-WHERE promotion_id = p_promotion_id;
+WHERE promotion_id = p_promotion_id
+  AND status = 'ACTIVE';
 END IF;
 
     IF v_discount_value IS NOT NULL

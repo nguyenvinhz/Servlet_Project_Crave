@@ -1,11 +1,12 @@
 <%@ page contentType="text/html;charset=UTF-8" pageEncoding="UTF-8" %>
 <%@ include file="../components/header.jspf" %>
-<main class="page account-page">
+<link rel="stylesheet" href="<c:url value='/assets/css/account.css'/>">
+<main class="page account-page account-ui">
     <aside class="account-sidebar">
         <p class="eyebrow">Tài khoản</p>
         <h1>Thông tin của bạn</h1>
         <nav aria-label="Thiết lập tài khoản">
-            <a class="active" href="<c:url value='/customer/profile'/>">Hồ sơ</a>
+            <a class="active" aria-current="page" href="<c:url value='/customer/profile'/>">Hồ sơ</a>
             <c:if test="${sessionScope.currentUser.accountType == 'CUSTOMER'}">
                 <a href="<c:url value='/customer/addresses'/>">Địa chỉ giao hàng</a>
             </c:if>
@@ -19,10 +20,10 @@
             <p>Cập nhật thông tin dùng cho xác nhận và giao đơn.</p>
         </div>
 
-        <div id="form-error" class="form-error" role="alert" aria-live="polite">
+        <div id="form-error" class="form-error" role="alert" aria-live="polite" ${empty error ? 'hidden' : ''}>
             <c:out value="${error}"/>
         </div>
-        <div id="form-success" class="form-success" role="status" aria-live="polite">
+        <div id="form-success" class="form-success" role="status" aria-live="polite" ${empty message ? 'hidden' : ''}>
             <c:out value="${message}"/>
         </div>
         <p id="profile-loading" class="field-hint" role="status">Đang tải hồ sơ...</p>

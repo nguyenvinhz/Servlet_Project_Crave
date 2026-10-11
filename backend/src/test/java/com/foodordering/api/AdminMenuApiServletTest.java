@@ -31,6 +31,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.foodordering.dto.ProfileResponse;
@@ -220,6 +221,45 @@ class AdminMenuApiServletTest {
 
         verify(response).setStatus(HttpServletResponse.SC_FORBIDDEN);
         assertTrue(responseWriter.toString().contains("FORBIDDEN"));
+    }
+
+    @Test
+    void menuManagerMayAccessMenuResources() throws Exception {
+        sessionAttributes.put("currentUser", new ProfileResponse("NV02", AccountType.EMPLOYEE,
+                "Menu manager", "menu@example.com", "0901234599", EmployeeRole.MENU_MANAGER));
+        when(request.getServletPath()).thenReturn("/api/admin/categories");
+        when(menuService.getCategories()).thenReturn(List.of());
+
+        servlet.doGet(request, response);
+
+        verify(response).setStatus(HttpServletResponse.SC_OK);
+        verify(menuService).getCategories();
+    }
+
+    @Test
+    void orderStaffCannotReadMenuResources() throws Exception {
+        sessionAttributes.put("currentUser", new ProfileResponse("NV02", AccountType.EMPLOYEE,
+                "Order staff", "orders@example.com", "0901234599", EmployeeRole.ORDER_STAFF));
+        when(request.getServletPath()).thenReturn("/api/admin/categories");
+
+        servlet.doGet(request, response);
+
+        verify(response).setStatus(HttpServletResponse.SC_FORBIDDEN);
+        assertTrue(responseWriter.toString().contains("FORBIDDEN"));
+        verifyNoInteractions(menuService);
+    }
+
+    @Test
+    void orderStaffCannotMutateMenuResources() throws Exception {
+        sessionAttributes.put("currentUser", new ProfileResponse("NV02", AccountType.EMPLOYEE,
+                "Order staff", "orders@example.com", "0901234599", EmployeeRole.ORDER_STAFF));
+        when(request.getServletPath()).thenReturn("/api/admin/categories");
+
+        servlet.doPost(request, response);
+
+        verify(response).setStatus(HttpServletResponse.SC_FORBIDDEN);
+        assertTrue(responseWriter.toString().contains("FORBIDDEN"));
+        verifyNoInteractions(menuService);
     }
 
     @Test

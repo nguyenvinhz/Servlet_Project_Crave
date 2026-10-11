@@ -2,10 +2,12 @@ package com.foodordering.security;
 
 import com.foodordering.dto.ProfileResponse;
 import com.foodordering.enums.AccountType;
+import com.foodordering.enums.EmployeeRole;
 import com.foodordering.exception.AccountException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 
+import java.util.Arrays;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -159,6 +161,16 @@ public final class SessionAuth {
         ProfileResponse user = requireUser(request);
         if (user.accountType() != AccountType.CUSTOMER) {
             throw new AccountException("FORBIDDEN", "Chức năng này chỉ dành cho khách hàng.", 403);
+        }
+        return user;
+    }
+
+    /** Admins may access all staff resources; other employees need an assigned role. */
+    public static ProfileResponse requireEmployee(HttpServletRequest request, EmployeeRole... allowedRoles) {
+        ProfileResponse user = requireUser(request);
+        if (user.accountType() != AccountType.EMPLOYEE || user.role() == null
+                || (user.role() != EmployeeRole.ADMIN && !Arrays.asList(allowedRoles).contains(user.role()))) {
+            throw new AccountException("FORBIDDEN", "Bạn không có quyền truy cập chức năng này.", 403);
         }
         return user;
     }

@@ -1,12 +1,13 @@
 <%@ page contentType="text/html;charset=UTF-8" pageEncoding="UTF-8" %>
 <%@ include file="../components/header.jspf" %>
-<main class="page account-page">
+<link rel="stylesheet" href="<c:url value='/assets/css/account.css'/>">
+<main class="page account-page account-ui">
     <aside class="account-sidebar">
         <p class="eyebrow">Tài khoản</p>
         <h1>Thông tin của bạn</h1>
         <nav aria-label="Thiết lập tài khoản">
             <a href="<c:url value='/customer/profile'/>">Hồ sơ</a>
-            <a class="active" href="<c:url value='/customer/addresses'/>">Địa chỉ giao hàng</a>
+            <a class="active" aria-current="page" href="<c:url value='/customer/addresses'/>">Địa chỉ giao hàng</a>
         </nav>
     </aside>
 
@@ -18,10 +19,10 @@
                 <p>Chọn địa chỉ mặc định để đặt món nhanh hơn.</p>
             </div>
 
-            <div id="form-error" class="form-error" role="alert" aria-live="polite">
+            <div id="form-error" class="form-error" role="alert" aria-live="polite" ${empty error ? 'hidden' : ''}>
                 <c:out value="${error}"/>
             </div>
-            <div id="form-success" class="form-success" role="status" aria-live="polite">
+            <div id="form-success" class="form-success" role="status" aria-live="polite" ${empty message ? 'hidden' : ''}>
                 <c:out value="${message}"/>
             </div>
 

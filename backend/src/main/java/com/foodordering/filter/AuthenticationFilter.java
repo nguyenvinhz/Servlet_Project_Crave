@@ -62,7 +62,7 @@ public class AuthenticationFilter implements Filter {
                 snapshot = SessionAuth.capture(request);
                 ProfileResponse fresh = accountService.getProfile(snapshot.user().id());
                 SessionAuth.refresh(request, snapshot, fresh);
-                authorize(path, fresh);
+                authorize(request, path, fresh);
             }
         } catch (AccountException exception) {
             if (exception.getStatusCode() == 401) {
@@ -90,7 +90,7 @@ public class AuthenticationFilter implements Filter {
         return path.equals(prefix) || path.startsWith(prefix + "/");
     }
 
-    private static void authorize(String path, ProfileResponse user) {
+    private static void authorize(HttpServletRequest request, String path, ProfileResponse user) {
         if (under(path, "/admin") || under(path, "/api/admin")) {
             String resource = path.startsWith("/api/") ? path.substring(4) : path;
             EmployeeRole expected = under(resource, "/admin/orders") || under(resource, "/admin/payments")
@@ -99,10 +99,7 @@ public class AuthenticationFilter implements Filter {
                     || under(resource, "/admin/categories") || under(resource, "/admin/options")
                     ? EmployeeRole.MENU_MANAGER
                     : under(resource, "/admin/promotions") ? EmployeeRole.PROMOTION_MANAGER : EmployeeRole.ADMIN;
-            if (user.accountType() != AccountType.EMPLOYEE
-                    || (user.role() != EmployeeRole.ADMIN && user.role() != expected)) {
-                throw new AccountException("FORBIDDEN", "Bạn không có quyền truy cập chức năng này.", 403);
-            }
+            SessionAuth.requireEmployee(request, expected);
         } else if (!path.equals("/api/profile") && !path.equals("/customer/profile")
                 && user.accountType() != AccountType.CUSTOMER) {
             throw new AccountException("FORBIDDEN", "Chức năng này chỉ dành cho khách hàng.", 403);

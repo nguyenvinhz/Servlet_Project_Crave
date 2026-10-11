@@ -227,12 +227,15 @@ class AuthenticationFilterTest {
     @Test
     void staffRolesOnlyAccessTheirAssignedAdminResources() throws Exception {
         Object[][] cases = {
+                {EmployeeRole.ORDER_STAFF, "/admin/orders", true},
                 {EmployeeRole.ORDER_STAFF, "/api/admin/orders", true},
                 {EmployeeRole.ORDER_STAFF, "/api/admin/payments/TT01", true},
                 {EmployeeRole.ORDER_STAFF, "/api/admin/foods", false},
                 {EmployeeRole.MENU_MANAGER, "/api/admin/foods/MA01", true},
                 {EmployeeRole.MENU_MANAGER, "/api/admin/categories", true},
                 {EmployeeRole.MENU_MANAGER, "/api/admin/options/TC01", true},
+                {EmployeeRole.MENU_MANAGER, "/admin/menu", true},
+                {EmployeeRole.MENU_MANAGER, "/admin/categories", true},
                 {EmployeeRole.MENU_MANAGER, "/api/admin/orders", false},
                 {EmployeeRole.PROMOTION_MANAGER, "/api/admin/promotions", true},
                 {EmployeeRole.HR_MANAGER, "/api/admin/foods", false},
@@ -250,6 +253,41 @@ class AuthenticationFilterTest {
                 exchange.assertError(403, "FORBIDDEN");
                 verifyNoInteractions(exchange.chain);
             }
+        }
+    }
+
+    @Test
+    void employeesCannotUseCustomerCartCheckoutOrderOrPaymentRoutes() throws Exception {
+        for (EmployeeRole role : EmployeeRole.values()) {
+            ProfileResponse employee = employee(role);
+            when(accounts.getProfile("NV01")).thenReturn(employee);
+            for (String path : new String[]{"/cart", "/checkout", "/orders", "/orders/DH01",
+                    "/api/cart", "/api/orders/DH01", "/api/payments/TT01"}) {
+                Exchange exchange = request("GET", path, employee);
+                exchange.send();
+                if (path.startsWith("/api/")) {
+                    exchange.assertError(403, "FORBIDDEN");
+                } else {
+                    verify(exchange.response).sendError(403, "Chức năng này chỉ dành cho khách hàng.");
+                }
+                verifyNoInteractions(exchange.chain);
+            }
+        }
+    }
+
+    @Test
+    void employeeWithoutAssignedRoleCannotAccessAdminPagesOrApis() throws Exception {
+        ProfileResponse employee = employee(null);
+        when(accounts.getProfile("NV01")).thenReturn(employee);
+        for (String path : new String[]{"/admin/orders", "/api/admin/orders", "/api/admin/foods"}) {
+            Exchange exchange = request("GET", path, employee);
+            exchange.send();
+            if (path.startsWith("/api/")) {
+                exchange.assertError(403, "FORBIDDEN");
+            } else {
+                verify(exchange.response).sendError(403, "Bạn không có quyền truy cập chức năng này.");
+            }
+            verifyNoInteractions(exchange.chain);
         }
     }
 

@@ -1,117 +1,72 @@
 <%@ page contentType="text/html;charset=UTF-8" language="java" %>
-<%@ taglib prefix="c" uri="jakarta.tags.core" %>
-<c:set var="pageTitle" value="Checkout" scope="request"/>
-<%@ include file="../components/header.jspf" %>
-
-<link rel="stylesheet" href="<c:url value='/assets/css/order.css'/>">
-
-<main class="page order-page order-theme">
-    <div class="checkout-grid">
-        <!-- Cột trái: Delivery & Payment -->
-        <section class="checkout-left">
-            <h1>Checkout</h1>
-            <div class="card checkout-section">
-                <h2>Delivery information</h2>
-
-                <div class="field-grid">
-                    <div>
-                        <label for="receiverName">Người nhận</label>
-                        <input type="text" id="receiverName" placeholder="Tên người nhận" required>
-                    </div>
-                    <div>
-                        <label for="receiverPhone">Điện thoại</label>
-                        <input type="text" id="receiverPhone" placeholder="Số điện thoại" required>
-                    </div>
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <title>Thanh toán | Crave</title>
+    <link rel="stylesheet" href="/crave/assets/css/styles.css">
+    <style>
+        .checkout-container { max-width: 800px; margin: 40px auto; display: flex; gap: 20px; }
+        .form-section { flex: 2; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .summary-section { flex: 1; background: #fafafa; padding: 20px; border-radius: 8px; border: 1px solid #ddd; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: bold; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        .btn-submit { background: var(--primary-color, #e74c3c); color: white; border: none; padding: 12px 20px; border-radius: 4px; cursor: pointer; width: 100%; font-size: 16px; font-weight: bold; }
+        .btn-submit:hover { background: #c0392b; }
+        .alert { padding: 10px; margin-bottom: 15px; display: none; border-radius: 4px; }
+        .alert.error { background: #fee; color: #c0392b; border: 1px solid #fcc; }
+        .alert.success { background: #efe; color: #27ae60; border: 1px solid #cfc; }
+    </style>
+</head>
+<body>
+    <div class="checkout-container">
+        <div class="form-section">
+            <h2>Thông tin giao hàng</h2>
+            <div id="checkoutAlert" class="alert"></div>
+            <form id="checkoutForm">
+                <div class="form-group">
+                    <label>Hình thức nhận hàng</label>
+                    <select name="fulfillmentType" id="fulfillmentType">
+                        <option value="DELIVERY">Giao hàng tận nơi</option>
+                        <option value="PICKUP">Lấy tại quán</option>
+                    </select>
                 </div>
-
-                <label for="fulfillmentType">Hình thức nhận hàng</label>
-                <select id="fulfillmentType">
-                    <option value="DELIVERY">Giao tận nơi</option>
-                    <option value="PICKUP">Đến lấy</option>
-                </select>
-
-                <label for="deliveryAddress">Địa chỉ giao hàng</label>
-                <input type="text" id="deliveryAddress" placeholder="Nhập địa chỉ (nếu giao hàng)">
-
-                <label for="customerNote">Ghi chú (tuỳ chọn)</label>
-                <textarea id="customerNote" rows="2" placeholder="VD: Gọi trước khi giao"></textarea>
-            </div>
-
-            <div class="card checkout-section">
-                <h2>Payment method</h2>
-                <div class="radio-group" id="paymentMethodGroup">
-                    <label>
-                        <input type="radio" name="paymentMethod" value="CASH" checked>
-                        Cash on Delivery
-                    </label>
-                    <label>
-                        <input type="radio" name="paymentMethod" value="BANK_TRANSFER">
-                        Credit / Debit Card
-                    </label>
-                    <label>
-                        <input type="radio" name="paymentMethod" value="E_WALLET">
-                        E-wallet
-                    </label>
+                <div class="form-group">
+                    <label>Người nhận</label>
+                    <input type="text" name="receiverName" id="receiverName" required />
                 </div>
-            </div>
-        </section>
-
-        <!-- Cột phải: Summary -->
-        <aside class="checkout-right">
-            <div class="order-summary">
-                <h2>Your order</h2>
-                <div class="summary-row">
-                    <span>Smoky Stack Burger</span>
-                    <span>12.50</span>
+                <div class="form-group">
+                    <label>Số điện thoại</label>
+                    <input type="text" name="receiverPhone" id="receiverPhone" required />
                 </div>
-                <div class="summary-row">
-                    <span>Delivery fee</span>
-                    <span>2.50</span>
+                <div class="form-group" id="addressGroup">
+                    <label>Địa chỉ nhận hàng</label>
+                    <input type="text" name="deliveryAddress" id="deliveryAddress" required />
                 </div>
-                <div class="summary-row">
-                    <span>Discount</span>
-                    <span>-2.58</span>
+                <div class="form-group">
+                    <label>Phương thức thanh toán</label>
+                    <select name="paymentMethod" id="paymentMethod">
+                        <option value="CASH">Tiền mặt</option>
+                        <option value="BANK_TRANSFER">Chuyển khoản ngân hàng</option>
+                        <option value="E_WALLET">Ví điện tử (Momo, ZaloPay...)</option>
+                    </select>
                 </div>
-                <div class="summary-row total">
-                    <span>Total</span>
-                    <span>12.42</span>
+                <div class="form-group">
+                    <label>Ghi chú (Không bắt buộc)</label>
+                    <textarea name="customerNote" id="customerNote" rows="3"></textarea>
                 </div>
-
-                <button class="btn-primary" onclick="submitOrder()">Place Order</button>
-            </div>
-        </aside>
+                <button type="submit" class="btn-submit">Đặt hàng</button>
+            </form>
+        </div>
+        <div class="summary-section">
+            <h3>Tóm tắt đơn hàng</h3>
+            <p><strong>Tạm tính:</strong> <span id="summarySubtotal">Đang tải...</span></p>
+            <p><strong>Phí giao hàng:</strong> <span id="summaryFee">15,000 đ</span></p>
+            <hr>
+            <h4>Tổng cộng: <span id="summaryTotal">...</span></h4>
+        </div>
     </div>
-</main>
 
-<script>
-    function submitOrder() {
-        const selectedPayment = document.querySelector('input[name="paymentMethod"]:checked').value;
-        const data = {
-            fulfillmentType: document.getElementById('fulfillmentType').value,
-            receiverName: document.getElementById('receiverName').value,
-            receiverPhone: document.getElementById('receiverPhone').value,
-            deliveryAddress: document.getElementById('deliveryAddress').value,
-            customerNote: document.getElementById('customerNote').value,
-            paymentMethod: selectedPayment
-        };
-
-        fetch('${pageContext.request.contextPath}/api/orders', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
-        }).then(res => res.json())
-          .then(json => {
-              console.log('Response:', json);
-              if (json.success) {
-                  // Forward sang trang tracking order sau khi đặt thành công
-                  alert('Đặt hàng thành công! Mã đơn: ' + json.data.orderId);
-                  window.location.href = '${pageContext.request.contextPath}/orders/' + json.data.orderId;
-              } else {
-                  alert('Lỗi: ' + json.error.message);
-              }
-          })
-          .catch(err => console.error('Error:', err));
-    }
-</script>
-
-<%@ include file="../components/footer.jspf" %>
+    <script src="/crave/assets/js/checkout.js"></script>
+</body>
+</html>

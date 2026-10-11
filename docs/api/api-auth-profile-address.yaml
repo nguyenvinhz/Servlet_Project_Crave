@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Crave Account API
-  version: 1.0.0-day2
+  version: 1.0.0-day3
   description: |
     Implemented authentication, profile and customer delivery-address APIs.
     Send JSON request bodies with Content-Type: application/json and use
@@ -29,6 +29,14 @@ info:
     may read their own profile, but receives 403 for profile mutations and all
     address operations. Resource ownership always comes from the session;
     request bodies cannot select a different user or customer.
+    Staff endpoints require ADMIN or the assigned domain role (MENU_MANAGER for
+    menu, ORDER_STAFF for orders/payments); customer cart/checkout/order routes
+    reject employees with 403. Session changes are checked at these endpoints.
+
+    Contact and address fields must contain well-formed Unicode without NUL.
+    Full names and email addresses also reject ISO control characters. Invalid
+    text returns 400 with fieldErrors before persistence. Vietnamese,
+    emoji and multiline address notes remain supported.
 servers:
   - url: /crave
     description: Default Tomcat context
@@ -78,6 +86,8 @@ paths:
           $ref: "#/components/responses/ValidationError"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "405":
           $ref: "#/components/responses/MethodNotAllowed"
         "415":
@@ -104,6 +114,8 @@ paths:
           $ref: "#/components/responses/ValidationError"
         "409":
           $ref: "#/components/responses/AccountConflict"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "405":
           $ref: "#/components/responses/MethodNotAllowed"
         "415":
@@ -135,6 +147,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/LogoutEnvelope"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "405":
           $ref: "#/components/responses/MethodNotAllowed"
 
@@ -384,7 +398,7 @@ components:
           schema:
             $ref: "#/components/schemas/ErrorEnvelope"
     Forbidden:
-      description: Authenticated account does not have the required customer role (FORBIDDEN)
+      description: Account lacks the required role or mutation request has a disallowed Origin/fetch metadata (FORBIDDEN)
       content:
         application/json:
           schema:

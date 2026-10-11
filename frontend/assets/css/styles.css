@@ -2013,6 +2013,24 @@ label {
     color: #6b7280;
 }
 
+@media (max-width: 1000px) {
+    .site-header-inner {
+        flex-wrap: wrap;
+        padding-block: 14px;
+        gap: 14px 24px;
+    }
+    .site-header nav,
+    .main-nav {
+        gap: 1rem;
+        flex-wrap: wrap;
+        min-width: 0;
+        max-width: 100%;
+    }
+    .header-actions-right {
+        gap: 14px;
+    }
+}
+
 @media (max-width: 640px) {
     .site-header-inner {
         flex-direction: column;
