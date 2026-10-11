@@ -1,9 +1,10 @@
 <%@ page contentType="text/html;charset=UTF-8" language="java" %>
+<%@ taglib prefix="c" uri="jakarta.tags.core" %>
 <!DOCTYPE html>
 <html lang="vi">
 <head>
     <title>Thanh toán | Crave</title>
-    <link rel="stylesheet" href="/crave/assets/css/styles.css">
+    <link rel="stylesheet" href="<c:url value='/assets/css/styles.css' />">
     <style>
         .checkout-container { max-width: 800px; margin: 40px auto; display: flex; gap: 20px; }
         .form-section { flex: 2; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
@@ -18,11 +19,13 @@
         .alert.success { background: #efe; color: #27ae60; border: 1px solid #cfc; }
     </style>
 </head>
-<body>
+<body data-context-path="<c:out value='${pageContext.request.contextPath}' />">
     <div class="checkout-container">
         <div class="form-section">
             <h2>Thông tin giao hàng</h2>
             <div id="checkoutAlert" class="alert"></div>
+            <p><a href="<c:url value='/cart' />">Quay lại giỏ hàng</a></p>
+            <button type="button" id="retryCheckoutBtn" hidden>Thử tải lại</button>
             <form id="checkoutForm">
                 <div class="form-group">
                     <label>Hình thức nhận hàng</label>
@@ -55,18 +58,19 @@
                     <label>Ghi chú (Không bắt buộc)</label>
                     <textarea name="customerNote" id="customerNote" rows="3"></textarea>
                 </div>
-                <button type="submit" class="btn-submit">Đặt hàng</button>
+                <button type="submit" id="placeOrderBtn" class="btn-submit" disabled>Đặt hàng</button>
             </form>
         </div>
         <div class="summary-section">
             <h3>Tóm tắt đơn hàng</h3>
             <p><strong>Tạm tính:</strong> <span id="summarySubtotal">Đang tải...</span></p>
             <p><strong>Phí giao hàng:</strong> <span id="summaryFee">15,000 đ</span></p>
+            <p id="summaryDiscountRow" hidden><strong>Giảm giá:</strong> <span id="summaryDiscount">0 đ</span></p>
             <hr>
             <h4>Tổng cộng: <span id="summaryTotal">...</span></h4>
         </div>
     </div>
 
-    <script src="/crave/assets/js/checkout.js"></script>
+    <script src="<c:url value='/assets/js/checkout.js' />"></script>
 </body>
 </html>

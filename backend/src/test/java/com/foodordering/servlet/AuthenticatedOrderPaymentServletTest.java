@@ -6,8 +6,12 @@ import com.foodordering.dto.OrderResponse;
 import com.foodordering.dto.ProfileResponse;
 import com.foodordering.enums.AccountType;
 import com.foodordering.enums.EmployeeRole;
+import com.foodordering.enums.ErrorCode;
 import com.foodordering.enums.OrderStatus;
 import com.foodordering.enums.PaymentStatus;
+import com.foodordering.exception.ApiException;
+import com.foodordering.exception.BadRequestException;
+import com.foodordering.exception.PromotionValidationException;
 import com.foodordering.security.SessionAuth;
 import com.foodordering.service.CustomerOrderService;
 import com.foodordering.service.PaymentService;
@@ -139,6 +143,21 @@ class AuthenticatedOrderPaymentServletTest {
         assertEquals("DH01", exchange.json().path("data").path("orderId").asText());
         verify(orders).createOrder(eq("KH01"), any(OrderRequest.class));
         verify(orders, never()).createOrder(eq("KH99"), any());
+    }
+
+    @Test
+    void checkoutReturnsDomainBadRequestsWithTheirOriginalErrorCodes() throws Exception {
+        for (ApiException failure : List.of(new BadRequestException(ErrorCode.CART_EMPTY),
+                new BadRequestException(ErrorCode.INVALID_OPTION),
+                new PromotionValidationException(ErrorCode.PROMOTION_EXPIRED))) {
+            doThrow(failure).when(orders).createOrder(eq("KH01"), any(OrderRequest.class));
+            Route route = new Route(customerServlet, "POST", "/api/orders", null);
+            Exchange exchange = request(route, CUSTOMER, CHECKOUT);
+
+            exchange.send(customerServlet);
+
+            exchange.assertError(400, failure.getErrorCode().getCode());
+        }
     }
 
     @Test

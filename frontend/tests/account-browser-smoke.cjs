@@ -1,5 +1,5 @@
-// Run with Node and Chrome/Edge; optionally set CHROME_PATH or pass a case-name regex.
-// Uses real account/cart JSP markup and scripts with deterministic API fixtures.
+// Run with Node 22+ and Chrome/Edge; optionally set CHROME_PATH or pass a case-name regex.
+// Uses real account/cart/checkout JSP markup and scripts with deterministic API fixtures.
 const fs = require('node:fs');
 const http = require('node:http');
 const path = require('node:path');
@@ -477,6 +477,180 @@ cases.push(
  `}))
 );
 
+const voucherFixture = `
+ const validVoucher={valid:true,originalSubtotal:100000,discountAmount:10000,promotion:{promotionId:'KM01',code:'SAVE10'}};
+ const saveVoucher=()=>sessionStorage.setItem('crave_applied_voucher',JSON.stringify({code:' save10 ',promotionId:'FORGED',discountAmount:999999}));
+ const orderFields=()=>setFields({receiverName:'  Khach Hang  ',receiverPhone:'0901234567',deliveryAddress:'  123 Street  ',customerNote:' note '});
+`;
+const cartReady = `await waitFor(()=>document.querySelector('.btn-inc')&&!document.getElementById('proceedCheckoutBtn').disabled);`;
+const applyCartVoucher = `document.getElementById('voucherCodeInput').value='SAVE10';document.getElementById('voucherApplyBtn').click();await waitFor(()=>document.getElementById('voucherAppliedCode').textContent==='SAVE10'&&!document.getElementById('proceedCheckoutBtn').disabled);`;
+cases.push(
+ {name:'cart-pending-voucher-blocks-enter-mutations-checkout',page:'cart/index',route:'cart',setup:cartFixture+voucherFixture+`
+ let release;const fixtureFetch=async request=>request.method==='GET'?reply(200,cart):new Promise(resolve=>{release=()=>resolve(reply(200,validVoucher));});`,run:cartReady+`
+ document.getElementById('voucherCodeInput').value='SAVE10';document.getElementById('voucherApplyBtn').click();
+ document.getElementById('voucherCodeInput').dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}));
+ document.querySelector('.btn-inc').click();document.getElementById('clearCartBtn').click();document.getElementById('proceedCheckoutBtn').click();
+ assert(calls.length===2,'Pending voucher sent duplicate validation, mutation, or checkout');
+ assert(document.getElementById('proceedCheckoutBtn').disabled,'Pending voucher allowed checkout');
+ release();await waitFor(()=>!document.getElementById('proceedCheckoutBtn').disabled);
+ assert(document.getElementById('voucherApplyBtn').textContent.includes('Áp dụng'),'Voucher button did not restore its label');
+ `},
+ {name:'cart-quantity-revalidation-serializes-and-updates-total',page:'cart/index',route:'cart',setup:cartFixture+voucherFixture+`
+ let releaseUpdate,releaseValidate,validations=0;
+ const fixtureFetch=async request=>{
+ if(request.method==='GET')return reply(200,cart);
+ if(request.url.endsWith('/items/update'))return new Promise(resolve=>{releaseUpdate=()=>resolve(reply(200,{...cart,subtotal:250000,totalItems:2,items:[{...cart.items[0],quantity:2}]}));});
+ if(++validations===1)return reply(200,validVoucher);
+ return new Promise(resolve=>{releaseValidate=()=>resolve(reply(200,{...validVoucher,originalSubtotal:250000,discountAmount:25000}));});};`,run:cartReady+applyCartVoucher+`
+ document.querySelector('.btn-inc').click();document.querySelector('.btn-inc').click();document.querySelector('.btn-remove').click();
+ assert(calls.filter(c=>c.url.endsWith('/items/update')).length===1,'Pending mutation repeated or raced removal');
+ releaseUpdate();await waitFor(()=>releaseValidate);
+ assert(document.getElementById('summaryDiscountRow').style.display==='none','Old cart discount remained while revalidation pending');
+ assert(document.getElementById('proceedCheckoutBtn').disabled,'Revalidation allowed checkout');
+ document.getElementById('proceedCheckoutBtn').click();
+ releaseValidate();await waitFor(()=>!document.getElementById('proceedCheckoutBtn').disabled);
+ assert(calls.at(-1).body.subtotal===250000,'Revalidation used old subtotal');
+ assert(document.getElementById('summaryTotal').textContent==='240.000 đ','New total or fixed delivery fee incorrect');
+ assert(document.getElementById('summaryDeliveryFee').textContent==='15.000 đ','Cart invented free delivery above 200k');
+ `},
+ {name:'cart-remove-during-revalidation-ignores-stale-response',page:'cart/index',route:'cart',setup:cartFixture+voucherFixture+`
+ let release,validations=0;const fixtureFetch=async request=>{
+ if(request.method==='GET')return reply(200,cart);
+ if(request.url.endsWith('/items/update'))return reply(200,{...cart,subtotal:200000});
+ if(++validations===1)return reply(200,validVoucher);
+ return new Promise(resolve=>{release=()=>resolve(reply(200,{...validVoucher,discountAmount:20000}));});};`,run:cartReady+applyCartVoucher+`
+ sessionStorage.setItem('crave_applied_voucher','old voucher');document.querySelector('.btn-inc').click();await waitFor(()=>release);
+ document.getElementById('voucherRemoveBtn').click();release();await waitFor(()=>!document.getElementById('proceedCheckoutBtn').disabled);
+ assert(document.getElementById('voucherAppliedChip').style.display==='none','Delayed validation restored removed voucher');
+ assert(document.getElementById('summaryTotal').textContent==='215.000 đ','Removed voucher left stale discount');
+ assert(sessionStorage.getItem('crave_applied_voucher')===null,'Removed voucher persisted for checkout');
+ `},
+ ...['network','minimum'].map(kind=>({name:'cart-revalidation-'+kind+'-clears-discount',page:'cart/index',route:'cart',setup:cartFixture+voucherFixture+`
+ let validations=0;const fixtureFetch=async request=>{
+ if(request.method==='GET')return reply(200,cart);
+ if(request.url.endsWith('/items/update'))return reply(200,{...cart,subtotal:50000});
+ if(++validations===1)return reply(200,validVoucher);
+ ${kind==='network'?"throw new Error('offline');":"return reply(400,null,{code:'PROMOTION_MIN_ORDER_NOT_MET',message:'Minimum not met'});"}};`,run:cartReady+applyCartVoucher+`
+ saveVoucher();document.querySelector('.btn-inc').click();await waitFor(()=>!document.getElementById('proceedCheckoutBtn').disabled);
+ assert(document.getElementById('voucherAppliedChip').style.display==='none','Failed validation kept voucher');
+ assert(document.getElementById('summaryTotal').textContent==='65.000 đ','Failed validation kept old amount');
+ assert(sessionStorage.getItem('crave_applied_voucher')===null,'Failed validation left checkout voucher');
+ `})),
+ {name:'cart-storage-unavailable-handoff-uses-code-query',page:'cart/index',route:'cart',context:'/cart-shop',setup:cartFixture+voucherFixture+`
+ const fixtureFetch=async request=>request.method==='GET'?reply(200,cart):reply(200,validVoucher);
+ Storage.prototype.setItem=()=>{throw new Error('Storage blocked');};`,run:cartReady+applyCartVoucher+`
+ document.getElementById('proceedCheckoutBtn').click();`,redirect:'/cart-shop/checkout?voucher=SAVE10'},
+ {name:'checkout-validates-handoff-and-pickup-totals',page:'order/checkout',route:'checkout',context:'/cart-shop',setup:cartFixture+voucherFixture+`
+ saveVoucher();const fixtureFetch=async request=>{
+ if(request.method==='GET')return reply(200,{...cart,subtotal:'150000'});
+ if(request.url.endsWith('/validate'))return reply(200,{...validVoucher,originalSubtotal:150000,discountAmount:15000});
+ return reply(400,null,{code:'VALIDATION_ERROR',message:'Order validation failed'});};`,run:`
+ await waitFor(()=>!document.getElementById('placeOrderBtn').disabled);
+ assert(calls[1].body.code==='SAVE10'&&calls[1].body.subtotal===150000,'Checkout failed to revalidate handoff against fresh subtotal');
+ assert(document.getElementById('summaryTotal').textContent==='150.000 đ','Checkout trusted saved discount');
+ assert(!document.getElementById('summaryDiscountRow').hidden,'Validated discount missing');
+ document.getElementById('fulfillmentType').value='PICKUP';document.getElementById('fulfillmentType').dispatchEvent(new Event('change'));
+ assert(document.getElementById('summaryTotal').textContent==='135.000 đ'&&!document.getElementById('deliveryAddress').required,'Pickup fee/address incorrect');
+ orderFields();submit('checkoutForm');await waitFor(()=>!document.getElementById('placeOrderBtn').disabled);
+ const order=calls.find(c=>c.url.endsWith('/api/orders'));
+ assert(order.body.promotionId==='KM01'&&order.body.deliveryAddress===null,'Checkout sent forged ID or pickup address');
+ assert(!('discountAmount' in order.body)&&!('subtotal' in order.body),'Checkout submitted client money');
+ assert(order.body.receiverName==='Khach Hang'&&order.body.customerNote==='note','Checkout fields not trimmed');
+ assert(document.getElementById('checkoutAlert').textContent==='Order validation failed','Canonical order error missing');
+ assert(calls.every(c=>c.url.startsWith('/cart-shop/api/')&&c.options.credentials==='same-origin'),'Checkout escaped context/session');
+ `},
+ {name:'checkout-loading-and-order-double-submit-success',page:'order/checkout',route:'checkout',context:'/cart-shop',setup:cartFixture+voucherFixture+`
+ saveVoucher();let releaseLoad,releaseOrder;const fixtureFetch=async request=>{
+ if(request.method==='GET')return new Promise(resolve=>{releaseLoad=()=>resolve(reply(200,cart));});
+ if(request.url.endsWith('/validate'))return reply(200,validVoucher);
+ return new Promise(resolve=>{releaseOrder=()=>resolve(reply(201,{orderId:'DH01'}));});};`,run:`
+ submit('checkoutForm');document.getElementById('retryCheckoutBtn').click();assert(calls.length===1,'Pending cart allowed order or duplicate load');
+ releaseLoad();await waitFor(()=>!document.getElementById('placeOrderBtn').disabled);
+ orderFields();submit('checkoutForm');submit('checkoutForm');
+ assert(calls.filter(c=>c.url.endsWith('/api/orders')).length===1,'Double submit created two order requests');
+ assert(document.getElementById('placeOrderBtn').disabled,'Pending order button enabled');releaseOrder();`,redirect:'/cart-shop/orders/DH01',
+ redirectCheck:`if(sessionStorage.getItem('crave_applied_voucher')!==null)throw new Error('Successful checkout retained voucher');`},
+ {name:'checkout-voucher-network-failure-blocks-and-retries',page:'order/checkout',route:'checkout',setup:cartFixture+voucherFixture+`
+ saveVoucher();let validations=0,release;const fixtureFetch=async request=>{
+ if(request.method==='GET')return reply(200,cart);
+ if(++validations===1)return new Promise(resolve=>{release=()=>resolve(reply(503,null,{code:'DATABASE_ERROR',message:'Validation unavailable'}));});
+ return reply(200,validVoucher);};`,run:`
+ await waitFor(()=>release);submit('checkoutForm');assert(calls.length===2,'Pending voucher allowed checkout');
+ release();await waitFor(()=>!document.getElementById('retryCheckoutBtn').hidden);
+ assert(document.getElementById('placeOrderBtn').disabled&&sessionStorage.getItem('crave_applied_voucher'),'Validation failure allowed order or lost voucher intent');
+ assert(document.getElementById('checkoutAlert').textContent==='Validation unavailable','Validation failure missing');
+ document.getElementById('retryCheckoutBtn').click();await waitFor(()=>!document.getElementById('placeOrderBtn').disabled);
+ assert(document.getElementById('summaryTotal').textContent==='105.000 đ','Validation retry failed');
+ `},
+ {name:'checkout-expired-handoff-clears-voucher',page:'order/checkout',route:'checkout',setup:cartFixture+voucherFixture+`
+ saveVoucher();const fixtureFetch=async request=>request.method==='GET'?reply(200,cart):reply(400,null,{code:'PROMOTION_EXPIRED',message:'Voucher expired'});`,run:`
+ await waitFor(()=>!document.getElementById('placeOrderBtn').disabled);
+ assert(document.getElementById('checkoutAlert').textContent==='Voucher expired','Expired voucher was silently dropped');
+ assert(document.getElementById('summaryTotal').textContent==='115.000 đ'&&document.getElementById('summaryDiscountRow').hidden,'Expired voucher left discounted total');
+ assert(sessionStorage.getItem('crave_applied_voucher')===null,'Expired handoff retained');
+ `},
+ {name:'checkout-order-expiry-updates-total-before-retry',page:'order/checkout',route:'checkout',setup:cartFixture+voucherFixture+`
+ saveVoucher();let orders=0;const fixtureFetch=async request=>{
+ if(request.method==='GET')return reply(200,cart);
+ if(request.url.endsWith('/validate'))return reply(200,validVoucher);
+ return reply(400,null,++orders===1?{code:'PROMOTION_EXPIRED',message:'Expired while ordering'}:{code:'VALIDATION_ERROR',message:'Stop fixture'});};`,run:`
+ await waitFor(()=>!document.getElementById('placeOrderBtn').disabled);orderFields();submit('checkoutForm');
+ await waitFor(()=>document.getElementById('checkoutAlert').textContent==='Expired while ordering');
+ assert(calls.filter(c=>c.url.endsWith('/api/orders')).length===1,'Expired voucher silently retried full-price order');
+ await waitFor(()=>!document.getElementById('placeOrderBtn').disabled);
+ assert(document.getElementById('summaryTotal').textContent==='115.000 đ'&&sessionStorage.getItem('crave_applied_voucher')===null,'Order expiry retained discount');
+ submit('checkoutForm');await waitFor(()=>calls.filter(c=>c.url.endsWith('/api/orders')).length===2);
+ assert(calls.at(-1).body.promotionId===null,'Explicit retry sent expired promotion');
+ `},
+ {name:'checkout-minimum-rejection-refreshes-changed-cart-before-retry',page:'order/checkout',route:'checkout',setup:cartFixture+voucherFixture+`
+ saveVoucher();let loads=0,releaseReload;const fixtureFetch=async request=>{
+ if(request.method==='GET'){
+ if(++loads===1)return reply(200,{...cart,subtotal:150000});
+ return new Promise(resolve=>{releaseReload=()=>resolve(reply(200,{...cart,subtotal:80000}));});}
+ if(request.url.endsWith('/validate'))return reply(200,{...validVoucher,originalSubtotal:150000,discountAmount:15000});
+ return reply(400,null,{code:'PROMOTION_MIN_ORDER_NOT_MET',message:'Current cart is below minimum'});};`,run:`
+ await waitFor(()=>!document.getElementById('placeOrderBtn').disabled);orderFields();submit('checkoutForm');
+ await waitFor(()=>releaseReload);submit('checkoutForm');
+ assert(calls.filter(c=>c.url.endsWith('/api/orders')).length===1&&document.getElementById('placeOrderBtn').disabled,'Stale cart allowed another order');
+ releaseReload();await waitFor(()=>!document.getElementById('placeOrderBtn').disabled);
+ assert(document.getElementById('summarySubtotal').textContent==='80.000 đ'&&document.getElementById('summaryTotal').textContent==='95.000 đ','Rejected order kept obsolete cart subtotal');
+ assert(document.getElementById('checkoutAlert').textContent==='Current cart is below minimum','Cart refresh swallowed rejection warning');
+ `},
+ ...['FOOD_NOT_AVAILABLE','INVALID_OPTION'].map(code=>({name:'checkout-'+code.toLowerCase()+'-retains-cart-recovery',page:'order/checkout',route:'checkout',setup:cartFixture+`
+ const fixtureFetch=async request=>request.method==='GET'?reply(200,cart):reply(400,null,{code:'${code}',message:'Fix cart selection'});`,run:`
+ await waitFor(()=>!document.getElementById('placeOrderBtn').disabled);setFields({receiverName:'Khach',receiverPhone:'0901234567',deliveryAddress:'Street'});submit('checkoutForm');
+ await waitFor(()=>calls.filter(c=>c.method==='GET').length===2&&!document.getElementById('retryCheckoutBtn').hidden);
+ assert(document.getElementById('placeOrderBtn').disabled,'Rejected cart selection still allowed checkout');
+ assert(document.querySelector('a[href="/crave/cart"]'),'Rejected cart selection omitted cart recovery link');
+ assert(document.getElementById('checkoutAlert').textContent==='Fix cart selection','Rejected cart warning lost during refresh');
+ assert(document.getElementById('receiverName').value==='Khach','Rejected cart selection lost recipient draft');
+ `})),
+ {name:'checkout-root-context-query-voucher-validates',page:'order/checkout',route:'checkout',context:'',query:'voucher=SAVE10',setup:cartFixture+voucherFixture+`
+ Storage.prototype.getItem=()=>{throw new Error('Storage blocked');};
+ const fixtureFetch=async request=>request.method==='GET'?reply(200,cart):reply(200,validVoucher);`,run:`
+ await waitFor(()=>!document.getElementById('placeOrderBtn').disabled);
+ assert(calls[0].url==='/api/cart'&&calls[1].url==='/api/promotions/validate'&&calls[1].body.code==='SAVE10','Root context/query voucher was ignored');
+ assert(document.getElementById('summaryTotal').textContent==='105.000 đ','Root-context validated voucher total incorrect');
+ assert(document.querySelector('a[href="/cart"]'),'Root-context cart link incorrect');
+ `},
+ {name:'checkout-empty-cart-cannot-submit',page:'order/checkout',route:'checkout',setup:cartFixture+voucherFixture+`
+ saveVoucher();const fixtureFetch=async()=>reply(200,{items:[],subtotal:0,totalItems:0});`,run:`
+ await waitFor(()=>!document.getElementById('retryCheckoutBtn').hidden);submit('checkoutForm');
+ assert(calls.length===1&&document.getElementById('placeOrderBtn').disabled,'Empty checkout submitted');
+ assert(document.getElementById('summaryTotal').textContent==='0 đ'&&sessionStorage.getItem('crave_applied_voucher')===null,'Empty cart kept amount or voucher');
+ `},
+ {name:'checkout-session-expiry-clears-private-form',page:'order/checkout',route:'checkout',context:'/cart-shop',setup:cartFixture+voucherFixture+`
+ saveVoucher();const fixtureFetch=async request=>request.method==='GET'?reply(200,cart):request.url.endsWith('/validate')?reply(200,validVoucher):reply(401,null,{message:'Unauthorized'});`,run:`
+ await waitFor(()=>!document.getElementById('placeOrderBtn').disabled);orderFields();
+ window.addEventListener('beforeunload',()=>sessionStorage.setItem('checkout-expiry-snapshot',JSON.stringify({
+ name:document.getElementById('receiverName').value,total:document.getElementById('summaryTotal').textContent,disabled:document.getElementById('placeOrderBtn').disabled
+ })));submit('checkoutForm');`,redirect:'/cart-shop/auth/login?reason=session-expired&returnTo=%2Fcart-shop%2Fcheckout',redirectCheck:`
+ const snapshot=JSON.parse(sessionStorage.getItem('checkout-expiry-snapshot'));
+ if(snapshot?.name!==''||snapshot.total!=='0 đ'||!snapshot.disabled)throw new Error('Expired checkout retained private form');
+ if(sessionStorage.getItem('crave_applied_voucher')!==null)throw new Error('Expired checkout retained voucher');
+ `}
+);
+
 const selectedCases = cases.filter(test => !process.argv[2] || new RegExp(process.argv[2]).test(test.name));
 if (!selectedCases.length) throw new Error('No browser cases matched.');
 let current;
@@ -487,7 +661,8 @@ function renderTags(source) {
    if(condition==="sessionScope.currentUser.accountType == 'CUSTOMER'")return accountType==='CUSTOMER'?content:'';
    throw new Error('Unrecognized JSP condition: '+condition);
  })
- .replace(/<%@[^]*?%>/g,'').replace(/<c:url value='([^']*)'\s*\/>/g,(_,p)=>(current.context||'/crave')+p)
+ .replace(/<%@[^]*?%>/g,'').replace(/<c:url value='([^']*)'\s*\/>/g,(_,p)=>(current.context??'/crave')+p)
+ .replace(/<c:out value='\$\{pageContext.request.contextPath\}'\s*\/>/g,current.context??'/crave')
  .replace(/<c:out[^]*?\/>/g,'')
  .replace(/\$\{empty (?:error|message) \? 'hidden' : ''\}/g,'hidden');
 }
@@ -495,7 +670,7 @@ function markup(page) {
  return renderTags(fs.readFileSync(path.join(project,'frontend/WEB-INF/views',page+'.jsp'),'utf8'));
 }
 function headerMarkup() {
- const context=current.context||'/crave';
+ const context=current.context??'/crave';
  const source=fs.readFileSync(path.join(project,'frontend/WEB-INF/views/components/header.jspf'),'utf8')
  .replace(/<c:choose>\s*<c:when[^>]*>([^]*?)<\/c:when>\s*<c:otherwise>([^]*?)<\/c:otherwise>\s*<\/c:choose>/g,(_,signedIn,guest)=>current.accountType?signedIn:guest)
  .replace(/<c:out value='\$\{pageContext.request.contextPath\}'\s*\/>/g,context)
@@ -510,8 +685,8 @@ function footerMarkup() {
  .replace(/<script[^]*?<\/script>/g,'').replace(/<\/body>|<\/html>/g,''));
 }
 const server=http.createServer((req,res)=>{
- const context=current.context||'/crave';
- const script=/\/assets\/js\/(account|cart)\.js$/.exec(req.url);
+ const context=current.context??'/crave';
+ const script=/\/assets\/js\/(account|cart|checkout)\.js$/.exec(req.url);
  if(script){res.setHeader('Content-Type','text/javascript; charset=utf-8');res.end(fs.readFileSync(path.join(project,'frontend/assets/js',script[1]+'.js')));return;}
  const stylesheet=/\/assets\/css\/(styles|account|cart)\.css$/.exec(req.url);
  if(stylesheet){res.setHeader('Content-Type','text/css; charset=utf-8');res.end(fs.readFileSync(path.join(project,'frontend/assets/css',stylesheet[1]+'.css')));return;}
@@ -529,18 +704,63 @@ const server=http.createServer((req,res)=>{
  <script>document.addEventListener('DOMContentLoaded',async()=>{try{${run}}catch(e){finish('FAIL '+e.message);}});</script></body></html>`);
 });
 async function browser(url,index){
- return await new Promise((resolve,reject)=>{
- const child=spawn(chrome,['--headless=new','--no-sandbox','--disable-gpu','--disable-background-networking','--disable-extensions','--no-first-run','--no-default-browser-check','--window-size='+(current.viewport||1280)+',900','--user-data-dir='+path.join(work,'profile-'+index),'--dump-dom','--virtual-time-budget=12000',url],{windowsHide:true});
- let output='';child.stdout.on('data',d=>output+=d);child.stderr.resume();child.on('error',reject);
- const timer=setTimeout(()=>{child.kill();reject(new Error('Browser timeout'));},25000);
- child.on('close',()=>{clearTimeout(timer);resolve(output);});
+ const profileDirectory=path.join(work,'profile-'+index);
+ const child=spawn(chrome,['--headless=new','--no-sandbox','--disable-gpu','--disable-background-networking','--disable-extensions','--no-first-run','--no-default-browser-check','--window-size='+(current.viewport||1280)+',900','--user-data-dir='+profileDirectory,'--remote-debugging-port=0',url],{windowsHide:true});
+ child.stdout.resume();child.stderr.resume();
+ let startupError,socket,sequence=0;
+ child.on('error',error=>startupError=error);
+ const pending=new Map();
+ const send=(method,params={})=>new Promise(resolve=>{
+   const id=++sequence;
+   const timer=setTimeout(()=>{pending.delete(id);resolve({});},2000);
+   pending.set(id,data=>{clearTimeout(timer);resolve(data);});
+   socket.send(JSON.stringify({id,method,params}));
  });
+ const deadline=Date.now()+25000;
+ try {
+   while(Date.now()<deadline){
+     if(startupError)throw startupError;
+     if(!socket){
+       const portFile=path.join(profileDirectory,'DevToolsActivePort');
+       if(fs.existsSync(portFile)){
+         let port,targets;
+         try {
+           port=fs.readFileSync(portFile,'utf8').split('\n')[0];
+           if(!/^\d+$/.test(port))throw new Error('Debugging port not ready');
+           targets=await fetch('http://127.0.0.1:'+port+'/json').then(response=>response.json());
+         } catch (_) {
+           // Windows briefly locks the file while Chrome publishes its debugging endpoint.
+           await new Promise(resolve=>setTimeout(resolve,50));
+           continue;
+         }
+         const target=targets.find(page=>page.type==='page'&&page.url.startsWith(new URL(url).origin));
+         if(target){
+           socket=new WebSocket(target.webSocketDebuggerUrl);
+           await new Promise((resolve,reject)=>{socket.addEventListener('open',resolve,{once:true});socket.addEventListener('error',reject,{once:true});});
+           socket.addEventListener('message',event=>{const data=JSON.parse(event.data);if(data.id){pending.get(data.id)?.(data);pending.delete(data.id);}});
+         }
+       }
+     }
+     if(socket){
+       // Explicitly wait for the fixture result; --dump-dom can stall across async checkout redirects.
+       const response=await send('Runtime.evaluate',{expression:"document.getElementById('smoke-result') ? document.documentElement.outerHTML : null",returnByValue:true});
+       const output=response.result?.result?.value;
+       if(output)return output;
+     }
+     await new Promise(resolve=>setTimeout(resolve,50));
+   }
+   throw new Error('Browser timeout: '+current.name);
+ } finally {
+   if(socket&&socket.readyState===WebSocket.OPEN){socket.send(JSON.stringify({id:++sequence,method:'Browser.close'}));socket.close();}
+   await new Promise(resolve=>{if(child.exitCode!==null)return resolve();child.once('close',resolve);setTimeout(resolve,1000);});
+   if(child.exitCode===null)child.kill();
+ }
 }
 (async()=>{
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
  let failed=0;
  for(let i=0;i<selectedCases.length;i++){
- current=selectedCases[i];const url=`http://127.0.0.1:${server.address().port}${current.context||'/crave'}/${current.route||current.page}${current.query?'?'+current.query:''}`;
+ current=selectedCases[i];const url=`http://127.0.0.1:${server.address().port}${current.context??'/crave'}/${current.route||current.page}${current.query?'?'+current.query:''}`;
  const output=await browser(url,i);fs.writeFileSync(path.join(work,current.name+'.html'),output);
  const matches=[...output.matchAll(/<pre id="smoke-result">([^<]*)<\/pre>/g)];const result=matches.at(-1)?.[1]||'FAIL no result';
  console.log(current.name+': '+result);if(!result.startsWith('PASS '))failed++;

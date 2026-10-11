@@ -64,8 +64,7 @@ public class PromotionValidator {
      */
     public static void validateApplicableForOrder(Promotion promotion, CustomerOrder order) {
         if (order == null) {
-            validateApplicable(promotion, BigDecimal.ZERO, LocalDateTime.now());
-            return;
+            throw new PromotionValidationException(ErrorCode.BAD_REQUEST, "Đơn hàng không được để trống");
         }
         validateApplicable(promotion, order.getSubtotal(), order.getOrderTime());
     }

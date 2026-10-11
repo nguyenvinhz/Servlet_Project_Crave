@@ -12,6 +12,12 @@ paths:
   /orders:
     post:
       summary: Tạo đơn hàng mới từ giỏ hàng hiện tại (Checkout)
+      description: |
+        Server đọc lại giá món, tùy chọn và subtotal từ giỏ hàng trong transaction.
+        Voucher được kiểm tra lại trạng thái, thời gian hiệu lực và giá trị tối thiểu
+        tại thời điểm tạo đơn. Client chỉ gửi promotionId, không gửi tổng tiền hoặc
+        số tiền giảm. Giỏ được xóa sau khi tạo đơn thành công; request lặp trên giỏ
+        đã checkout trả CART_EMPTY và không tạo thêm đơn.
       security:
         - sessionCookie: []
       requestBody:
@@ -28,7 +34,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiResponse_OrderResponse'
         '400':
-          description: Lỗi dữ liệu đầu vào hoặc giỏ hàng trống / sai mã khuyến mãi
+          description: |
+            Dữ liệu không hợp lệ; CART_EMPTY, FOOD_NOT_AVAILABLE, INVALID_OPTION;
+            PROMOTION_NOT_FOUND, PROMOTION_INACTIVE, PROMOTION_NOT_STARTED,
+            PROMOTION_EXPIRED hoặc PROMOTION_MIN_ORDER_NOT_MET.
           content:
             application/json:
               schema:

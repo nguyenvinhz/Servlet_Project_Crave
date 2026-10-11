@@ -19,6 +19,7 @@ Báo cáo được nhóm theo chức năng; ngày trong tên file là ngày tạ
 | 2026-10-03 | Backend giỏ hàng và khuyến mãi | [Cart/promotion backend](cart-voucher/2026-10-03-ung-van-tri-cart-promotion-backend.md) |
 | 2026-10-09 | Tách phạm vi giỏ hàng và voucher Ngày 1 | [Cart/voucher Day 1](cart-voucher/2026-10-09-ung-van-tri-cart-voucher-day1.md) |
 | 2026-10-09 | Tách phạm vi giỏ hàng và voucher Ngày 2 | [Cart/voucher Day 2](cart-voucher/2026-10-09-ung-van-tri-cart-voucher-day2.md) |
+| 2026-10-09 | Tích hợp cart/voucher với checkout Ngày 3; sửa sau review ngày 2026-10-11 | [Cart/voucher Day 3](cart-voucher/2026-10-09-ung-van-tri-cart-voucher-day3.md) |
 | 2026-10-11 | Sửa issue #23: chặn voucher INACTIVE trong procedure tính giảm giá — Nguyễn Quang Vinh | [Inactive promotion discount](cart-voucher/2026-10-11-nguyen-quang-vinh-inactive-promotion-discount.md) |
 
 ## Menu và quản lý món — Nguyễn Minh Huân
