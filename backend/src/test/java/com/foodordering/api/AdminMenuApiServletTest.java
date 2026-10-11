@@ -236,6 +236,128 @@ class AdminMenuApiServletTest {
         assertTrue(responseWriter.toString().contains("UNAUTHORIZED"));
     }
 
+    @Test
+    void postCategorySessionChangeRejectsWith401() throws Exception {
+        when(request.getServletPath()).thenReturn("/api/admin/categories");
+        when(request.getPathInfo()).thenReturn(null);
+        mockRequestBody("{\"name\":\"Món mới\",\"description\":\"Mô tả\"}");
+
+        when(menuService.createCategory(any())).thenAnswer(invocation -> {
+            ProfileResponse anotherUser = new ProfileResponse(
+                    "NV02", AccountType.EMPLOYEE, "Khác", "other@crave.vn", "0901234599", EmployeeRole.ADMIN);
+            SessionAuth.store(session, anotherUser);
+            return new CategoryResponse("DM02", "Món mới", "Mô tả", 0);
+        });
+
+        servlet.doPost(request, response);
+
+        verify(response).setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        assertTrue(responseWriter.toString().contains("UNAUTHORIZED"));
+    }
+
+    @Test
+    void putFoodStatusSessionChangeRejectsWith401() throws Exception {
+        when(request.getServletPath()).thenReturn("/api/admin/foods");
+        when(request.getPathInfo()).thenReturn("/MA01/status");
+        mockRequestBody("{\"status\":\"UNAVAILABLE\"}");
+
+        when(menuService.updateFoodStatus(eq("MA01"), eq(FoodStatus.UNAVAILABLE))).thenAnswer(invocation -> {
+            ProfileResponse anotherUser = new ProfileResponse(
+                    "NV02", AccountType.EMPLOYEE, "Khác", "other@crave.vn", "0901234599", EmployeeRole.ADMIN);
+            SessionAuth.store(session, anotherUser);
+            return new FoodDetailResponse("MA01", "DM01", "Burger", "Burger bò", BigDecimal.valueOf(50000), null, null, FoodStatus.UNAVAILABLE, Collections.emptyList());
+        });
+
+        servlet.doPut(request, response);
+
+        verify(response).setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        assertTrue(responseWriter.toString().contains("UNAUTHORIZED"));
+    }
+
+    @Test
+    void deleteCategorySessionChangeRejectsWith401() throws Exception {
+        when(request.getServletPath()).thenReturn("/api/admin/categories");
+        when(request.getPathInfo()).thenReturn("/DM01");
+
+        doAnswer(invocation -> {
+            ProfileResponse anotherUser = new ProfileResponse(
+                    "NV02", AccountType.EMPLOYEE, "Khác", "other@crave.vn", "0901234599", EmployeeRole.ADMIN);
+            SessionAuth.store(session, anotherUser);
+            return null;
+        }).when(menuService).deleteCategory("DM01");
+
+        servlet.doDelete(request, response);
+
+        verify(response).setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        assertTrue(responseWriter.toString().contains("UNAUTHORIZED"));
+    }
+
+    @Test
+    void roleDemotionToCustomerRejectsWith401() throws Exception {
+        when(request.getServletPath()).thenReturn("/api/admin/categories");
+        when(request.getPathInfo()).thenReturn(null);
+        mockRequestBody("{\"name\":\"Món mới\",\"description\":\"Mô tả\"}");
+
+        when(menuService.createCategory(any())).thenAnswer(invocation -> {
+            ProfileResponse demotedUser = new ProfileResponse(
+                    "NV01", AccountType.EMPLOYEE, "Admin", "admin@crave.vn", "0901234567", null);
+            SessionAuth.store(session, demotedUser);
+            return new CategoryResponse("DM02", "Món mới", "Mô tả", 0);
+        });
+
+        servlet.doPost(request, response);
+
+        verify(response).setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        assertTrue(responseWriter.toString().contains("UNAUTHORIZED"));
+    }
+
+    @Test
+    void updateFoodOptionStatusViaOptionsStatusPathReturns200() throws Exception {
+        when(request.getServletPath()).thenReturn("/api/admin/options");
+        when(request.getPathInfo()).thenReturn("/TC01/status");
+        mockRequestBody("{\"status\":\"INACTIVE\"}");
+
+        when(menuService.updateFoodOptionStatus("TC01", OptionStatus.INACTIVE)).thenReturn(
+                new FoodOptionResponse("TC01", "MA01", OptionType.TOPPING, "Trân châu", BigDecimal.valueOf(5000), OptionStatus.INACTIVE)
+        );
+
+        servlet.doPut(request, response);
+
+        verify(response).setStatus(HttpServletResponse.SC_OK);
+        assertTrue(responseWriter.toString().contains("INACTIVE"));
+    }
+
+    @Test
+    void updateFoodOptionStatusViaFoodOptionsStatusPathReturns200() throws Exception {
+        when(request.getServletPath()).thenReturn("/api/admin/foods");
+        when(request.getPathInfo()).thenReturn("/MA01/options/TC01/status");
+        mockRequestBody("{\"status\":\"ACTIVE\"}");
+
+        when(menuService.updateFoodOptionStatus("TC01", OptionStatus.ACTIVE)).thenReturn(
+                new FoodOptionResponse("TC01", "MA01", OptionType.TOPPING, "Trân châu", BigDecimal.valueOf(5000), OptionStatus.ACTIVE)
+        );
+
+        servlet.doPut(request, response);
+
+        verify(response).setStatus(HttpServletResponse.SC_OK);
+        assertTrue(responseWriter.toString().contains("ACTIVE"));
+    }
+
+    @Test
+    void customerAccountReturnsForbidden403OnAdminMenuApi() throws Exception {
+        ProfileResponse customer = new ProfileResponse(
+                "KH01", AccountType.CUSTOMER, "Khách hàng", "khach@crave.vn", "0912345678", null);
+        sessionAttributes.put("currentUser", customer);
+
+        when(request.getServletPath()).thenReturn("/api/admin/categories");
+        when(request.getPathInfo()).thenReturn(null);
+
+        servlet.doGet(request, response);
+
+        verify(response).setStatus(HttpServletResponse.SC_FORBIDDEN);
+        assertTrue(responseWriter.toString().contains("FORBIDDEN"));
+    }
+
     private void mockRequestBody(String json) throws IOException {
         byte[] bytes = json.getBytes(StandardCharsets.UTF_8);
         ByteArrayInputStream bais = new ByteArrayInputStream(bytes);
