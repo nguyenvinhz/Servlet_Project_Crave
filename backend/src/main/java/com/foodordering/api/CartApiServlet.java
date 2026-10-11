@@ -2,23 +2,19 @@ package com.foodordering.api;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.foodordering.dto.AddToCartRequest;
-import com.foodordering.dto.ApiError;
 import com.foodordering.dto.ApiResponse;
 import com.foodordering.dto.CartDto;
 import com.foodordering.dto.UpdateCartItemRequest;
 import com.foodordering.enums.ErrorCode;
-import com.foodordering.exception.ApiException;
-import com.foodordering.exception.AppException;
 import com.foodordering.exception.BadRequestException;
+import com.foodordering.security.SessionAuth;
 import com.foodordering.service.CartService;
 import com.foodordering.utils.JsonProvider;
 import com.foodordering.utils.JsonUtils;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
-import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import jakarta.servlet.http.HttpSession;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -26,7 +22,7 @@ import java.util.Collections;
 import java.util.List;
 
 @WebServlet(name = "CartApiServlet", urlPatterns = {"/api/cart", "/api/cart/*"})
-public class CartApiServlet extends HttpServlet {
+public class CartApiServlet extends BaseApiServlet {
 
     private final CartService cartService;
 
@@ -42,11 +38,8 @@ public class CartApiServlet extends HttpServlet {
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
         try {
             String customerId = resolveCustomerId(req);
-            if (customerId == null) {
-                throw new ApiException(ErrorCode.UNAUTHORIZED, "Vui lòng đăng nhập để xem giỏ hàng", HttpServletResponse.SC_UNAUTHORIZED);
-            }
             CartDto cart = cartService.getOrCreateCart(customerId);
-            writeResponse(resp, HttpServletResponse.SC_OK, new ApiResponse<>(true, "Lấy giỏ hàng thành công", cart, null));
+            writeJson(resp, HttpServletResponse.SC_OK, ApiResponse.success(cart));
         } catch (Exception e) {
             handleError(resp, e);
         }
@@ -56,9 +49,6 @@ public class CartApiServlet extends HttpServlet {
     protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
         try {
             String customerId = resolveCustomerId(req);
-            if (customerId == null) {
-                throw new ApiException(ErrorCode.UNAUTHORIZED, "Vui lòng đăng nhập để thao tác giỏ hàng", HttpServletResponse.SC_UNAUTHORIZED);
-            }
 
             String normPath = normalizePath(req.getPathInfo());
             String action = req.getParameter("action");
@@ -83,9 +73,6 @@ public class CartApiServlet extends HttpServlet {
     protected void doPut(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
         try {
             String customerId = resolveCustomerId(req);
-            if (customerId == null) {
-                throw new ApiException(ErrorCode.UNAUTHORIZED, "Vui lòng đăng nhập để thao tác giỏ hàng", HttpServletResponse.SC_UNAUTHORIZED);
-            }
 
             String normPath = normalizePath(req.getPathInfo());
             if ("".equals(normPath) || "/items".equals(normPath) || normPath.startsWith("/items/")) {
@@ -102,9 +89,6 @@ public class CartApiServlet extends HttpServlet {
     protected void doDelete(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
         try {
             String customerId = resolveCustomerId(req);
-            if (customerId == null) {
-                throw new ApiException(ErrorCode.UNAUTHORIZED, "Vui lòng đăng nhập để thao tác giỏ hàng", HttpServletResponse.SC_UNAUTHORIZED);
-            }
 
             String normPath = normalizePath(req.getPathInfo());
             String action = req.getParameter("action");
@@ -133,13 +117,13 @@ public class CartApiServlet extends HttpServlet {
     private void handleAddItem(HttpServletRequest req, HttpServletResponse resp, String customerId) throws IOException {
         AddToCartRequest addReq = readAddToCartDto(req);
         CartDto cart = cartService.addItem(customerId, addReq);
-        writeResponse(resp, HttpServletResponse.SC_OK, new ApiResponse<>(true, "Thêm món vào giỏ hàng thành công", cart, null));
+        writeJson(resp, HttpServletResponse.SC_OK, ApiResponse.success(cart));
     }
 
     private void handleUpdateItem(HttpServletRequest req, HttpServletResponse resp, String customerId) throws IOException {
         UpdateCartItemRequest updateReq = readUpdateCartItemDto(req);
         CartDto cart = cartService.updateItem(customerId, updateReq);
-        writeResponse(resp, HttpServletResponse.SC_OK, new ApiResponse<>(true, "Cập nhật món trong giỏ hàng thành công", cart, null));
+        writeJson(resp, HttpServletResponse.SC_OK, ApiResponse.success(cart));
     }
 
     private void handleRemoveItem(HttpServletRequest req, HttpServletResponse resp, String customerId) throws IOException {
@@ -148,24 +132,16 @@ public class CartApiServlet extends HttpServlet {
             throw new BadRequestException(ErrorCode.BAD_REQUEST, "Mã mục giỏ hàng (cartItemId) không được để trống khi xóa món");
         }
         CartDto cart = cartService.removeItem(customerId, cartItemId.trim());
-        writeResponse(resp, HttpServletResponse.SC_OK, new ApiResponse<>(true, "Xóa món khỏi giỏ hàng thành công", cart, null));
+        writeJson(resp, HttpServletResponse.SC_OK, ApiResponse.success(cart));
     }
 
     private void handleClearCart(HttpServletRequest req, HttpServletResponse resp, String customerId) throws IOException {
         CartDto cart = cartService.clearCart(customerId);
-        writeResponse(resp, HttpServletResponse.SC_OK, new ApiResponse<>(true, "Xóa toàn bộ giỏ hàng thành công", cart, null));
+        writeJson(resp, HttpServletResponse.SC_OK, ApiResponse.success(cart));
     }
 
     private String resolveCustomerId(HttpServletRequest req) {
-        HttpSession session = req.getSession(false);
-        String customerId = session != null ? (String) session.getAttribute("customerId") : null;
-        if (customerId == null || customerId.trim().isEmpty()) {
-            customerId = req.getHeader("X-Customer-Id");
-        }
-        if (customerId == null || customerId.trim().isEmpty()) {
-            customerId = req.getParameter("customerId");
-        }
-        return (customerId != null && !customerId.trim().isEmpty()) ? customerId.trim() : null;
+        return SessionAuth.requireCustomer(req).id();
     }
 
     private String normalizePath(String pathInfo) {
@@ -318,39 +294,5 @@ public class CartApiServlet extends HttpServlet {
             }
         }
         return null;
-    }
-
-    private void handleError(HttpServletResponse resp, Exception e) throws IOException {
-        int statusCode = HttpServletResponse.SC_INTERNAL_SERVER_ERROR;
-        ErrorCode errorCode = ErrorCode.INTERNAL_SERVER_ERROR;
-        String message = e.getMessage() != null ? e.getMessage() : "Lỗi hệ thống máy chủ nội bộ";
-
-        if (e instanceof ApiException apiEx) {
-            statusCode = apiEx.getHttpStatus();
-            errorCode = apiEx.getErrorCode() != null ? apiEx.getErrorCode() : ErrorCode.BAD_REQUEST;
-            message = apiEx.getMessage();
-        } else if (e instanceof AppException appEx) {
-            statusCode = appEx.getStatusCode();
-            writeResponse(resp, statusCode, ApiResponse.failure(new ApiError(appEx.getErrorCode(), appEx.getMessage(), appEx.getDetails())));
-            return;
-        } else if (e instanceof com.fasterxml.jackson.core.JsonProcessingException || e instanceof IllegalArgumentException) {
-            statusCode = HttpServletResponse.SC_BAD_REQUEST;
-            errorCode = ErrorCode.BAD_REQUEST;
-            message = "Dữ liệu JSON không hợp lệ: " + e.getMessage();
-        } else if (e.getCause() instanceof com.fasterxml.jackson.core.JsonProcessingException) {
-            statusCode = HttpServletResponse.SC_BAD_REQUEST;
-            errorCode = ErrorCode.BAD_REQUEST;
-            message = "Dữ liệu JSON không hợp lệ: " + e.getCause().getMessage();
-        }
-
-        writeResponse(resp, statusCode, new ApiResponse<>(false, message, null, errorCode));
-    }
-
-    private void writeResponse(HttpServletResponse resp, int statusCode, ApiResponse<?> apiResponse) throws IOException {
-        resp.setContentType("application/json; charset=UTF-8");
-        resp.setCharacterEncoding("UTF-8");
-        resp.setStatus(statusCode);
-        resp.getWriter().write(JsonUtils.toJson(apiResponse));
-        resp.getWriter().flush();
     }
 }

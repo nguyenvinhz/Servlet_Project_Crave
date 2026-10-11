@@ -1,46 +1,26 @@
 <%@ page contentType="text/html;charset=UTF-8" language="java" %>
-<%@ taglib prefix="c" uri="jakarta.tags.core" %>
-<c:set var="pageTitle" value="Order Tracking" scope="request"/>
-<%@ include file="../components/header.jspf" %>
-
-<link rel="stylesheet" href="<c:url value='/assets/css/order.css'/>">
-
-<main class="page order-page order-theme" style="max-width: 800px;">
-    <div class="tracking-header" style="text-align: center;">
-        <h1>Your order is on its way</h1>
-        <p id="orderSubtitle">Order #CRV-48291 · Basil & Brick · Estimated arrival 18-25 min</p>
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <title>Chi tiết đơn hàng | Crave</title>
+    <link rel="stylesheet" href="/crave/assets/css/styles.css">
+    <style>
+        .detail-container { max-width: 800px; margin: 40px auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .order-header { border-bottom: 1px solid #eee; padding-bottom: 15px; margin-bottom: 15px; }
+        .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; }
+        .item-list { border-top: 1px solid #eee; padding-top: 15px; }
+        .item-row { display: flex; justify-content: space-between; margin-bottom: 10px; border-bottom: 1px dashed #eee; padding-bottom: 10px; }
+        .item-details small { color: #777; display: block; }
+        .totals { margin-top: 20px; text-align: right; border-top: 1px solid #eee; padding-top: 15px; }
+        .btn-back { display: inline-block; margin-bottom: 20px; text-decoration: none; color: #3498db; }
+    </style>
+</head>
+<body>
+    <div class="detail-container">
+        <a href="/crave/orders" class="btn-back">← Quay lại danh sách</a>
+        <div id="orderContent">Đang tải...</div>
     </div>
 
-    <!-- Stepper Status -->
-    <div class="stepper" id="orderStepper">
-        <div class="step done">
-            <div class="step-icon">✓</div>
-            <div class="step-label">Order placed</div>
-        </div>
-        <div class="step active">
-            <div class="step-icon">2</div>
-            <div class="step-label">Preparing</div>
-        </div>
-        <div class="step">
-            <div class="step-icon">3</div>
-            <div class="step-label">Out for delivery</div>
-        </div>
-        <div class="step">
-            <div class="step-icon">4</div>
-            <div class="step-label">Delivered</div>
-        </div>
-    </div>
-
-    <!-- Order Item Card -->
-    <div class="tracking-item">
-        <h3>Smoky Stack Burger</h3>
-        <p>1 Item · Paid by Cash on Delivery · Total $12.82</p>
-    </div>
-</main>
-
-<script>
-    // Frontend JS placeholder: Fetch detail từ backend và update DOM tương ứng
-    // Các trạng thái (PENDING, PREPARING, DELIVERING, COMPLETED) sẽ mapping thành active / done class của stepper
-</script>
-
-<%@ include file="../components/footer.jspf" %>
+    <script src="/crave/assets/js/order-detail.js"></script>
+</body>
+</html>

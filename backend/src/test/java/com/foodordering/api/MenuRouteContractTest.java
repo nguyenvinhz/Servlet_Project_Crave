@@ -31,6 +31,7 @@ class MenuRouteContractTest {
                         "/api/admin/categories/*",
                         "/api/admin/foods",
                         "/api/admin/foods/*",
+                        "/api/admin/options",
                         "/api/admin/options/*"),
                 patterns(AdminMenuApiServlet.class));
     }

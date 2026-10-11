@@ -3,6 +3,9 @@
 Ứng dụng Java Servlet/JSP đóng gói dạng WAR, dùng Jakarta Servlet 6, JPA/Hibernate,
 HikariCP và MySQL.
 
+Tài liệu được chia thành API, kế hoạch/quy ước làm việc và báo cáo theo chức năng.
+Xem [mục lục tài liệu](docs/README.md) để tìm đúng phần cần đọc.
+
 ## Chạy môi trường phát triển
 
 Yêu cầu: JDK 17+, Maven 3.9+, Docker (nếu chưa có MySQL) và Tomcat 10.1+.
@@ -26,6 +29,18 @@ Yêu cầu: JDK 17+, Maven 3.9+, Docker (nếu chưa có MySQL) và Tomcat 10.1+
    Các biến tùy chọn: `DB_POOL_MAX_SIZE`, `DB_POOL_MIN_IDLE`,
    `DB_CONNECTION_TIMEOUT_MS`, `DB_VALIDATION_TIMEOUT_MS`, `DB_FAIL_FAST`.
 
+   Với database đã tồn tại, áp dụng bản sửa voucher `INACTIVE` (issue #23) từ
+   thư mục gốc repository bằng tài khoản sở hữu procedure:
+
+   ```powershell
+   mysql --user=root --password --database=crave --execute="SOURCE database/migrations/2026-10-11-active-promotion-discount.sql"
+   ```
+
+   Script thay thế riêng `sp_calculate_discount`; đơn cũ giữ snapshot giảm giá
+   khi chỉ đổi trạng thái. Nếu đã cấp quyền `EXECUTE` riêng cho procedure,
+   cấp lại đúng các quyền đó sau khi chạy migration. Chạy migration trong lúc
+   tạm dừng ghi đơn vì MySQL thay thế routine qua `DROP`/`CREATE`.
+
 3. Build và kiểm thử:
 
    ```powershell
@@ -40,6 +55,57 @@ Yêu cầu: JDK 17+, Maven 3.9+, Docker (nếu chưa có MySQL) và Tomcat 10.1+
    - `/crave/customer/profile`
    - `/crave/customer/addresses`
 
-Các route nghiệp vụ API Ngày 1 đã tồn tại nhưng chủ động trả HTTP `501` cho tới
-khi logic Ngày 2 được triển khai. Hợp đồng đầy đủ nằm tại
-[`docs/api-auth-profile-address.yaml`](docs/api-auth-profile-address.yaml).
+Phần tài khoản Ngày 2 đã hoàn thiện: đăng ký, đăng nhập/đăng xuất, session,
+cập nhật hồ sơ và quản lý địa chỉ giao hàng. Hợp đồng nằm tại
+[`docs/api/api-auth-profile-address.yaml`](docs/api/api-auth-profile-address.yaml).
+
+## Demo tài khoản Ngày 2 — Nguyễn Quang Vinh
+
+1. Mở `/crave/auth/register`, đăng ký bằng email và số điện thoại chưa tồn tại.
+2. Đăng nhập tại `/crave/auth/login`; ứng dụng chuyển tới hồ sơ.
+3. Sửa họ tên, email hoặc số điện thoại và lưu; tải lại trang để kiểm tra dữ liệu.
+4. Mở `/crave/customer/addresses`, thêm, sửa, chọn mặc định và xóa địa chỉ.
+   Địa chỉ đầu tiên tự động là mặc định; xóa địa chỉ mặc định sẽ chọn một địa chỉ còn lại.
+5. Đăng xuất; truy cập lại trang khách hàng sẽ chuyển về đăng nhập, API trả `401`.
+
+Mật khẩu tài khoản trong `database/seed.sql` là placeholder và không đăng nhập được.
+Hãy đăng ký tài khoản mới để demo. Ứng dụng lưu mật khẩu PBKDF2 có salt riêng;
+API không trả hash hoặc mật khẩu. Session dùng cookie HttpOnly, SameSite=Lax và
+hết hạn sau 30 phút không hoạt động. API hỗ trợ `rememberMe` kéo dài thời gian
+không hoạt động lên 7 ngày; cookie vẫn chỉ tồn tại trong phiên trình duyệt.
+
+Nhân viên đang làm việc có thể đăng nhập và xem hồ sơ; cập nhật hồ sơ và sổ địa chỉ
+dành cho khách hàng. Filter bảo vệ các route khách hàng và phân quyền route quản trị
+theo chức vụ. API quản trị menu yêu cầu `ADMIN`/`MENU_MANAGER`; API quản trị đơn và
+thanh toán yêu cầu `ADMIN`/`ORDER_STAFF`. Các servlet kiểm tra lại session và vai trò
+trước khi gọi service; ID khách hàng/nhân viên lấy từ session.
+
+Phần tài khoản Ngày 3 bổ sung kiểm thử tích hợp auth với cart/voucher/order/payment,
+validation Unicode cho dữ liệu tài khoản/địa chỉ và giao diện responsive với CSS
+riêng. Xem [báo cáo Ngày 3](docs/reports/account/2026-10-11-nguyen-quang-vinh-account-day3.md).
+Giao diện xóa voucher còn lưu của phiên trước khi đăng nhập thành công hoặc khi
+phát hiện session hết hạn; `returnTo` hợp lệ vẫn đưa người dùng về trang đang thực hiện.
+
+Demo kiểm tra quyền: chưa đăng nhập gọi `/api/cart`, `/api/orders` hoặc
+`/api/admin/orders` nhận `401`; khách hàng gọi API quản trị nhận `403`; nhân viên
+quản lý menu gọi `/api/admin/orders` nhận `403`. Đổi chức vụ hoặc khóa tài khoản
+trong database sẽ áp dụng ở request bảo vệ tiếp theo.
+
+Nếu máy đang dùng Java 25/26, chọn JDK 17 hoặc 21 trước khi chạy Maven để tương thích
+với phiên bản Mockito/Byte Buddy hiện tại:
+
+```powershell
+$env:JAVA_HOME = '<đường dẫn JDK 17 hoặc 21>'
+mvn -f backend/pom.xml clean verify
+```
+
+Kiểm thử tích hợp cần MySQL với schema/seed hiện có. Các test Ngày 2 tạo dữ liệu
+riêng và dọn dữ liệu của mình sau khi chạy.
+
+Kiểm thử giao diện tài khoản bằng Node và Chrome/Edge (API giả lập):
+
+```powershell
+node frontend/tests/account-browser-smoke.cjs
+```
+
+Nếu browser chưa được tìm thấy tự động, đặt `CHROME_PATH` tới file thực thi Chrome/Edge.

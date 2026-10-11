@@ -61,6 +61,11 @@ class CustomerOrderCompatibilityTest {
         assertEquals("DH02", order.getOrderId());
         order.setOrderId("DH03");
         assertEquals("DH03", order.getId());
+
+        order.setCustomer(new Customer("KH02"));
+        assertEquals("KH02", order.getCustomerId());
+        order.setCustomer(null);
+        assertNull(order.getCustomerId());
     }
 
     @Test
@@ -96,6 +101,9 @@ class CustomerOrderCompatibilityTest {
         assertTrue(column.insertable());
         assertTrue(column.updatable());
         assertNull(promotionId.getAnnotation(Transient.class));
+
+        order.setPromotionId(null);
+        assertNull(order.getPromotionId());
 
         Column orderTime = CustomerOrder.class.getDeclaredField("orderedAt").getAnnotation(Column.class);
         assertNotNull(orderTime);
