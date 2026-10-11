@@ -29,6 +29,18 @@ Yêu cầu: JDK 17+, Maven 3.9+, Docker (nếu chưa có MySQL) và Tomcat 10.1+
    Các biến tùy chọn: `DB_POOL_MAX_SIZE`, `DB_POOL_MIN_IDLE`,
    `DB_CONNECTION_TIMEOUT_MS`, `DB_VALIDATION_TIMEOUT_MS`, `DB_FAIL_FAST`.
 
+   Với database đã tồn tại, áp dụng bản sửa voucher `INACTIVE` (issue #23) từ
+   thư mục gốc repository bằng tài khoản sở hữu procedure:
+
+   ```powershell
+   mysql --user=root --password --database=crave --execute="SOURCE database/migrations/2026-10-11-active-promotion-discount.sql"
+   ```
+
+   Script thay thế riêng `sp_calculate_discount`; đơn cũ giữ snapshot giảm giá
+   khi chỉ đổi trạng thái. Nếu đã cấp quyền `EXECUTE` riêng cho procedure,
+   cấp lại đúng các quyền đó sau khi chạy migration. Chạy migration trong lúc
+   tạm dừng ghi đơn vì MySQL thay thế routine qua `DROP`/`CREATE`.
+
 3. Build và kiểm thử:
 
    ```powershell

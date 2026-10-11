@@ -12,13 +12,14 @@ Báo cáo được nhóm theo chức năng; ngày trong tên file là ngày tạ
 | 2026-10-08 | Tài khoản, xác thực, hồ sơ và địa chỉ Ngày 2 | [Account Day 2](account/2026-10-08-nguyen-quang-vinh-account-day2.md) |
 | 2026-10-11 | Rà soát session/phân quyền, tích hợp auth và hoàn thiện giao diện Ngày 3 | [Account Day 3](account/2026-10-11-nguyen-quang-vinh-account-day3.md) |
 
-## Giỏ hàng và khuyến mãi — Ung Văn Trí
+## Giỏ hàng và khuyến mãi
 
 | Ngày tạo | Công việc | Báo cáo |
 |---|---|---|
 | 2026-10-03 | Backend giỏ hàng và khuyến mãi | [Cart/promotion backend](cart-voucher/2026-10-03-ung-van-tri-cart-promotion-backend.md) |
 | 2026-10-09 | Tách phạm vi giỏ hàng và voucher Ngày 1 | [Cart/voucher Day 1](cart-voucher/2026-10-09-ung-van-tri-cart-voucher-day1.md) |
 | 2026-10-09 | Tách phạm vi giỏ hàng và voucher Ngày 2 | [Cart/voucher Day 2](cart-voucher/2026-10-09-ung-van-tri-cart-voucher-day2.md) |
+| 2026-10-11 | Sửa issue #23: chặn voucher INACTIVE trong procedure tính giảm giá — Nguyễn Quang Vinh | [Inactive promotion discount](cart-voucher/2026-10-11-nguyen-quang-vinh-inactive-promotion-discount.md) |
 
 ## Menu và quản lý món — Nguyễn Minh Huân
 
