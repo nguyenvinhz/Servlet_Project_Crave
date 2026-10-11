@@ -49,6 +49,7 @@ const cases = [
  return reply(200,{...profile,...request.body});};`,run:`
  await waitFor(()=>!document.getElementById('profile-fields').disabled,'Profile did not load');
  assert(document.getElementById('email').value===profile.email,'Profile not populated');
+  assert(document.querySelector('.account-sidebar a[href$="/customer/addresses"]'),'Customer profile sidebar omitted addresses');
  setFields({fullName:'  Nguyen Quang Vinh  ',email:'vinh@example.com'});submit('profileForm');
  await waitFor(()=>document.getElementById('email-error'),'Server fieldErrors not rendered');
  assert(document.activeElement.id==='email','Server field error not focused');
@@ -60,10 +61,11 @@ const cases = [
  assert(!document.getElementById('email-error'),'Old field error remained');
  assert(calls[2].options.credentials==='same-origin','Session credentials missing');
  `},
- {name:'employee-profile-readonly',page:'customer/profile',setup:`const fixtureFetch=async()=>reply(200,{...profile,id:'NV01',accountType:'EMPLOYEE',role:'ADMIN'});`,run:`
+ {name:'employee-profile-readonly',page:'customer/profile',accountType:'EMPLOYEE',setup:`const fixtureFetch=async()=>reply(200,{...profile,id:'NV01',accountType:'EMPLOYEE',role:'ADMIN'});`,run:`
  await waitFor(()=>document.getElementById('profile-loading').hidden);
  assert(document.getElementById('profile-fields').disabled,'Employee can edit profile');
  assert(!document.getElementById('profile-readonly').hidden,'Employee explanation missing');
+  assert(!document.querySelector('.account-sidebar a[href$="/customer/addresses"]'),'Employee profile sidebar exposes customer addresses');
  `},
  {name:'profile-load-retry',page:'customer/profile',setup:`let attempts=0;const fixtureFetch=async()=>++attempts===1?reply(503,null,{message:'Database unavailable'}):reply(200,profile);`,run:`
  await waitFor(()=>!document.getElementById('profile-retry').hidden);
@@ -231,6 +233,11 @@ cases.push(
  sessionStorage.setItem('crave_applied_voucher','old account voucher');
  const fixtureFetch=async()=>reply(200,{message:'Signed out'});`,run:`submit('logoutForm');`,redirect:'/crave/auth/login?loggedOut=1',
  redirectCheck:`if(sessionStorage.getItem('crave_applied_voucher')!==null)throw new Error('Signed out account voucher retained');`},
+ {name:'login-clears-previous-checkout-voucher',page:'auth/login',query:'returnTo='+encodeURIComponent('/crave/checkout?code=SAVE10'),setup:`
+  sessionStorage.setItem('crave_applied_voucher','previous account voucher');
+  const fixtureFetch=async()=>reply(200,profile);`,run:`setFields({email:'a@example.com',password:'password1'});submit('loginForm');`,
+  redirect:'/crave/checkout?code=SAVE10',
+  redirectCheck:`if(sessionStorage.getItem('crave_applied_voucher')!==null)throw new Error('Successful login retained previous account voucher');`},
  {name:'logout-storage-failure-still-redirects',page:'auth/login',setup:`
  Storage.prototype.removeItem=()=>{throw new Error('Storage blocked');};
  const fixtureFetch=async()=>reply(200,{message:'Signed out'});`,run:`submit('logoutForm');`,redirect:'/crave/auth/login?loggedOut=1'}
@@ -411,7 +418,7 @@ cases.push(
  release();await waitFor(()=>!document.getElementById('profileForm').hasAttribute('aria-busy'));
  assert(!document.getElementById('profile-fields').disabled&&document.getElementById('email').value===profile.email,'Profile did not restore after slow load');
  `},
- {name:'employee-disabled-profile-ignores-submit',page:'customer/profile',setup:`
+ {name:'employee-disabled-profile-ignores-submit',page:'customer/profile',accountType:'EMPLOYEE',setup:`
  const fixtureFetch=async()=>reply(200,{...profile,id:'NV01',accountType:'EMPLOYEE'});`,run:`
  await waitFor(()=>document.getElementById('profile-loading').hidden&&!document.getElementById('profileForm').hasAttribute('aria-busy'));
  submit('profileForm');assert(calls.length===1,'Disabled employee profile sent a write');
@@ -459,6 +466,7 @@ cases.push(
  const screen=frame.contentWindow,doc=frame.contentDocument,main=doc.querySelector('main');
  assert(screen.innerWidth===320,'Fixture did not use exact 320px viewport');
  assert(doc.querySelectorAll('header nav a').length===${role?5:3},'Fixture did not render expected role navigation');
+  if(${page==='customer/profile'})assert(Boolean(doc.querySelector('.account-sidebar a[href$="/customer/addresses"]'))===${accountType==='CUSTOMER'},'Profile sidebar disagrees with account type');
  if(${Boolean(role)})assert(screen.getComputedStyle(doc.querySelector('header nav')).flexWrap==='wrap','Staff navigation does not wrap onto rows');
  assert(main.getBoundingClientRect().right<=screen.innerWidth,'Account layout extends beyond viewport');
  assert(doc.documentElement.scrollWidth<=screen.innerWidth,'Full account document including header has horizontal overflow: '+doc.documentElement.scrollWidth+'px');
@@ -473,8 +481,14 @@ const selectedCases = cases.filter(test => !process.argv[2] || new RegExp(proces
 if (!selectedCases.length) throw new Error('No browser cases matched.');
 let current;
 function renderTags(source) {
- return source.replace(/<%@[^]*?%>/g,'').replace(/<c:url value='([^']*)'\s*\/>/g,(_,p)=>(current.context||'/crave')+p)
- .replace(/<c:out[^]*?\/>/g,'').replace(/<\/?c:if[^>]*>/g,'')
+ const accountType=current.accountType||(current.page.startsWith('customer/')?'CUSTOMER':null);
+ return source.replace(/<c:if test="\$\{([^}]+)\}">([^]*?)<\/c:if>/g,(_,condition,content)=>{
+   if(condition==="sessionScope.currentUser.role == 'ADMIN' or sessionScope.currentUser.role == 'MENU_MANAGER'")return ['ADMIN','MENU_MANAGER'].includes(current.role)?content:'';
+   if(condition==="sessionScope.currentUser.accountType == 'CUSTOMER'")return accountType==='CUSTOMER'?content:'';
+   throw new Error('Unrecognized JSP condition: '+condition);
+ })
+ .replace(/<%@[^]*?%>/g,'').replace(/<c:url value='([^']*)'\s*\/>/g,(_,p)=>(current.context||'/crave')+p)
+ .replace(/<c:out[^]*?\/>/g,'')
  .replace(/\$\{empty (?:error|message) \? 'hidden' : ''\}/g,'hidden');
 }
 function markup(page) {
@@ -483,11 +497,6 @@ function markup(page) {
 function headerMarkup() {
  const context=current.context||'/crave';
  const source=fs.readFileSync(path.join(project,'frontend/WEB-INF/views/components/header.jspf'),'utf8')
- .replace(/<c:if test="\$\{([^}]+)\}">([^]*?)<\/c:if>/g,(_,condition,content)=>{
-   if(condition.includes('currentUser.role'))return ['ADMIN','MENU_MANAGER'].includes(current.role)?content:'';
-   if(condition.includes('currentUser.accountType'))return current.accountType==='CUSTOMER'?content:'';
-   throw new Error('Unrecognized header condition: '+condition);
- })
  .replace(/<c:choose>\s*<c:when[^>]*>([^]*?)<\/c:when>\s*<c:otherwise>([^]*?)<\/c:otherwise>\s*<\/c:choose>/g,(_,signedIn,guest)=>current.accountType?signedIn:guest)
  .replace(/<c:out value='\$\{pageContext.request.contextPath\}'\s*\/>/g,context)
  .replace(/\$\{pageContext.request.contextPath\}/g,context)

@@ -213,6 +213,7 @@ document.addEventListener("DOMContentLoaded", () => {
         link.href = `${url.pathname}${url.search}`;
     });
     bindForm(loginForm, () => {
+        clearCheckoutVoucher();
         window.location.assign(returnTo || localUrl("/customer/profile"));
     });
     if (loginForm) {

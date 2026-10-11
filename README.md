@@ -71,6 +71,8 @@ trước khi gọi service; ID khách hàng/nhân viên lấy từ session.
 Phần tài khoản Ngày 3 bổ sung kiểm thử tích hợp auth với cart/voucher/order/payment,
 validation Unicode cho dữ liệu tài khoản/địa chỉ và giao diện responsive với CSS
 riêng. Xem [báo cáo Ngày 3](docs/reports/account/2026-10-11-nguyen-quang-vinh-account-day3.md).
+Giao diện xóa voucher còn lưu của phiên trước khi đăng nhập thành công hoặc khi
+phát hiện session hết hạn; `returnTo` hợp lệ vẫn đưa người dùng về trang đang thực hiện.
 
 Demo kiểm tra quyền: chưa đăng nhập gọi `/api/cart`, `/api/orders` hoặc
 `/api/admin/orders` nhận `401`; khách hàng gọi API quản trị nhận `403`; nhân viên

@@ -51,5 +51,28 @@ git diff --check
 
 - Breaking change: nhân viên khác chức vụ order không thể gọi API quản trị order/payment; phù hợp ma trận quyền hiện có của filter. Dữ liệu text không hợp lệ và URL/status sai bị từ chối bằng `400`.
 - Migration: không cần. Không bổ sung dependency hoặc cấu hình bắt buộc.
-- Code, test, OpenAPI, README và báo cáo cùng nằm trên nhánh riêng để review; không merge vào main.
+- Code, test, OpenAPI, README và báo cáo được bàn giao từ nhánh riêng qua PR đích `main`; phần dưới ghi hai lượt kiểm tra bổ sung trước khi tạo PR/merge theo yêu cầu.
 - Hoàn thành phạm vi Ngày 3 của Vinh. Checklist Gate 2/Gate 3 toàn nhóm vẫn cần demo và xác nhận của các thành viên; báo cáo này không tự đánh dấu Gate chung hoàn thành.
+
+## Hai lượt rà soát bổ sung — 2026-10-11
+
+Đã đọc lại toàn bộ code Ngày 3 và các phần tích hợp liên quan trong hai lượt độc lập. Lượt 1 rà backend và frontend song song; lượt 2 đổi người/focus review để kiểm tra chéo session/filter/API, account service/repository, auth/profile/address UI, CSS/JSP và độ chính xác của fixture. Không còn lỗi thuộc phạm vi nhánh cần chặn merge sau bản sửa dưới đây.
+
+### Lỗi tìm được và bản sửa
+
+- Khi session hết hạn và filter chuyển trang trực tiếp tới login, JavaScript trên trang cũ chưa chạy cleanup. Đăng nhập thành công có thể giữ `crave_applied_voucher` của tài khoản trước. Callback login giờ xóa voucher trước khi chuyển về `returnTo`, kể cả khi người dùng đổi tài khoản. Regression mới thất bại trước sửa và đạt sau sửa.
+- Fixture trước đây bỏ thẻ `c:if` mà luôn giữ nội dung, khiến sidebar địa chỉ khách hàng xuất hiện trong fixture hồ sơ nhân viên. Runner giờ đánh giá đúng điều kiện accountType/role, có assertions sidebar customer/employee và sáu trường hợp mobile với header/footer thật. Đây là sửa fixture; JSP production đã có điều kiện quyền đúng.
+- Nhóm 9 case liên quan: **5/9 trước sửa → 9/9 sau sửa**. Suite đầy đủ tăng từ 58 lên 59 case nhờ regression login/voucher; các assertions sidebar được thêm vào case sẵn có.
+
+### Kết quả chạy lại
+
+| Kiểm tra | Lượt 1 | Lượt 2 — bản cuối |
+|---|---|---|
+| Maven `clean verify`, gồm MySQL | 235/235, không failure/error/skipped | 235/235, không failure/error/skipped |
+| Chrome headless | 58/58 trước bản sửa; 9/9 case liên quan đạt sau sửa | 59/59 |
+| HTTP/JSP trên WAR, Tomcat/MySQL | 121/121 | 121/121 |
+| Review code độc lập | Backend và frontend hoàn tất | Review chéo backend/API và frontend hoàn tất |
+
+JavaScript syntax, OpenAPI YAML (8 paths, 89 refs, không key trùng) và whitespace checks đạt. Logs riêng của hai lượt ở `$env:TEMP\crave-account-day3-review{1,2}-maven.log`, `$env:TEMP\crave-account-day3-review{1,2}-browser.log` và `crave-account-day3-validation-20261011/http-review{1,2}.log`. HTTP runner dọn dữ liệu test riêng trong `finally`.
+
+Review cũng ghi nhận hành vi có sẵn trên main: order service bọc lỗi chuyển trạng thái sai/đơn không tồn tại thành RuntimeException nên API có thể trả `500`. Phần transaction/status của order-payment thuộc nhiệm vụ riêng; nhánh này hoàn thiện các kiểm tra auth và dữ liệu đầu vào tại endpoint. Gate end-to-end toàn nhóm vẫn cần các phần việc còn lại được demo/review.
