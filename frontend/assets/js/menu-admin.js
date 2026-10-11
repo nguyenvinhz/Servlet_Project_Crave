@@ -11,6 +11,44 @@ function getApiUrl(endpoint) {
     return (contextPath.startsWith('/') && contextPath.length > 1 ? contextPath : '') + endpoint;
 }
 
+function adminRedirectToLogin() {
+    const returnTo = encodeURIComponent(window.location.pathname + window.location.search);
+    window.location.href = getApiUrl('/auth/login?reason=session-expired&returnTo=' + returnTo);
+}
+
+async function adminFetch(url, options = {}) {
+    const fetchOptions = {
+        ...options,
+        credentials: 'same-origin',
+        headers: {
+            'Accept': 'application/json',
+            ...(options.headers || {})
+        }
+    };
+
+    let response;
+    try {
+        response = await fetch(url, fetchOptions);
+    } catch (e) {
+        throw new Error('Không thể kết nối máy chủ: ' + e.message);
+    }
+
+    if (response.status === 401) {
+        showToast('Phiên làm việc đã hết hạn hoặc thay đổi. Đang chuyển về trang đăng nhập...', 'error');
+        setTimeout(() => {
+            adminRedirectToLogin();
+        }, 800);
+        throw new Error('Phiên đăng nhập đã hết hạn.');
+    }
+
+    if (response.status === 403) {
+        showToast('Tài khoản không có quyền thực hiện thao tác quản trị này.', 'error');
+        throw new Error('Không có quyền quản trị.');
+    }
+
+    return response;
+}
+
 // ==========================================
 // Toast Feedback
 // ==========================================
@@ -22,7 +60,7 @@ function showToast(message, type = 'success') {
     const toast = document.createElement('div');
     toast.className = `toast toast-${type}`;
     const icon = type === 'success' ? '✅' : (type === 'error' ? '❌' : 'ℹ️');
-    toast.innerHTML = `<span class="toast-icon">${icon}</span> <span class="toast-msg">${message}</span>`;
+    toast.innerHTML = `<span class="toast-icon">${icon}</span> <span class="toast-msg">${escapeHtml(message)}</span>`;
 
     container.appendChild(toast);
     setTimeout(() => {
@@ -54,8 +92,8 @@ function openEditCategoryModal(id, name, desc) {
     const modal = document.getElementById('categoryModal');
     if (!modal) return;
     document.getElementById('categoryModalTitle').textContent = 'Chỉnh sửa danh mục';
-    document.getElementById('categoryModalId').value = id;
-    document.getElementById('catNameInput').value = name;
+    document.getElementById('categoryModalId').value = id || '';
+    document.getElementById('catNameInput').value = name || '';
     document.getElementById('catDescInput').value = desc && desc !== '—' ? desc : '';
     hideAlert('categoryFormAlert');
     modal.style.display = 'flex';
@@ -82,7 +120,7 @@ async function submitCategoryForm() {
     const method = isEdit ? 'PUT' : 'POST';
 
     try {
-        const response = await fetch(url, {
+        const response = await adminFetch(url, {
             method,
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
@@ -98,7 +136,9 @@ async function submitCategoryForm() {
             showAlert('categoryFormAlert', errorMsg);
         }
     } catch (e) {
-        showAlert('categoryFormAlert', 'Không thể kết nối đến máy chủ: ' + e.message);
+        if (!e.message.includes('Phiên đăng nhập đã hết hạn')) {
+            showAlert('categoryFormAlert', e.message);
+        }
     }
 }
 
@@ -113,7 +153,7 @@ async function deleteCategory(id, name, foodCount) {
     }
 
     try {
-        const response = await fetch(getApiUrl(`/api/admin/categories/${id}`), {
+        const response = await adminFetch(getApiUrl(`/api/admin/categories/${id}`), {
             method: 'DELETE'
         });
         const data = await response.json();
@@ -125,7 +165,9 @@ async function deleteCategory(id, name, foodCount) {
             showToast(data.error?.message || 'Không thể xóa danh mục.', 'error');
         }
     } catch (e) {
-        showToast('Lỗi kết nối máy chủ: ' + e.message, 'error');
+        if (!e.message.includes('Phiên đăng nhập đã hết hạn')) {
+            showToast(e.message, 'error');
+        }
     }
 }
 
@@ -154,7 +196,7 @@ async function openEditFoodModal(id) {
     hideAlert('foodFormAlert');
 
     try {
-        const res = await fetch(getApiUrl(`/api/admin/foods/${id}`));
+        const res = await adminFetch(getApiUrl(`/api/admin/foods/${id}`));
         const data = await res.json();
         if (!res.ok || !data.success) {
             showToast(data.error?.message || 'Không thể tải thông tin món ăn.', 'error');
@@ -173,7 +215,9 @@ async function openEditFoodModal(id) {
 
         modal.style.display = 'flex';
     } catch (e) {
-        showToast('Lỗi kết nối: ' + e.message, 'error');
+        if (!e.message.includes('Phiên đăng nhập đã hết hạn')) {
+            showToast(e.message, 'error');
+        }
     }
 }
 
@@ -210,7 +254,7 @@ async function submitFoodForm() {
     const method = isEdit ? 'PUT' : 'POST';
 
     try {
-        const response = await fetch(url, {
+        const response = await adminFetch(url, {
             method,
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
@@ -226,7 +270,9 @@ async function submitFoodForm() {
             showAlert('foodFormAlert', errorMsg);
         }
     } catch (e) {
-        showAlert('foodFormAlert', 'Lỗi kết nối: ' + e.message);
+        if (!e.message.includes('Phiên đăng nhập đã hết hạn')) {
+            showAlert('foodFormAlert', e.message);
+        }
     }
 }
 
@@ -234,7 +280,7 @@ async function toggleFoodStatus(id, currentStatus) {
     const nextStatus = currentStatus === 'AVAILABLE' ? 'UNAVAILABLE' : 'AVAILABLE';
 
     try {
-        const response = await fetch(getApiUrl(`/api/admin/foods/${id}/status`), {
+        const response = await adminFetch(getApiUrl(`/api/admin/foods/${id}/status`), {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ status: nextStatus })
@@ -248,7 +294,9 @@ async function toggleFoodStatus(id, currentStatus) {
             showToast(data.error?.message || 'Không thể đổi trạng thái.', 'error');
         }
     } catch (e) {
-        showToast('Lỗi kết nối: ' + e.message, 'error');
+        if (!e.message.includes('Phiên đăng nhập đã hết hạn')) {
+            showToast(e.message, 'error');
+        }
     }
 }
 
@@ -258,7 +306,7 @@ async function deleteFood(id, name) {
     }
 
     try {
-        const response = await fetch(getApiUrl(`/api/admin/foods/${id}`), {
+        const response = await adminFetch(getApiUrl(`/api/admin/foods/${id}`), {
             method: 'DELETE'
         });
         const data = await response.json();
@@ -270,7 +318,9 @@ async function deleteFood(id, name) {
             showToast(data.error?.message || 'Không thể xóa món ăn.', 'error');
         }
     } catch (e) {
-        showToast('Lỗi kết nối máy chủ: ' + e.message, 'error');
+        if (!e.message.includes('Phiên đăng nhập đã hết hạn')) {
+            showToast(e.message, 'error');
+        }
     }
 }
 
@@ -283,7 +333,7 @@ async function openOptionsModal(foodId, foodName) {
     if (!modal) return;
 
     document.getElementById('currentOptionFoodId').value = foodId;
-    document.getElementById('optionsModalFoodName').textContent = 'Món ăn: ' + foodName;
+    document.getElementById('optionsModalFoodName').textContent = 'Món ăn: ' + (foodName || '');
     hideAlert('optionsModalAlert');
     modal.style.display = 'flex';
 
@@ -300,7 +350,7 @@ async function loadFoodOptions(foodId) {
     tbody.innerHTML = '<tr><td colspan="5" class="text-center py-2">Đang tải tùy chọn...</td></tr>';
 
     try {
-        const res = await fetch(getApiUrl(`/api/admin/foods/${foodId}/options`));
+        const res = await adminFetch(getApiUrl(`/api/admin/foods/${foodId}/options`));
         const data = await res.json();
         if (res.ok && data.success) {
             const options = data.data;
@@ -314,7 +364,16 @@ async function loadFoodOptions(foodId) {
                     <td><code>${escapeHtml(opt.optionType)}</code></td>
                     <td><strong>${escapeHtml(opt.name)}</strong></td>
                     <td>+${(opt.extraPrice || 0).toLocaleString('vi-VN')} ₫</td>
-                    <td><span class="badge ${opt.status === 'ACTIVE' ? 'available' : 'unavailable'}">${opt.status === 'ACTIVE' ? 'Khả dụng' : 'Khóa'}</span></td>
+                    <td>
+                        <button type="button"
+                                class="status-toggle-btn ${opt.status === 'ACTIVE' ? 'btn-status-available' : 'btn-status-unavailable'}"
+                                data-option-id="${escapeHtml(opt.id)}"
+                                data-status="${escapeHtml(opt.status)}"
+                                onclick="toggleFoodOptionStatus(this)"
+                                title="Nhấp để bật/tắt trạng thái tùy chọn">
+                            ${opt.status === 'ACTIVE' ? '● Khả dụng' : '○ Tạm khóa'}
+                        </button>
+                    </td>
                     <td style="text-align: right;">
                         <button type="button" class="action-btn delete-btn" data-id="${escapeHtml(opt.id)}" data-name="${escapeHtml(opt.name)}" onclick="handleDeleteOptionClick(this)" title="Xóa">
                             🗑️
@@ -326,7 +385,44 @@ async function loadFoodOptions(foodId) {
             tbody.innerHTML = `<tr><td colspan="5" class="text-center py-2 text-error">${escapeHtml(data.error?.message || 'Lỗi tải tùy chọn')}</td></tr>`;
         }
     } catch (e) {
-        tbody.innerHTML = `<tr><td colspan="5" class="text-center py-2 text-error">Lỗi kết nối: ${escapeHtml(e.message)}</td></tr>`;
+        if (!e.message.includes('Phiên đăng nhập đã hết hạn')) {
+            tbody.innerHTML = `<tr><td colspan="5" class="text-center py-2 text-error">Lỗi kết nối: ${escapeHtml(e.message)}</td></tr>`;
+        }
+    }
+}
+
+async function toggleFoodOptionStatus(btn) {
+    const optionId = btn.dataset.optionId;
+    const currentStatus = btn.dataset.status;
+    const newStatus = currentStatus === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
+    btn.disabled = true;
+
+    try {
+        const res = await adminFetch(getApiUrl(`/api/admin/options/${optionId}/status`), {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: newStatus })
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+            btn.dataset.status = newStatus;
+            if (newStatus === 'ACTIVE') {
+                btn.className = 'status-toggle-btn btn-status-available';
+                btn.textContent = '● Khả dụng';
+            } else {
+                btn.className = 'status-toggle-btn btn-status-unavailable';
+                btn.textContent = '○ Tạm khóa';
+            }
+            showToast(`Đã đổi trạng thái tùy chọn sang ${newStatus === 'ACTIVE' ? 'Khả dụng' : 'Tạm khóa'}!`);
+        } else {
+            showToast(data.error?.message || 'Không thể đổi trạng thái tùy chọn.', 'error');
+        }
+    } catch (e) {
+        if (!e.message.includes('Phiên đăng nhập đã hết hạn')) {
+            showToast(e.message, 'error');
+        }
+    } finally {
+        btn.disabled = false;
     }
 }
 
@@ -344,7 +440,7 @@ async function submitAddOption() {
     const payload = { foodId, optionType, name, extraPrice, status: 'ACTIVE' };
 
     try {
-        const res = await fetch(getApiUrl(`/api/admin/foods/${foodId}/options`), {
+        const res = await adminFetch(getApiUrl(`/api/admin/foods/${foodId}/options`), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
@@ -361,7 +457,9 @@ async function submitAddOption() {
             showAlert('optionsModalAlert', data.error?.message || 'Không thể tạo tùy chọn.');
         }
     } catch (e) {
-        showAlert('optionsModalAlert', 'Lỗi kết nối: ' + e.message);
+        if (!e.message.includes('Phiên đăng nhập đã hết hạn')) {
+            showAlert('optionsModalAlert', e.message);
+        }
     }
 }
 
@@ -371,7 +469,7 @@ async function deleteFoodOption(optionId, optName) {
     }
 
     try {
-        const res = await fetch(getApiUrl(`/api/admin/options/${optionId}`), {
+        const res = await adminFetch(getApiUrl(`/api/admin/options/${optionId}`), {
             method: 'DELETE'
         });
         const data = await res.json();
@@ -383,7 +481,9 @@ async function deleteFoodOption(optionId, optName) {
             showToast(data.error?.message || 'Không thể xóa tùy chọn.', 'error');
         }
     } catch (e) {
-        showToast('Lỗi kết nối: ' + e.message, 'error');
+        if (!e.message.includes('Phiên đăng nhập đã hết hạn')) {
+            showToast(e.message, 'error');
+        }
     }
 }
 
@@ -402,6 +502,43 @@ function handleDeleteOptionClick(btn) {
     const id = btn.dataset.id;
     const name = btn.dataset.name;
     deleteFoodOption(id, name);
+}
+
+function handleToggleStatusClick(btn) {
+    const id = btn.dataset.foodId;
+    const status = btn.dataset.status;
+    toggleFoodStatus(id, status);
+}
+
+function handleOpenOptionsClick(btn) {
+    const foodId = btn.dataset.foodId;
+    const foodName = btn.dataset.foodName;
+    openOptionsModal(foodId, foodName);
+}
+
+function handleEditFoodClick(btn) {
+    const foodId = btn.dataset.foodId;
+    openEditFoodModal(foodId);
+}
+
+function handleDeleteFoodClick(btn) {
+    const foodId = btn.dataset.foodId;
+    const foodName = btn.dataset.foodName;
+    deleteFood(foodId, foodName);
+}
+
+function handleEditCategoryClick(btn) {
+    const id = btn.dataset.catId;
+    const name = btn.dataset.catName;
+    const desc = btn.dataset.catDesc;
+    openEditCategoryModal(id, name, desc);
+}
+
+function handleDeleteCategoryClick(btn) {
+    const id = btn.dataset.catId;
+    const name = btn.dataset.catName;
+    const count = parseInt(btn.dataset.foodCount, 10) || 0;
+    deleteCategory(id, name, count);
 }
 
 function showAlert(elementId, msg) {

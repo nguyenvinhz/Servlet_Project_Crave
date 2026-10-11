@@ -36,6 +36,9 @@ body {
     font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     line-height: 1.55;
     -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
 }
 
 a {
@@ -121,7 +124,8 @@ a:hover {
     border-radius: 2px;
 }
 
-.header-actions {
+.header-actions,
+.header-actions-right {
     display: flex;
     align-items: center;
     gap: 1.25rem;
@@ -167,20 +171,51 @@ a:hover {
     grid-template-columns: minmax(0, 1fr) minmax(360px, 500px);
 }
 
-.header-icon-btn {
-    color: #4b5563;
+.header-icon-btn,
+.header-cart-icon-btn {
+    position: relative;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    position: relative;
-    padding: 6px;
+    width: 42px;
+    height: 42px;
     border-radius: 50%;
-    transition: background 0.15s, color 0.15s;
+    background: #fff8f3;
+    color: #1f2937;
+    border: 1px solid var(--line);
+    transition: all 0.2s ease;
+    text-decoration: none;
+    padding: 0;
 }
 
-.header-icon-btn:hover {
-    color: var(--accent);
-    background: #fff4f0;
+.header-icon-btn:hover,
+.header-cart-icon-btn:hover {
+    background: var(--accent);
+    color: #ffffff;
+    border-color: var(--accent);
+    text-decoration: none;
+}
+
+.header-cart-icon-btn .cart-badge-count {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 0.72rem;
+    font-weight: 800;
+    min-width: 18px;
+    height: 18px;
+    border-radius: 999px;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 0 4px;
+    border: 2px solid #fff;
+}
+
+.header-cart-icon-btn:hover .cart-badge-count {
+    background: #1f2937;
 }
 
 .cart-badge-dot {
@@ -200,12 +235,13 @@ a:hover {
     font-weight: 700;
     padding: 0.4rem 0.8rem;
     border-radius: 8px;
-    transition: background 0.15s;
+    transition: background 0.15s, color 0.15s;
+    text-decoration: none;
 }
 
 .header-login-link:hover {
     background: #f3f4f6;
-    color: #111827;
+    color: var(--accent);
     text-decoration: none;
 }
 
@@ -1764,47 +1800,217 @@ label {
 }
 .empty-state {
     margin: 2rem 0;
-    padding: 3rem;
-    border: 1px dashed var(--line);
-    border-radius: 16px;
+    padding: 3.5rem 2rem;
+    border: 1.5px dashed var(--line);
+    border-radius: 20px;
     color: var(--muted);
     text-align: center;
     background: #ffffff;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.02);
 }
 
-.empty-state span {
+.empty-state span,
+.empty-icon-art {
     display: block;
-    font-size: 2.5rem;
-    margin-bottom: 0.5rem;
+    font-size: 3rem;
+    margin-bottom: 0.75rem;
 }
 
-.empty-state h3 {
+.empty-state h3,
+.empty-title {
     margin: 0.2rem 0;
     color: var(--ink);
+    font-size: 1.35rem;
+    font-weight: 800;
 }
 
-.empty-state p {
-    margin: 0.4rem 0 1.2rem;
+.empty-state p,
+.empty-desc {
+    margin: 0.5rem auto 1.5rem;
+    max-width: 480px;
+    font-size: 0.95rem;
+    line-height: 1.5;
+    color: var(--muted);
 }
 
 .empty-btn {
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.75rem 1.8rem;
+    border-radius: 999px;
+    font-weight: 750;
+}
+
+/* Unavailable Notice Banner */
+.unavailable-notice-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    padding: 1.25rem 1.5rem;
+    border-radius: 14px;
+    background: #fff7ed;
+    border: 1px solid #fed7aa;
+    color: #9a3412;
+    margin: 0.5rem 0 1rem;
+}
+
+.unavailable-notice-banner .notice-icon {
+    font-size: 1.4rem;
+    line-height: 1;
+    flex-shrink: 0;
+}
+
+.unavailable-notice-banner strong {
+    display: block;
+    font-size: 0.98rem;
+    font-weight: 800;
+    margin-bottom: 0.25rem;
+    color: #c2410c;
+}
+
+.unavailable-notice-banner p {
+    margin: 0;
+    font-size: 0.88rem;
+    line-height: 1.45;
+    color: #9a3412;
+}
+
+/* Card unavailable state */
+.food-card-unavailable {
+    opacity: 0.82;
+}
+
+.card-status-badge {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    padding: 0.35rem 0.75rem;
+    border-radius: 8px;
+    font-size: 0.78rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.12);
+}
+
+.card-status-badge.badge-unavailable {
+    background: #dc2626;
+    color: #ffffff;
 }
 
 /* Responsive adjustments */
 @media (max-width: 860px) {
     .crave-hero-banner {
         grid-template-columns: 1fr;
-        padding: 2rem;
+        padding: 2rem 1.5rem;
+    }
+
+    .hero-photo-wrapper img {
+        max-height: 320px;
+        object-fit: cover;
     }
 
     .product-detail-layout {
         grid-template-columns: 1fr;
+        gap: 2rem;
+    }
+
+    .product-image-container {
+        position: static;
     }
 
     .main-nav {
+        gap: 0.75rem;
+        flex-wrap: wrap;
+    }
+
+    .catalog-tabs-bar {
+        overflow-x: auto;
+        white-space: nowrap;
+        padding-bottom: 8px;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+    }
+
+    .catalog-tabs-bar::-webkit-scrollbar {
+        display: none;
+    }
+}
+
+@media (max-width: 560px) {
+    .craving-cards-grid {
+        grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+        gap: 0.75rem;
+    }
+
+    .craving-tile {
+        padding: 0.75rem;
+    }
+
+    .clean-food-grid {
+        grid-template-columns: 1fr;
+        gap: 1.25rem;
+    }
+
+    .crave-features-row {
+        grid-template-columns: 1fr;
+    }
+
+    .order-action-bar {
+        flex-direction: column;
+        align-items: stretch;
         gap: 1rem;
     }
+
+    .order-action-bar .add-cart-btn {
+        width: 100%;
+        justify-content: center;
+    }
+}
+
+/* ============================================================
+   Footer
+   ============================================================ */
+.site-footer {
+    background: #111827;
+    color: #9ca3af;
+    padding: 32px 24px;
+    margin-top: auto;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.site-footer-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px;
+}
+
+.footer-brand {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-weight: 800;
+    font-size: 1.15rem;
+    color: #ffffff;
+    letter-spacing: -0.02em;
+}
+
+.footer-brand span {
+    color: var(--accent);
+}
+
+.footer-tagline {
+    color: #d1d5db;
+    margin-left: 8px;
+    font-size: 0.95rem;
+}
+
+.footer-copy {
+    font-size: 0.85rem;
+    color: #6b7280;
 }
 
 @media (max-width: 640px) {

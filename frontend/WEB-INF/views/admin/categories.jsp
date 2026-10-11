@@ -44,28 +44,34 @@
                         </tr>
                     </c:if>
                     <c:forEach var="cat" items="${categories}">
-                        <tr id="catRow-${cat.id}">
-                            <td><code>${cat.id}</code></td>
+                        <tr id="catRow-<c:out value='${cat.id}'/>">
+                            <td><code><c:out value="${cat.id}"/></code></td>
                             <td>
-                                <strong>${cat.name}</strong>
+                                <strong><c:out value="${cat.name}"/></strong>
                             </td>
                             <td>
-                                <span class="text-muted">${not empty cat.description ? cat.description : '—'}</span>
+                                <span class="text-muted"><c:out value="${not empty cat.description ? cat.description : '—'}"/></span>
                             </td>
                             <td style="text-align: center;">
-                                <a href="<c:url value='/admin/menu?categoryId=${cat.id}'/>" class="badge count-badge" title="Xem các món trong danh mục này">
-                                    ${cat.foodCount} món
+                                <a href="<c:url value='/admin/menu'><c:param name='categoryId' value='${cat.id}'/></c:url>" class="badge count-badge" title="Xem các món trong danh mục này">
+                                    <c:out value="${cat.foodCount}"/> món
                                 </a>
                             </td>
                             <td style="text-align: right;">
                                 <div class="row-actions">
                                     <button type="button" class="action-btn edit-btn"
-                                            onclick="openEditCategoryModal('${cat.id}', '${cat.name}', '${cat.description}')"
+                                            data-cat-id="<c:out value='${cat.id}'/>"
+                                            data-cat-name="<c:out value='${cat.name}'/>"
+                                            data-cat-desc="<c:out value='${cat.description}'/>"
+                                            onclick="handleEditCategoryClick(this)"
                                             title="Sửa danh mục">
                                         ✏️ Sửa
                                     </button>
                                     <button type="button" class="action-btn delete-btn"
-                                            onclick="deleteCategory('${cat.id}', '${cat.name}', ${cat.foodCount})"
+                                            data-cat-id="<c:out value='${cat.id}'/>"
+                                            data-cat-name="<c:out value='${cat.name}'/>"
+                                            data-food-count="<c:out value='${cat.foodCount}'/>"
+                                            onclick="handleDeleteCategoryClick(this)"
                                             title="${cat.foodCount > 0 ? 'Không thể xóa danh mục đang có món' : 'Xóa danh mục'}"
                                             ${cat.foodCount > 0 ? 'disabled style="opacity: 0.5; cursor: not-allowed;"' : ''}>
                                         🗑️ Xóa
