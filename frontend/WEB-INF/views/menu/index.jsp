@@ -36,8 +36,12 @@
                 <c:forEach var="cat" items="${categories}">
                     <c:url var="categoryUrl" value="/menu"><c:param name="categoryId" value="${cat.id}"/></c:url>
                     <a href="<c:out value='${categoryUrl}'/>#catalogSection" class="craving-tile ${currentCategoryId == cat.id ? 'active' : ''}">
-                        <span class="craving-tile-media category-art" aria-hidden="true">
-                            <svg viewBox="0 0 120 90" fill="none"><ellipse cx="60" cy="48" rx="38" ry="28" fill="currentColor" opacity=".12"/><ellipse cx="60" cy="48" rx="29" ry="20" stroke="currentColor" stroke-width="3"/><path d="M18 22v19m-5-19v13c0 4 10 4 10 0V22M18 40v27M103 23c-8 2-9 19-1 21v23m1-44v21M47 48l9 7 19-17" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        <span class="craving-tile-media category-photo" aria-hidden="true" data-category-gallery>
+                            <c:set var="categoryPhotos" value="${categoryFoods[cat.id]}" />
+                            <img src="<c:out value='${not empty categoryPhotos ? categoryPhotos[0].imageUrl : pageContext.request.contextPath.concat("/assets/images/hero-meal.jpg")}'/>" alt="" loading="lazy" onerror="this.onerror=null;this.src='<c:url value='/assets/images/hero-meal.jpg'/>'">
+                            <c:forEach var="categoryFood" items="${categoryPhotos}">
+                                <span hidden data-photo-src="<c:out value='${categoryFood.imageUrl}'/>"></span>
+                            </c:forEach>
                         </span>
                         <span class="craving-tile-name"><c:out value="${cat.name}"/></span>
                     </a>
@@ -73,22 +77,59 @@
         <div class="clean-food-grid">
             <c:forEach var="food" items="${foods}">
                 <c:url var="foodUrl" value="/menu/detail"><c:param name="id" value="${food.id}"/></c:url>
-                <article class="clean-food-card ${food.status == 'UNAVAILABLE' ? 'food-card-unavailable' : ''}">
+                <article class="clean-food-card ${food.status == 'UNAVAILABLE' ? 'food-card-unavailable' : ''}" data-food-id="<c:out value='${food.id}'/>">
                     <a href="<c:out value='${foodUrl}'/>" class="clean-card-image-wrap" aria-label="Xem món <c:out value='${food.name}'/>">
                         <img src="<c:out value='${not empty food.imageUrl ? food.imageUrl : pageContext.request.contextPath.concat("/assets/images/food-placeholder.svg")}'/>" alt="<c:out value='${food.name}'/>" loading="lazy" onerror="this.onerror=null;this.src='<c:url value='/assets/images/food-placeholder.svg'/>'">
                         <c:if test="${food.status == 'UNAVAILABLE'}"><span class="card-status-badge badge-unavailable">Tạm hết</span></c:if>
+                        <span class="cart-added-label" hidden></span>
                     </a>
                     <div class="clean-card-body">
                         <h3 class="clean-card-title"><a href="<c:out value='${foodUrl}'/>"><c:out value="${food.name}"/></a></h3>
                         <p class="clean-card-desc"><c:out value="${not empty food.description ? food.description : 'Món ngon được chuẩn bị riêng cho bữa ăn của bạn.'}"/></p>
                         <div class="clean-card-bottom">
-                            <span class="clean-price"><fmt:formatNumber value="${food.price}" type="number" groupingUsed="true"/> ₫</span>
-                            <a href="<c:out value='${foodUrl}'/>" class="food-card-action" aria-label="Chọn món <c:out value='${food.name}'/>"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></a>
+                            <span class="clean-price"><fmt:formatNumber value="${food.price}" type="number" groupingUsed="true"/>&nbsp;₫</span>
+                            <a href="<c:out value='${foodUrl}'/>" class="food-card-action" data-cart-add data-food-name="<c:out value='${food.name}'/>" aria-label="Chọn món <c:out value='${food.name}'/>"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></a>
                         </div>
                     </div>
                 </article>
             </c:forEach>
         </div>
+        <p class="customer-cart-feedback" id="menuCartFeedback" role="status" aria-live="polite"></p>
+        <c:if test="${totalPages > 1}">
+            <nav class="customer-pagination" aria-label="Phân trang thực đơn">
+                <span class="pagination-summary">${pageStart}–${pageEnd} / ${totalFoods} món</span>
+                <div class="pagination-controls">
+                    <c:choose>
+                        <c:when test="${currentPage > 1}">
+                            <c:url var="previousPageUrl" value="/menu"><c:param name="page" value="${currentPage - 1}"/><c:param name="categoryId" value="${currentCategoryId}"/><c:param name="keyword" value="${keyword}"/></c:url>
+                            <a class="pagination-btn" href="<c:out value='${previousPageUrl}'/>#catalogSection" aria-label="Trang trước">←</a>
+                        </c:when>
+                        <c:otherwise><span class="pagination-btn" aria-disabled="true">←</span></c:otherwise>
+                    </c:choose>
+                    <c:if test="${paginationStart > 1}">
+                        <c:url var="firstPageUrl" value="/menu"><c:param name="page" value="1"/><c:param name="categoryId" value="${currentCategoryId}"/><c:param name="keyword" value="${keyword}"/></c:url>
+                        <a class="pagination-btn" href="<c:out value='${firstPageUrl}'/>#catalogSection" aria-label="Trang 1">1</a>
+                        <c:if test="${paginationStart > 2}"><span class="pagination-ellipsis">…</span></c:if>
+                    </c:if>
+                    <c:forEach var="pageNumber" begin="${paginationStart}" end="${paginationEnd}">
+                        <c:url var="pageUrl" value="/menu"><c:param name="page" value="${pageNumber}"/><c:param name="categoryId" value="${currentCategoryId}"/><c:param name="keyword" value="${keyword}"/></c:url>
+                        <a class="pagination-btn ${pageNumber == currentPage ? 'active' : ''}" href="<c:out value='${pageUrl}'/>#catalogSection" aria-label="Trang ${pageNumber}" ${pageNumber == currentPage ? 'aria-current="page"' : ''}>${pageNumber}</a>
+                    </c:forEach>
+                    <c:if test="${paginationEnd < totalPages}">
+                        <c:if test="${paginationEnd < totalPages - 1}"><span class="pagination-ellipsis">…</span></c:if>
+                        <c:url var="lastPageUrl" value="/menu"><c:param name="page" value="${totalPages}"/><c:param name="categoryId" value="${currentCategoryId}"/><c:param name="keyword" value="${keyword}"/></c:url>
+                        <a class="pagination-btn" href="<c:out value='${lastPageUrl}'/>#catalogSection" aria-label="Trang ${totalPages}">${totalPages}</a>
+                    </c:if>
+                    <c:choose>
+                        <c:when test="${currentPage < totalPages}">
+                            <c:url var="nextPageUrl" value="/menu"><c:param name="page" value="${currentPage + 1}"/><c:param name="categoryId" value="${currentCategoryId}"/><c:param name="keyword" value="${keyword}"/></c:url>
+                            <a class="pagination-btn" href="<c:out value='${nextPageUrl}'/>#catalogSection" aria-label="Trang sau">→</a>
+                        </c:when>
+                        <c:otherwise><span class="pagination-btn" aria-disabled="true">→</span></c:otherwise>
+                    </c:choose>
+                </div>
+            </nav>
+        </c:if>
     </section>
 
     <section class="crave-promo-banner" aria-labelledby="promo-title">

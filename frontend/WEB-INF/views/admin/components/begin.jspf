@@ -1,13 +1,11 @@
-<%@ page pageEncoding="UTF-8" %>
+<%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
 <!doctype html>
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title><c:out value="${pageTitle}"/> · Quản trị Crave</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="<c:url value='/assets/css/fonts.css'/>">
     <link rel="stylesheet" href="<c:url value='/assets/css/admin.css'/>">
 </head>
 <body class="admin-body" data-page="<c:out value='${adminPage}'/>" data-context-path="<c:out value='${pageContext.request.contextPath}'/>" data-role="<c:out value='${sessionScope.role}'/>" data-user-id="<c:out value='${sessionScope.currentUser.id}'/>">
@@ -22,7 +20,8 @@
     <symbol id="icon-percent" viewBox="0 0 24 24"><path d="m5 19 14-14"/><circle cx="7" cy="7" r="3"/><circle cx="17" cy="17" r="3"/></symbol>
     <symbol id="icon-chart" viewBox="0 0 24 24"><path d="M3 3v18h18M7 16v-5M12 16V7M17 16v-9"/></symbol>
     <symbol id="icon-arrow" viewBox="0 0 24 24"><path d="m12 5-7 7 7 7M5 12h14"/></symbol>
-    <symbol id="icon-panel" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18m6-12-3 3 3 3"/></symbol>
+    <symbol id="icon-delete" viewBox="0 0 24 24"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/></symbol>
+    <symbol id="icon-chevron" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
 </svg>
 <aside class="admin-sidebar" id="adminSidebar">
     <a class="admin-brand" href="<c:url value='/admin'/>"><span class="brand-mark"><svg class="icon"><use href="#icon-chef"/></svg></span><span class="brand-text">crave<span>Admin</span></span></a>
@@ -35,13 +34,24 @@
         <c:if test="${sessionScope.role == 'ADMIN' or sessionScope.role == 'PROMOTION_MANAGER'}"><a href="<c:url value='/admin/promotions'/>" class="${adminPage == 'promotions' ? 'active' : ''}" title="Khuyến mãi"><svg class="icon"><use href="#icon-percent"/></svg><span>Khuyến mãi</span></a></c:if>
         <c:if test="${sessionScope.role == 'ADMIN'}"><a href="<c:url value='/admin/reports'/>" class="${adminPage == 'reports' ? 'active' : ''}" title="Báo cáo - Thống kê"><svg class="icon"><use href="#icon-chart"/></svg><span>Báo cáo - Thống kê</span></a></c:if>
     </nav>
-    <div class="sidebar-bottom"><a class="store-link" href="<c:url value='/menu'/>"><svg class="icon"><use href="#icon-arrow"/></svg><span>Xem cửa hàng</span></a><button type="button" id="sidebarToggle" aria-label="Thu gọn thanh điều hướng" aria-expanded="true"><svg class="icon"><use href="#icon-panel"/></svg><span>Thu gọn</span></button></div>
+    <div class="sidebar-bottom"><a class="store-link" href="<c:url value='/menu'/>"><svg class="icon"><use href="#icon-arrow"/></svg><span>Xem cửa hàng</span></a></div>
 </aside>
 <div class="admin-workspace">
 <header class="admin-topbar">
     <button type="button" id="mobileSidebarToggle" class="mobile-menu-button" aria-label="Mở điều hướng" aria-expanded="false">☰</button>
     <div class="admin-breadcrumb"><span>Quản trị</span><span class="breadcrumb-separator">/</span><strong><c:out value="${pageTitle}"/></strong></div>
-    <div class="topbar-user"><span class="live-indicator"></span><span class="topbar-store">Crave Kitchen</span><a class="user-avatar" href="<c:url value='/customer/profile'/>" aria-label="Hồ sơ tài khoản">C</a><div class="user-caption"><strong><c:out value="${sessionScope.currentUser.fullName}"/></strong><small><c:choose><c:when test="${sessionScope.role == 'ADMIN'}">Quản trị viên</c:when><c:when test="${sessionScope.role == 'MENU_MANAGER'}">Quản lý thực đơn</c:when><c:when test="${sessionScope.role == 'ORDER_STAFF'}">Nhân viên đơn hàng</c:when><c:when test="${sessionScope.role == 'HR_MANAGER'}">Quản lý nhân sự</c:when><c:otherwise>Quản lý khuyến mãi</c:otherwise></c:choose></small></div><button class="logout-button" id="adminLogout" type="button">Đăng xuất</button></div>
+    <div class="topbar-user"><span class="live-indicator"></span><span class="topbar-store">Crave Kitchen</span>
+        <div class="admin-profile">
+            <button type="button" class="admin-profile-toggle" id="adminProfileToggle" aria-label="Mở thao tác tài khoản">
+                <span class="user-avatar" aria-hidden="true">C</span><span class="user-caption"><strong><c:out value="${sessionScope.currentUser.fullName}"/></strong><small><c:choose><c:when test="${sessionScope.role == 'ADMIN'}">Quản trị viên</c:when><c:when test="${sessionScope.role == 'MENU_MANAGER'}">Quản lý thực đơn</c:when><c:when test="${sessionScope.role == 'ORDER_STAFF'}">Nhân viên đơn hàng</c:when><c:when test="${sessionScope.role == 'HR_MANAGER'}">Quản lý nhân sự</c:when><c:otherwise>Quản lý khuyến mãi</c:otherwise></c:choose></small></span><svg class="icon profile-chevron" aria-hidden="true"><use href="#icon-chevron"/></svg>
+            </button>
+            <div id="adminProfileMenu" hidden>
+                <a href="<c:url value='/customer/profile'/>">Hồ sơ tài khoản</a>
+                <a href="<c:url value='/menu'/>">Xem cửa hàng</a>
+                <button class="logout-button" id="adminLogout" type="button">Đăng xuất</button>
+            </div>
+        </div>
+    </div>
 </header>
 <div id="main-content" tabindex="-1"></div>
 <script src="<c:url value='/assets/js/admin.js'/>"></script>

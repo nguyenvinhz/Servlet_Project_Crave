@@ -7,7 +7,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const error = document.getElementById("promosErrorState");
     const feedback = document.getElementById("promosFeedback");
     const contextPath = document.body.dataset.contextPath || "";
-    const price = value => `${new Intl.NumberFormat("vi-VN").format(Number(value) || 0)} đ`;
+    const price = value => `${new Intl.NumberFormat("vi-VN").format(Number(value) || 0)}\u00a0₫`;
     const element = (tag, className, value) => {
         const node = document.createElement(tag);
         node.className = className;
@@ -23,6 +23,8 @@ document.addEventListener("DOMContentLoaded", () => {
         grid.style.display = "none";
         empty.style.display = "none";
         error.hidden = true;
+        const pagination = document.getElementById("promosPagination");
+        if (pagination) pagination.hidden = true;
         feedback.textContent = "";
         try {
             const response = await fetch(`${contextPath}/api/promotions/active`, {headers: {Accept: "application/json"}, credentials: "same-origin"});
@@ -30,35 +32,41 @@ document.addEventListener("DOMContentLoaded", () => {
             if (!response.ok || result.success !== true || !Array.isArray(result.data)) {
                 throw new Error(result.error?.message || "Không thể tải danh sách khuyến mãi. Vui lòng thử lại.");
             }
-            grid.replaceChildren();
-            result.data.forEach(promotion => {
-                const code = String(promotion.code || "");
-                const discount = promotion.discountType === "PERCENT" ? `Giảm ${Number(promotion.discountValue) || 0}%` : `Giảm ${price(promotion.discountValue)}`;
-                const terms = [Number(promotion.minimumOrderValue) > 0 ? `Đơn tối thiểu ${price(promotion.minimumOrderValue)}` : "Không giới hạn đơn tối thiểu", Number(promotion.maximumDiscount) > 0 ? `Giảm tối đa ${price(promotion.maximumDiscount)}` : ""].filter(Boolean).join(" · ");
-                const card = element("article", "promo-ticket-card");
-                const content = element("div", "promo-ticket-content");
-                const top = element("div", "promo-ticket-top");
-                top.append(element("span", "promo-ticket-code", code), element("span", "promo-ticket-value", discount));
-                content.append(top, element("h2", "promo-ticket-name", promotion.name || "Ưu đãi cho bạn"));
-                if (promotion.description) content.append(element("p", "promo-ticket-desc", promotion.description));
-                content.append(element("p", "promo-ticket-desc", terms));
-                const actions = element("div", "promo-ticket-bottom");
-                const copy = element("button", "btn-copy-code", "Sao chép mã");
-                copy.type = "button";
-                copy.addEventListener("click", async () => {
-                    try {
-                        if (!navigator.clipboard) throw new Error("Clipboard unavailable");
-                        await navigator.clipboard.writeText(code);
-                        feedback.textContent = `Đã sao chép mã ${code}.`;
-                        copy.textContent = "Đã sao chép ✓";
-                    } catch (_) { feedback.textContent = `Mã ưu đãi: ${code}. Bạn có thể sao chép và nhập mã trong giỏ hàng.`; }
+            const pageSize = 6;
+            const renderPromotions = page => {
+                grid.replaceChildren();
+                result.data.slice((page - 1) * pageSize, page * pageSize).forEach(promotion => {
+                    const code = String(promotion.code || "");
+                    const discount = promotion.discountType === "PERCENT" ? `Giảm ${Number(promotion.discountValue) || 0}%` : `Giảm ${price(promotion.discountValue)}`;
+                    const terms = [Number(promotion.minimumOrderValue) > 0 ? `Đơn tối thiểu ${price(promotion.minimumOrderValue)}` : "Không giới hạn đơn tối thiểu", Number(promotion.maximumDiscount) > 0 ? `Giảm tối đa ${price(promotion.maximumDiscount)}` : ""].filter(Boolean).join(" · ");
+                    const card = element("article", "promo-ticket-card");
+                    const content = element("div", "promo-ticket-content");
+                    const top = element("div", "promo-ticket-top");
+                    top.append(element("span", "promo-ticket-code", code), element("span", "promo-ticket-value", discount));
+                    content.append(top, element("h2", "promo-ticket-name", promotion.name || "Ưu đãi cho bạn"));
+                    if (promotion.description) content.append(element("p", "promo-ticket-desc", String(promotion.description).replace(/(\d[\d.,]*)[ \t]+([đ₫])(?=\s|$|[.,;:])/g, '$1\u00a0$2')));
+                    content.append(element("p", "promo-ticket-desc", terms));
+                    const actions = element("div", "promo-ticket-bottom");
+                    const copy = element("button", "btn-copy-code", "Sao chép mã");
+                    copy.type = "button";
+                    copy.addEventListener("click", async () => {
+                        try {
+                            if (!navigator.clipboard) throw new Error("Clipboard unavailable");
+                            await navigator.clipboard.writeText(code);
+                            feedback.textContent = `Đã sao chép mã ${code}.`;
+                            copy.textContent = "Đã sao chép ✓";
+                        } catch (_) { feedback.textContent = `Mã ưu đãi: ${code}. Bạn có thể sao chép và nhập mã trong giỏ hàng.`; }
+                    });
+                    const use = element("a", "btn-apply-direct", "Dùng ngay");
+                    use.href = `${contextPath}/cart?code=${encodeURIComponent(code)}`;
+                    actions.append(copy, use);
+                    card.append(content, actions);
+                    grid.append(card);
                 });
-                const use = element("a", "btn-apply-direct", "Dùng ngay");
-                use.href = `${contextPath}/cart?code=${encodeURIComponent(code)}`;
-                actions.append(copy, use);
-                card.append(content, actions);
-                grid.append(card);
-            });
+            };
+            if (window.CravePagination) {
+                window.CravePagination.create({ container: pagination, totalItems: result.data.length, pageSize, label: 'ưu đãi', onChange: renderPromotions });
+            } else renderPromotions(1);
             grid.style.display = result.data.length ? "grid" : "none";
             empty.style.display = result.data.length ? "none" : "block";
         } catch (failure) {

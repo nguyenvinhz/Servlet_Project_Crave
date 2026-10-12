@@ -64,6 +64,25 @@ class AuthenticationFilterTest {
     }
 
     @Test
+    void onlyExactPayosWebhookPostBypassesSessionAndOriginForSignatureVerification() throws Exception {
+        Exchange webhook = request("POST", "/api/payments/payos/webhook", null);
+        when(webhook.request.getHeader("Origin")).thenReturn("https://payos.vn");
+        when(webhook.request.getHeader("Sec-Fetch-Site")).thenReturn("cross-site");
+        webhook.send();
+        verify(webhook.chain).doFilter(webhook.request, webhook.response);
+        verifyNoInteractions(accounts);
+        for (String path : new String[]{"/api/payments/payos/webhook/extra", "/api/payments/payos/orders/DH01/link"}) {
+            Exchange protectedRequest = request("POST", path, null);
+            protectedRequest.send();
+            protectedRequest.assertError(401, "UNAUTHORIZED");
+            verifyNoInteractions(protectedRequest.chain);
+        }
+        Exchange getWebhook = request("GET", "/api/payments/payos/webhook", null);
+        getWebhook.send();
+        getWebhook.assertError(401, "UNAUTHORIZED");
+    }
+
+    @Test
     void promotionMutationsRequireAuthenticationEvenWithPrefixMappingAndMatrixParameters() throws Exception {
         for (String path : new String[]{"/api/promotions", "/api/promotions/validate", "/api/promotions;ignored/validate"}) {
             Exchange exchange = request("POST", path, null);

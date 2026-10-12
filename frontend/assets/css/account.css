@@ -24,7 +24,7 @@
 .account-ui .account-sidebar h1,
 .account-ui .card-heading h2,
 #profile-title {
-    font-family: 'Nunito', 'Plus Jakarta Sans', ui-sans-serif, system-ui, -apple-system, sans-serif;
+    font-family: var(--font);
     margin: 0.25rem 0 1rem;
     font-size: clamp(2rem, 4vw, 3rem);
     line-height: 1.2;
@@ -89,10 +89,15 @@
 }
 
 .account-ui input:focus-visible,
-.account-ui textarea:focus-visible,
+.account-ui textarea:focus-visible {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(239, 91, 53, .16);
+}
+
 .account-ui button:focus-visible,
 .account-ui a:focus-visible {
-    outline: 3px solid var(--accent);
+    outline: 2px solid var(--accent);
     outline-offset: 3px;
 }
 

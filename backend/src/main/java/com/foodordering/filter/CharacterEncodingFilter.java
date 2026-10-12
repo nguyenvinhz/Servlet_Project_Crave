@@ -5,11 +5,10 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.ServletRequest;
 import jakarta.servlet.ServletResponse;
-import jakarta.servlet.annotation.WebFilter;
 
 import java.io.IOException;
 
-@WebFilter(filterName = "characterEncodingFilter", urlPatterns = "/*")
+/** Registered first in web.xml so parameters are decoded before authentication. */
 public class CharacterEncodingFilter implements Filter {
 
     @Override

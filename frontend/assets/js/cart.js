@@ -66,6 +66,13 @@
         cacheDOMElements();
         initCart();
         setupEventListeners();
+        document.addEventListener('crave:cart-change', async event => {
+            if (event.detail.source !== 'remote' || state.cartMutation || state.sessionExpired) return;
+            state.cart = event.detail.cart;
+            state.error = null;
+            renderCart(false);
+            await revalidateAppliedVoucher();
+        });
     });
 
     function cacheDOMElements() {
@@ -158,15 +165,17 @@
         state.loading = true;
         showLoadingState();
         updateControls();
+        const previousSnapshot = window.CraveCart?.cart;
         try {
             const data = await requestApi('/api/cart');
             if (!data) return;
 
             if (data.success && data.data) {
-                state.cart = data.data;
+                const latestSnapshot = window.CraveCart?.cart;
+                state.cart = latestSnapshot && latestSnapshot !== previousSnapshot ? latestSnapshot : data.data;
                 state.loading = false;
                 state.error = null;
-                renderCart();
+                renderCart(false);
                 checkUrlVoucherParam();
             } else {
                 showErrorState(apiErrorMessage(data, "Không thể tải giỏ hàng."));
@@ -544,12 +553,13 @@
         if (msgEl) msgEl.textContent = message;
     }
 
-    function renderCart() {
+    function renderCart(broadcast = true) {
         if (elements.cartLoading) elements.cartLoading.style.display = 'none';
         if (elements.cartError) elements.cartError.style.display = 'none';
 
         const items = state.cart ? state.cart.items : [];
         updateCartBadges(state.cart ? state.cart.totalItems : 0);
+        if (state.cart) window.CraveCart?.update(state.cart, { broadcast, source: 'cart' });
 
         if (!items || items.length === 0) {
             state.appliedVoucher = null;
@@ -604,7 +614,7 @@
                                 <span class="cart-stepper-val">${item.quantity}</span>
                                 <button type="button" class="cart-stepper-btn btn-inc" data-id="${escapeHtml(item.cartItemId)}" data-qty="${item.quantity + 1}" aria-label="Tăng số lượng">+</button>
                             </div>
-                            <button type="button" class="cart-item-remove-btn btn-remove" data-id="${escapeHtml(item.cartItemId)}" title="Xóa món khỏi giỏ">
+                            <button type="button" class="cart-item-remove-btn btn-remove" data-id="${escapeHtml(item.cartItemId)}" title="Xóa món khỏi giỏ" aria-label="Xóa ${escapeHtml(item.foodName || 'món ăn')} khỏi giỏ">
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                     <polyline points="3 6 5 6 21 6"></polyline>
                                     <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
@@ -718,7 +728,7 @@
 
     function formatPrice(amount) {
         const num = parseFloat(amount || 0);
-        return new Intl.NumberFormat('vi-VN').format(num) + ' đ';
+        return new Intl.NumberFormat('vi-VN').format(num) + '\u00a0₫';
     }
 
     function formatOptionsText(options) {

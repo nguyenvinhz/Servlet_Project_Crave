@@ -51,10 +51,11 @@ public class AuthenticationFilter implements Filter {
             path += request.getPathInfo();
         }
         path = path.replaceAll(";[^/]*", "");
-        boolean protectedRoute = isProtected(path, request.getMethod());
+        boolean payosWebhook = path.equals("/api/payments/payos/webhook") && "POST".equals(request.getMethod());
+        boolean protectedRoute = !payosWebhook && isProtected(path, request.getMethod());
         SessionAuth.Snapshot snapshot = null;
         try {
-            if (!READ_METHODS.contains(request.getMethod())) {
+            if (!payosWebhook && !READ_METHODS.contains(request.getMethod())) {
                 validateOrigin(request);
             }
             if (protectedRoute) {
