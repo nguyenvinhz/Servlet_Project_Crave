@@ -30,7 +30,6 @@
         <div id="promosGridContainer" class="promos-grid" style="display: none;">
             <!-- Rendered by JavaScript -->
         </div>
-        <nav id="promosPagination" class="customer-pagination" aria-label="Phân trang khuyến mãi" hidden></nav>
 
         <!-- Empty State -->
         <div id="promosEmptyState" class="cart-empty-state" style="display: none;">

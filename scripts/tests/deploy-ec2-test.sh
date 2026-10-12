@@ -38,16 +38,6 @@ shift
 shift 2
 [[ $1 == --file && $2 == "$TEST_DEPLOY_DIRECTORY/compose.yaml" ]] || exit 92
 shift 2
-if [[ $TEST_PRIVATE_OVERRIDE == 1 ]]; then
-  [[ $1 == --env-file && $2 == "$TEST_DEPLOY_DIRECTORY/.env" ]] || exit 96
-  shift 2
-  [[ $1 == --env-file && $2 == "$TEST_DEPLOY_DIRECTORY/.payos.env" ]] || exit 97
-  shift 2
-  [[ $1 == --file && $2 == "$TEST_DEPLOY_DIRECTORY/.payos-compose.yaml" ]] || exit 98
-  shift 2
-else
-  [[ $1 != --env-file ]] || exit 99
-fi
 case "$1" in
   version) printf 'Docker Compose fixture\n' ;;
   config)
@@ -148,7 +138,6 @@ PY
   cp -- "$case_directory/reference/old.war" "$deploy_directory/backend/target/crave.war"
   export TEST_CASE_DIRECTORY="$case_directory" TEST_DEPLOY_DIRECTORY="$deploy_directory"
   export TEST_CONFIG=valid TEST_HEALTH=healthy TEST_UP_FAIL_ON=0 TEST_INTERRUPT_ON=0 TEST_INSTALL_FAIL_ON=0
-  export TEST_PRIVATE_OVERRIDE=0
   export DEPLOY_PATH="$deploy_directory" COMPOSE_FILE=compose.yaml APP_SERVICE=app
   export HEALTH_URL=http://127.0.0.1:8080/crave/api/health HEALTH_TIMEOUT_SECONDS=1 HEALTH_INTERVAL_SECONDS=1
   export GITHUB_WORKSPACE="$test_root/workspace"
@@ -197,45 +186,6 @@ assert_recreates 1
 assert_recreated_wars "$incoming_war"
 [[ -s $case_directory/curl.calls ]] || fail 'Successful deployment did not check application health.'
 contains_log 'Deployment succeeded.'
-pass_case
-
-new_case success-private-payos-overlay
-export TEST_PRIVATE_OVERRIDE=1
-printf 'PAYOS_API_KEY="private-api-fixture"\n' > "$deploy_directory/.payos.env"
-printf '{"services":{"app":{"environment":{"PAYOS_API_KEY":"${PAYOS_API_KEY}"}}}}\n' > "$deploy_directory/.payos-compose.yaml"
-chmod 600 "$deploy_directory/.payos.env" "$deploy_directory/.payos-compose.yaml"
-cp -- "$deploy_directory/.payos.env" "$case_directory/reference/.payos.env"
-cp -- "$deploy_directory/.payos-compose.yaml" "$case_directory/reference/.payos-compose.yaml"
-run_deploy 0
-same_file "$incoming_war" "$deploy_directory/backend/target/crave.war"
-same_file "$case_directory/reference/.payos.env" "$deploy_directory/.payos.env"
-same_file "$case_directory/reference/.payos-compose.yaml" "$deploy_directory/.payos-compose.yaml"
-assert_backup
-assert_recreates 1
-if grep -Fq 'private-api-fixture' "$case_directory/deploy.log"; then fail 'Private PayOS credential leaked in deployment log.'; fi
-pass_case
-
-new_case rollback-private-payos-overlay
-export TEST_PRIVATE_OVERRIDE=1 TEST_HEALTH=database-down
-printf 'PAYOS_API_KEY="private-api-fixture"\n' > "$deploy_directory/.payos.env"
-printf '{"services":{"app":{"environment":{"PAYOS_API_KEY":"${PAYOS_API_KEY}"}}}}\n' > "$deploy_directory/.payos-compose.yaml"
-chmod 600 "$deploy_directory/.payos.env" "$deploy_directory/.payos-compose.yaml"
-run_deploy 1
-assert_old_war
-assert_backup
-assert_recreates 2
-assert_recreated_wars "$incoming_war" "$case_directory/reference/old.war"
-contains_log 'Rollback completed; the previous application is healthy.'
-if grep -Fq 'private-api-fixture' "$case_directory/deploy.log"; then fail 'Private PayOS credential leaked during rollback.'; fi
-pass_case
-
-new_case payos-overlay-without-private-environment
-printf '{"services":{"app":{"environment":{"PAYOS_API_KEY":"${PAYOS_API_KEY}"}}}}\n' > "$deploy_directory/.payos-compose.yaml"
-run_deploy 1
-assert_old_war
-assert_recreates 0
-[[ ! -d $deploy_directory/.deploy-backups ]] || fail 'Unsafe PayOS overlay created a WAR backup.'
-contains_log 'PayOS deployment files must be regular files.'
 pass_case
 
 for health in malformed database-down application-down failure-body http-failure; do

@@ -19,15 +19,6 @@ const waitFor = async predicate => { for (let i=0;i<100;i++) {if(predicate())ret
 const fields = values => Object.entries(values).forEach(([id,value])=>document.getElementById(id).value=value);
 const submit = id => document.getElementById(id).dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));
 const findButton = text => [...document.querySelectorAll('button')].find(node=>node.textContent.trim()===text);
-const openActions = scope => {
-    const trigger=scope.querySelector('.admin-actions-trigger');trigger.scrollIntoView({block:'center'});trigger.click();
-    const menu=document.querySelector('.admin-dropdown-menu:not([hidden])');
-    assert(menu && trigger.getAttribute('aria-expanded')==='true','Action menu did not open');
-    assert(menu.parentNode===document.body,'Action menu clipped by table container');
-    const rect=menu.getBoundingClientRect();assert(rect.left>=0&&rect.right<=innerWidth&&rect.top>=0&&rect.bottom<=innerHeight,'Action menu outside viewport');
-    return menu;
-};
-const rowAction = (scope,text) => [...openActions(scope).querySelectorAll('button')].find(button=>button.textContent.trim()===text).click();
 window.fetch = async (url,options={}) => {
     const call={path:new URL(url,location.origin).pathname,method:options.method||'GET',body:options.body?JSON.parse(options.body):undefined};
     calls.push(call);const data=fixture(call);
@@ -43,8 +34,8 @@ const cases = [
         await waitFor(()=>document.getElementById('managementTotal').textContent==='2');
         assert(!document.querySelector('#managementRows img'),'Customer name inserted as HTML');
         fields({managementSearch:'nguyen'});document.getElementById('managementSearch').dispatchEvent(new Event('input'));
-        await waitFor(()=>document.querySelectorAll('#managementRows tr').length===1);
-        rowAction(document.querySelector('#managementRows tr'),'Khóa');assert(document.getElementById('managementConfirm').open,'Confirmation did not open');submit('managementConfirmForm');
+        assert(document.querySelectorAll('#managementRows tr').length===1,'Vietnamese search failed');
+        findButton('Khóa').click();assert(document.getElementById('managementConfirm').open,'Confirmation did not open');submit('managementConfirmForm');
         await waitFor(()=>document.getElementById('managementActive').textContent==='0');
         assert(calls.filter(call=>call.method==='PATCH').length===1,'Status submitted more than once');
         assert(document.getElementById('managementRows').textContent.includes('Đã khóa'),'Updated customer not rendered');
@@ -60,7 +51,7 @@ const cases = [
         submit('employeeCreateForm');await waitFor(()=>document.getElementById('managementTotal').textContent==='2');
         assert(document.getElementById('employeePassword').value==='','Saved password remains in form');
         const oldRow=[...document.querySelectorAll('#managementRows tr')].find(row=>row.textContent.includes('NV02'));
-        rowAction(oldRow,'Đổi chức vụ');
+        [...oldRow.querySelectorAll('button')].find(button=>button.textContent==='Đổi chức vụ').click();
         fields({employeeNewRole:'HR_MANAGER'});submit('employeeRoleForm');
         await waitFor(()=>oldRow!==[...document.querySelectorAll('#managementRows tr')].find(row=>row.textContent.includes('NV02')));
         assert(document.getElementById('managementRows').textContent.includes('Quản lý nhân sự'),'Role change not rendered');
@@ -70,37 +61,16 @@ const cases = [
         const fixture=call=>{if(call.method==='GET')return promotions;if(call.method==='POST'){assert(call.body.maximumDiscount===null,'Empty cap did not become null');assert(call.body.discountValue===10,'Amount did not become number');assert(call.body.startAt==='2026-10-12T08:00:00','Timestamp contract invalid');const created={...call.body,promotionId:'KM02'};promotions.unshift(created);return created;}let item=promotions.find(p=>call.path.includes(p.promotionId));item=Object.assign(item,call.body);return item;};
         `,run:`
         await waitFor(()=>document.querySelectorAll('.management-promo-card').length===1);
-        assert(!document.querySelector('#managementPromotionList svg[onload]'),'Promotion name inserted as HTML');
+        assert(!document.querySelector('#managementPromotionList svg'),'Promotion name inserted as HTML');
         document.getElementById('promotionCreate').click();fields({promotionCode:'NEW10',promotionName:'Khuyến mãi mới',promotionType:'PERCENT',promotionValue:'10',promotionMinimum:'0',promotionMaximum:'',promotionStart:'2026-10-12T08:00',promotionEnd:'2026-10-13T20:00'});
         submit('promotionForm');await waitFor(()=>document.querySelectorAll('.management-promo-card').length===2);
-        const created=document.querySelector('.management-promo-card');rowAction(created,'Chỉnh sửa');
+        const created=document.querySelector('.management-promo-card');[...created.querySelectorAll('button')].find(button=>button.textContent==='Chỉnh sửa').click();
         fields({promotionType:'FIXED_AMOUNT',promotionValue:'5000'});document.getElementById('promotionType').dispatchEvent(new Event('change'));submit('promotionForm');
         await waitFor(()=>calls.some(call=>call.method==='PATCH'&&call.body.discountType==='FIXED_AMOUNT'));
         await waitFor(()=>!document.getElementById('promotionDialog').open);
-        rowAction(document.querySelector('.management-promo-card'),'Tắt áp dụng');submit('managementConfirmForm');
+        [...document.querySelector('.management-promo-card').querySelectorAll('button')].find(button=>button.textContent==='Tắt áp dụng').click();submit('managementConfirmForm');
         await waitFor(()=>document.querySelector('.management-promo-card').textContent.includes('Đã tắt'));
         assert(calls.some(call=>call.path.endsWith('/KM02/status')&&call.body.status==='INACTIVE'),'Status endpoint mismatch');
-        `},
-    {page:'customers',role:'ADMIN',name:'customer-pagination-filter-keyboard-focus',setup:`
-        const customers=Array.from({length:24},(_,i)=>({id:'KH'+String(i+1).padStart(2,'0'),fullName:'Khách '+(i+1),email:'customer'+i+'@example.com',phone:'0987654321',status:i%5===0?'LOCKED':'ACTIVE',registeredAt:'2026-10-01T10:00:00',orderCount:1,totalSpent:15000}));
-        const fixture=()=>customers;
-        `,run:`
-        await waitFor(()=>document.getElementById('managementTotal').textContent==='24');
-        assert(document.querySelectorAll('#managementRows tr').length===10,'First page not limited to 10');
-        const next=document.querySelector('.pagination-controls button:last-child');next.click();
-        assert(document.querySelector('#managementRows tr').textContent.includes('KH11'),'Second page started at wrong row');
-        next.click();assert(document.querySelectorAll('#managementRows tr').length===4&&next.disabled,'Last page boundary failed');
-        document.getElementById('managementStatus').value='LOCKED';document.getElementById('managementStatus').dispatchEvent(new Event('change'));
-        assert(document.querySelectorAll('#managementRows tr').length===5&&document.querySelector('.pagination-controls span').textContent==='Trang 1/1','Filter did not reset pagination');
-        const menu=openActions(document.querySelector('#managementRows tr'));
-        assert(document.activeElement===menu.querySelector('button'),'First action did not receive focus');
-        document.activeElement.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));
-        assert(!document.querySelector('.admin-dropdown-menu:not([hidden])')&&document.activeElement.classList.contains('admin-actions-trigger'),'Escape did not restore focus');
-        const select=document.getElementById('managementStatus');select.focus();
-        assert(getComputedStyle(select).outlineStyle==='none'&&getComputedStyle(select).appearance==='none','Select uses native double focus/arrow');
-        const search=document.getElementById('managementSearch');search.value='khach 21';search.dispatchEvent(new Event('input'));
-        await waitFor(()=>document.querySelectorAll('#managementRows tr').length===1);
-        assert(document.querySelector('#managementRows tr').textContent.includes('KH21'),'Debounced Vietnamese search failed');
         `}
 ];
 let current;

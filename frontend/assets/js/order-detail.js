@@ -16,18 +16,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
     }
 
-    let paymentWarning = '';
-    const payosReturn = new URLSearchParams(window.location.search).has('payos');
     try {
-        if (payosReturn) {
-            try {
-                const sync = await fetch(`${API_BASE}/api/payments/payos/orders/${encodeURIComponent(orderId)}/sync`, {
-                    method: 'POST', credentials: 'same-origin', headers: { 'Accept': 'application/json' }
-                });
-                const result = await sync.json();
-                if (!sync.ok || !result.success) paymentWarning = result?.error?.message || 'Chưa kiểm tra được thanh toán. Vui lòng thử lại.';
-            } catch (_) { paymentWarning = 'Chưa kết nối được dịch vụ thanh toán. Vui lòng thử lại.'; }
-        }
         const res = await fetch(`${API_BASE}/api/orders/${encodeURIComponent(orderId)}`, {
             credentials: 'same-origin',
             headers: { 'Accept': 'application/json' }
@@ -140,43 +129,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 <p style="margin: 0.4rem 0;"><strong>Trạng thái:</strong> <span style="font-weight: 700;">${payStatus}</span></p>
                 ${o.payment?.paymentId ? `<p style="margin: 0.4rem 0; font-size: 0.85rem; color: var(--text-muted);">Mã thanh toán: #${escapeHtml(o.payment.paymentId)}</p>` : ''}
             `;
-            if (o.payment?.method === 'BANK_TRANSFER' && !['SUCCESS', 'REFUNDED'].includes(o.payment.status) && o.status !== 'CANCELLED') {
-                const note = document.createElement('p');
-                note.className = 'summary-hint';
-                note.setAttribute('role', 'status');
-                note.textContent = paymentWarning || (payosReturn ? 'Thanh toán đang chờ ngân hàng xác nhận. Bạn có thể kiểm tra lại hoặc tiếp tục thanh toán.' : 'Quét QR ngân hàng qua PayOS để thanh toán đơn hàng.');
-                const payButton = document.createElement('button');
-                payButton.type = 'button';
-                payButton.className = 'btn-primary';
-                payButton.textContent = 'Thanh toán qua PayOS';
-                const syncButton = document.createElement('button');
-                syncButton.type = 'button';
-                syncButton.className = 'button outline';
-                syncButton.textContent = 'Kiểm tra thanh toán';
-                syncButton.style.marginTop = '0.75rem';
-                async function paymentAction(action) {
-                    payButton.disabled = syncButton.disabled = true;
-                    note.textContent = action === 'link' ? 'Đang mở PayOS...' : 'Đang kiểm tra giao dịch ngân hàng...';
-                    try {
-                        const response = await fetch(`${API_BASE}/api/payments/payos/orders/${encodeURIComponent(orderId)}/${action}`, {
-                            method: 'POST', credentials: 'same-origin', headers: { 'Accept': 'application/json' }
-                        });
-                        const payment = await response.json();
-                        if (!response.ok || !payment.success) throw new Error(payment?.error?.message || 'Không thể kiểm tra thanh toán.');
-                        if (action === 'link') {
-                            const url = new URL(payment.data.checkoutUrl);
-                            if (url.protocol !== 'https:' || url.hostname !== 'pay.payos.vn') throw new Error('Địa chỉ thanh toán không hợp lệ.');
-                            window.location.assign(url.href);
-                        } else if (['SUCCESS', 'REFUNDED'].includes(payment.data.status)) {
-                            window.location.reload();
-                        } else note.textContent = 'Ngân hàng chưa ghi nhận thanh toán. Bạn có thể tiếp tục quét QR PayOS.';
-                    } catch (error) { note.textContent = error.message || 'Lỗi kết nối. Vui lòng thử lại.'; }
-                    finally { payButton.disabled = syncButton.disabled = false; }
-                }
-                payButton.addEventListener('click', () => paymentAction('link'));
-                syncButton.addEventListener('click', () => paymentAction('sync'));
-                col2.append(note, payButton, syncButton);
-            }
             
             grid.append(col1, col2);
             container.appendChild(grid);
@@ -210,7 +162,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         <div style="font-weight: 700; font-size: 1rem;">${item.quantity}x ${escapeHtml(item.foodName || item.foodNameSnapshot)}</div>
                         ${item.options && item.options.length > 0 ? `
                             <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.2rem;">
-                                ${item.options.map(opt => `+ ${escapeHtml(opt.optionName)} (${Number(opt.extraPrice).toLocaleString('vi-VN')} đ)`).join(', ')}
+                                ${item.options.map(opt => `+ ${escapeHtml(opt.optionName)} (${Number(opt.extraPrice).toLocaleString('vi-VN')} đ)`).join(', ')}
                             </div>
                         ` : ''}
                         ${item.note ? `<div style="font-size: 0.85rem; color: var(--accent); font-style: italic; margin-top: 0.2rem;">Ghi chú: ${escapeHtml(item.note)}</div>` : ''}
@@ -220,7 +172,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     right.style.fontWeight = '700';
                     right.style.fontSize = '1rem';
                     const lineTotal = Number(item.lineTotal) || (Number(item.unitPrice) * Number(item.quantity)) || 0;
-                    right.textContent = lineTotal.toLocaleString('vi-VN') + '\u00a0đ';
+                    right.textContent = lineTotal.toLocaleString('vi-VN') + ' đ';
                     
                     row.append(left, right);
                     itemCard.appendChild(row);
@@ -244,21 +196,21 @@ document.addEventListener('DOMContentLoaded', async () => {
                 <h3 style="margin-top: 0; margin-bottom: 1rem; font-size: 1.1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem;">🧾 Tổng kết thanh toán</h3>
                 <div style="display: flex; justify-content: space-between; padding: 0.35rem 0;">
                     <span style="color: var(--text-muted);">Tạm tính món ăn:</span>
-                    <span>${subtotal.toLocaleString('vi-VN')} đ</span>
+                    <span>${subtotal.toLocaleString('vi-VN')} đ</span>
                 </div>
                 <div style="display: flex; justify-content: space-between; padding: 0.35rem 0;">
                     <span style="color: var(--text-muted);">Phí vận chuyển:</span>
-                    <span>${deliveryFee.toLocaleString('vi-VN')} đ</span>
+                    <span>${deliveryFee.toLocaleString('vi-VN')} đ</span>
                 </div>
                 ${discount > 0 ? `
                     <div style="display: flex; justify-content: space-between; padding: 0.35rem 0; color: #4ade80;">
                         <span>Mã khuyến mãi:</span>
-                        <span>-${discount.toLocaleString('vi-VN')} đ</span>
+                        <span>-${discount.toLocaleString('vi-VN')} đ</span>
                     </div>
                 ` : ''}
                 <div style="display: flex; justify-content: space-between; padding-top: 1rem; margin-top: 0.5rem; border-top: 1px solid var(--border); font-size: 1.25rem; font-weight: 800; color: var(--accent);">
                     <span>Tổng cộng:</span>
-                    <span>${total.toLocaleString('vi-VN')} đ</span>
+                    <span>${total.toLocaleString('vi-VN')} đ</span>
                 </div>
             `;
             container.appendChild(summaryCard);

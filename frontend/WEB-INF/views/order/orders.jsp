@@ -10,7 +10,6 @@
         <a href="<c:url value='/menu'/>" class="button primary">+ Đặt món mới</a>
     </header>
     <div id="orderList" class="orders-list" aria-live="polite"><div class="card order-loading"><p>Đang tải danh sách đơn hàng...</p></div></div>
-    <nav id="ordersPagination" class="customer-pagination" aria-label="Phân trang đơn hàng" hidden></nav>
 </main>
 <script src="<c:url value='/assets/js/orders.js'/>"></script>
 <%@ include file="/WEB-INF/views/components/footer.jspf" %>

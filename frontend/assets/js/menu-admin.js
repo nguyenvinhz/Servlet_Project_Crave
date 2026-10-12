@@ -380,8 +380,8 @@ async function loadFoodOptions(foodId) {
                         </button>
                     </td>
                     <td style="text-align: right;">
-                        <button type="button" class="action-btn delete-btn option-delete-button" data-id="${escapeHtml(opt.id)}" data-name="${escapeHtml(opt.name)}" onclick="handleDeleteOptionClick(this)" title="Xóa tùy chọn" aria-label="Xóa tùy chọn ${escapeHtml(opt.name)}">
-                            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/></svg>
+                        <button type="button" class="action-btn delete-btn" data-id="${escapeHtml(opt.id)}" data-name="${escapeHtml(opt.name)}" onclick="handleDeleteOptionClick(this)" title="Xóa">
+                            🗑️
                         </button>
                     </td>
                 </tr>
@@ -559,34 +559,3 @@ function hideAlert(elementId) {
     el.textContent = '';
     el.style.display = 'none';
 }
-
-document.addEventListener('DOMContentLoaded', () => {
-    const admin = window.CraveAdmin;
-    const table = document.getElementById('adminFoodTable') || document.getElementById('adminCategoryTable');
-    if (!table || !admin) return;
-    const tbody = table.tBodies[0];
-    const pager = admin.pagination(table.closest('.admin-card'), {
-        pageSize: 10, label: table.id === 'adminFoodTable' ? 'món ăn' : 'danh mục', onChange: renderPage
-    });
-    function renderPage() {
-        admin.closeDropdown();
-        const rows = [...tbody.rows].filter(row => row.id);
-        const visible = new Set(pager.slice(rows));
-        rows.forEach(row => {row.hidden = !visible.has(row);});
-        if (!rows.length && !tbody.querySelector('td[colspan]')) {
-            const row = tbody.insertRow(), cell = row.insertCell();
-            cell.colSpan = table.tHead.rows[0].cells.length;
-            cell.className = 'empty-state';cell.textContent = 'Chưa có dữ liệu trong danh sách.';
-        }
-        admin.enhanceActions(tbody);
-    }
-    new MutationObserver(renderPage).observe(tbody, {childList: true});
-    renderPage();
-    const form = document.querySelector('.admin-filter-form');
-    if (form) {
-        const search = form.querySelector('input[name="keyword"]');
-        const searchChanged = admin.debounce(() => {if (!search.value.trim() || search.value.trim() !== search.defaultValue.trim()) form.requestSubmit();},400);
-        search?.addEventListener('input',searchChanged);
-        form.querySelectorAll('select').forEach(select => select.addEventListener('change', () => form.requestSubmit()));
-    }
-});

@@ -35,7 +35,7 @@
 
 .promos-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
     gap: 24px;
 }
 
@@ -78,8 +78,6 @@
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    flex-wrap: wrap;
-    gap: 10px;
     margin-bottom: 16px;
 }
 
@@ -98,9 +96,8 @@
 }
 
 .promo-ticket-value {
-    white-space: nowrap;
     font-family: var(--crave-font-heading);
-    font-size: 1.25rem;
+    font-size: 1.4rem;
     font-weight: 800;
     color: var(--crave-text);
 }

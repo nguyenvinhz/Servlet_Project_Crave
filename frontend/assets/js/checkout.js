@@ -45,7 +45,7 @@
 
     function updateSummary() {
         const fee = state.subtotal > 0 && elements.fulfillment.value === 'DELIVERY' ? 15000 : 0;
-        const price = amount => new Intl.NumberFormat('vi-VN').format(amount) + '\u00a0đ';
+        const price = amount => new Intl.NumberFormat('vi-VN').format(amount) + ' đ';
         elements.subtotal.textContent = price(state.subtotal);
         elements.fee.textContent = price(fee);
         elements.discount.textContent = '-' + price(state.discount);
@@ -157,23 +157,6 @@
             if (data.success && data.data?.orderId) {
                 state.completed = true;
                 clearVoucher();
-                window.CraveCart?.update({ items: [], totalItems: 0, subtotal: 0 });
-                if (payload.paymentMethod === 'BANK_TRANSFER') {
-                    alert('Đơn hàng đã được lưu. Đang mở mã QR PayOS...', true);
-                    try {
-                        const payment = await requestApi(`/api/payments/payos/orders/${encodeURIComponent(data.data.orderId)}/link`, { method: 'POST' });
-                        if (!payment) return;
-                        if (!payment.success || !payment.data?.checkoutUrl) throw new Error(message(payment, 'Chưa tạo được mã QR PayOS.'));
-                        const checkoutUrl = new URL(payment.data.checkoutUrl);
-                        if (checkoutUrl.protocol !== 'https:' || checkoutUrl.hostname !== 'pay.payos.vn') throw new Error('Địa chỉ thanh toán không hợp lệ.');
-                        window.location.assign(checkoutUrl.href);
-                        return;
-                    } catch (error) {
-                        alert(`${error.message} Bạn có thể thanh toán lại trong chi tiết đơn hàng.`);
-                        setTimeout(() => window.location.assign(`${API_BASE}/orders/${encodeURIComponent(data.data.orderId)}`), 2000);
-                        return;
-                    }
-                }
                 alert('Đặt hàng thành công! Mã đơn: ' + data.data.orderId, true);
                 setTimeout(() => window.location.assign(`${API_BASE}/orders/${encodeURIComponent(data.data.orderId)}`), 2000);
             } else {
@@ -215,10 +198,6 @@
             updateSummary();
         });
         elements.form.addEventListener('submit', submitOrder);
-        document.getElementById('paymentMethod').addEventListener('change', event => {
-            document.getElementById('paymentHint').hidden = event.target.value !== 'BANK_TRANSFER';
-            elements.submit.textContent = event.target.value === 'BANK_TRANSFER' ? 'Đặt hàng & thanh toán PayOS' : 'Đặt hàng';
-        });
         elements.retry.addEventListener('click', () => loadCheckout());
         loadCheckout();
     });

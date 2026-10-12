@@ -23,7 +23,6 @@ const waitFor = async (predicate, message = 'Condition timed out') => {
 const reply = (status, data = null, error = null) => ({status, ok:status >= 200 && status < 300, json:async()=>({success:status < 400, data, error})});
 const submit = (id) => document.getElementById(id).dispatchEvent(new Event('submit', {bubbles:true,cancelable:true}));
 const setFields = (values) => Object.entries(values).forEach(([id,value])=>{document.getElementById(id).value=value;});
-const moneyText = id => document.getElementById(id).textContent.replace(/\u00a0/g,' ').replace(/₫/g,'đ');
 const profile = {id:'KH01',accountType:'CUSTOMER',fullName:'Khach Hang',email:'khach@example.com',phone:'0901234567'};
 window.fetch = async (url, options = {}) => {
   const request = {url:new URL(url, location.origin).pathname, method:options.method || 'GET', body:options.body === undefined ? undefined : JSON.parse(options.body), options};
@@ -525,8 +524,8 @@ cases.push(
  document.getElementById('proceedCheckoutBtn').click();
  releaseValidate();await waitFor(()=>!document.getElementById('proceedCheckoutBtn').disabled);
  assert(calls.at(-1).body.subtotal===250000,'Revalidation used old subtotal');
- assert(moneyText('summaryTotal')==='240.000 đ','New total or fixed delivery fee incorrect');
- assert(moneyText('summaryDeliveryFee')==='15.000 đ','Cart invented free delivery above 200k');
+ assert(document.getElementById('summaryTotal').textContent==='240.000 đ','New total or fixed delivery fee incorrect');
+ assert(document.getElementById('summaryDeliveryFee').textContent==='15.000 đ','Cart invented free delivery above 200k');
  `},
  {name:'cart-remove-during-revalidation-ignores-stale-response',page:'cart/index',route:'cart',setup:cartFixture+voucherFixture+`
  let release,validations=0;const fixtureFetch=async request=>{
@@ -537,7 +536,7 @@ cases.push(
  sessionStorage.setItem('crave_applied_voucher','old voucher');document.querySelector('.btn-inc').click();await waitFor(()=>release);
  document.getElementById('voucherRemoveBtn').click();release();await waitFor(()=>!document.getElementById('proceedCheckoutBtn').disabled);
  assert(document.getElementById('voucherAppliedChip').style.display==='none','Delayed validation restored removed voucher');
- assert(moneyText('summaryTotal')==='215.000 đ','Removed voucher left stale discount');
+ assert(document.getElementById('summaryTotal').textContent==='215.000 đ','Removed voucher left stale discount');
  assert(sessionStorage.getItem('crave_applied_voucher')===null,'Removed voucher persisted for checkout');
  `},
  ...['network','minimum'].map(kind=>({name:'cart-revalidation-'+kind+'-clears-discount',page:'cart/index',route:'cart',setup:cartFixture+voucherFixture+`
@@ -548,7 +547,7 @@ cases.push(
  ${kind==='network'?"throw new Error('offline');":"return reply(400,null,{code:'PROMOTION_MIN_ORDER_NOT_MET',message:'Minimum not met'});"}};`,run:cartReady+applyCartVoucher+`
  saveVoucher();document.querySelector('.btn-inc').click();await waitFor(()=>!document.getElementById('proceedCheckoutBtn').disabled);
  assert(document.getElementById('voucherAppliedChip').style.display==='none','Failed validation kept voucher');
- assert(moneyText('summaryTotal')==='65.000 đ','Failed validation kept old amount');
+ assert(document.getElementById('summaryTotal').textContent==='65.000 đ','Failed validation kept old amount');
  assert(sessionStorage.getItem('crave_applied_voucher')===null,'Failed validation left checkout voucher');
  `})),
  {name:'cart-storage-unavailable-handoff-uses-code-query',page:'cart/index',route:'cart',context:'/cart-shop',setup:cartFixture+voucherFixture+`
@@ -562,10 +561,10 @@ cases.push(
  return reply(400,null,{code:'VALIDATION_ERROR',message:'Order validation failed'});};`,run:`
  await waitFor(()=>!document.getElementById('placeOrderBtn').disabled);
  assert(calls[1].body.code==='SAVE10'&&calls[1].body.subtotal===150000,'Checkout failed to revalidate handoff against fresh subtotal');
- assert(moneyText('summaryTotal')==='150.000 đ','Checkout trusted saved discount');
+ assert(document.getElementById('summaryTotal').textContent==='150.000 đ','Checkout trusted saved discount');
  assert(!document.getElementById('summaryDiscountRow').hidden,'Validated discount missing');
  document.getElementById('fulfillmentType').value='PICKUP';document.getElementById('fulfillmentType').dispatchEvent(new Event('change'));
- assert(moneyText('summaryTotal')==='135.000 đ'&&!document.getElementById('deliveryAddress').required,'Pickup fee/address incorrect');
+ assert(document.getElementById('summaryTotal').textContent==='135.000 đ'&&!document.getElementById('deliveryAddress').required,'Pickup fee/address incorrect');
  orderFields();submit('checkoutForm');await waitFor(()=>!document.getElementById('placeOrderBtn').disabled);
  const order=calls.find(c=>c.url.endsWith('/api/orders'));
  assert(order.body.promotionId==='KM01'&&order.body.deliveryAddress===null,'Checkout sent forged ID or pickup address');
@@ -595,13 +594,13 @@ cases.push(
  assert(document.getElementById('placeOrderBtn').disabled&&sessionStorage.getItem('crave_applied_voucher'),'Validation failure allowed order or lost voucher intent');
  assert(document.getElementById('checkoutAlert').textContent==='Validation unavailable','Validation failure missing');
  document.getElementById('retryCheckoutBtn').click();await waitFor(()=>!document.getElementById('placeOrderBtn').disabled);
- assert(moneyText('summaryTotal')==='105.000 đ','Validation retry failed');
+ assert(document.getElementById('summaryTotal').textContent==='105.000 đ','Validation retry failed');
  `},
  {name:'checkout-expired-handoff-clears-voucher',page:'order/checkout',route:'checkout',setup:cartFixture+voucherFixture+`
  saveVoucher();const fixtureFetch=async request=>request.method==='GET'?reply(200,cart):reply(400,null,{code:'PROMOTION_EXPIRED',message:'Voucher expired'});`,run:`
  await waitFor(()=>!document.getElementById('placeOrderBtn').disabled);
  assert(document.getElementById('checkoutAlert').textContent==='Voucher expired','Expired voucher was silently dropped');
- assert(moneyText('summaryTotal')==='115.000 đ'&&document.getElementById('summaryDiscountRow').hidden,'Expired voucher left discounted total');
+ assert(document.getElementById('summaryTotal').textContent==='115.000 đ'&&document.getElementById('summaryDiscountRow').hidden,'Expired voucher left discounted total');
  assert(sessionStorage.getItem('crave_applied_voucher')===null,'Expired handoff retained');
  `},
  {name:'checkout-order-expiry-updates-total-before-retry',page:'order/checkout',route:'checkout',setup:cartFixture+voucherFixture+`
@@ -613,7 +612,7 @@ cases.push(
  await waitFor(()=>document.getElementById('checkoutAlert').textContent==='Expired while ordering');
  assert(calls.filter(c=>c.url.endsWith('/api/orders')).length===1,'Expired voucher silently retried full-price order');
  await waitFor(()=>!document.getElementById('placeOrderBtn').disabled);
- assert(moneyText('summaryTotal')==='115.000 đ'&&sessionStorage.getItem('crave_applied_voucher')===null,'Order expiry retained discount');
+ assert(document.getElementById('summaryTotal').textContent==='115.000 đ'&&sessionStorage.getItem('crave_applied_voucher')===null,'Order expiry retained discount');
  submit('checkoutForm');await waitFor(()=>calls.filter(c=>c.url.endsWith('/api/orders')).length===2);
  assert(calls.at(-1).body.promotionId===null,'Explicit retry sent expired promotion');
  `},
@@ -628,7 +627,7 @@ cases.push(
  await waitFor(()=>releaseReload);submit('checkoutForm');
  assert(calls.filter(c=>c.url.endsWith('/api/orders')).length===1&&document.getElementById('placeOrderBtn').disabled,'Stale cart allowed another order');
  releaseReload();await waitFor(()=>!document.getElementById('placeOrderBtn').disabled);
- assert(moneyText('summarySubtotal')==='80.000 đ'&&moneyText('summaryTotal')==='95.000 đ','Rejected order kept obsolete cart subtotal');
+ assert(document.getElementById('summarySubtotal').textContent==='80.000 đ'&&document.getElementById('summaryTotal').textContent==='95.000 đ','Rejected order kept obsolete cart subtotal');
  assert(document.getElementById('checkoutAlert').textContent==='Current cart is below minimum','Cart refresh swallowed rejection warning');
  `},
  ...['FOOD_NOT_AVAILABLE','INVALID_OPTION'].map(code=>({name:'checkout-'+code.toLowerCase()+'-retains-cart-recovery',page:'order/checkout',route:'checkout',setup:cartFixture+`
@@ -645,20 +644,20 @@ cases.push(
  const fixtureFetch=async request=>request.method==='GET'?reply(200,cart):reply(200,validVoucher);`,run:`
  await waitFor(()=>!document.getElementById('placeOrderBtn').disabled);
  assert(calls[0].url==='/api/cart'&&calls[1].url==='/api/promotions/validate'&&calls[1].body.code==='SAVE10','Root context/query voucher was ignored');
- assert(moneyText('summaryTotal')==='105.000 đ','Root-context validated voucher total incorrect');
+ assert(document.getElementById('summaryTotal').textContent==='105.000 đ','Root-context validated voucher total incorrect');
  assert(document.querySelector('a[href="/cart"]'),'Root-context cart link incorrect');
  `},
  {name:'checkout-empty-cart-cannot-submit',page:'order/checkout',route:'checkout',setup:cartFixture+voucherFixture+`
  saveVoucher();const fixtureFetch=async()=>reply(200,{items:[],subtotal:0,totalItems:0});`,run:`
  await waitFor(()=>!document.getElementById('retryCheckoutBtn').hidden);submit('checkoutForm');
  assert(calls.length===1&&document.getElementById('placeOrderBtn').disabled,'Empty checkout submitted');
- assert(moneyText('summaryTotal')==='0 đ'&&sessionStorage.getItem('crave_applied_voucher')===null,'Empty cart kept amount or voucher');
+ assert(document.getElementById('summaryTotal').textContent==='0 đ'&&sessionStorage.getItem('crave_applied_voucher')===null,'Empty cart kept amount or voucher');
  `},
  {name:'checkout-session-expiry-clears-private-form',page:'order/checkout',route:'checkout',context:'/cart-shop',setup:cartFixture+voucherFixture+`
  saveVoucher();const fixtureFetch=async request=>request.method==='GET'?reply(200,cart):request.url.endsWith('/validate')?reply(200,validVoucher):reply(401,null,{message:'Unauthorized'});`,run:`
  await waitFor(()=>!document.getElementById('placeOrderBtn').disabled);orderFields();
  window.addEventListener('beforeunload',()=>sessionStorage.setItem('checkout-expiry-snapshot',JSON.stringify({
- name:document.getElementById('receiverName').value,total:moneyText('summaryTotal'),disabled:document.getElementById('placeOrderBtn').disabled
+ name:document.getElementById('receiverName').value,total:document.getElementById('summaryTotal').textContent,disabled:document.getElementById('placeOrderBtn').disabled
  })));submit('checkoutForm');`,redirect:'/cart-shop/auth/login?reason=session-expired&returnTo=%2Fcart-shop%2Fcheckout',redirectCheck:`
  const snapshot=JSON.parse(sessionStorage.getItem('checkout-expiry-snapshot'));
  if(snapshot?.name!==''||snapshot.total!=='0 đ'||!snapshot.disabled)throw new Error('Expired checkout retained private form');

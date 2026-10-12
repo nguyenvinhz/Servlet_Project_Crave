@@ -49,10 +49,6 @@ if ! docker info >/dev/null 2>&1; then
   docker_command=(sudo -n docker)
 fi
 compose=("${docker_command[@]}" compose --project-directory "$deploy_root" --file "$compose_file")
-if [[ -f $deploy_root/.payos-compose.yaml ]]; then
-  [[ -f $deploy_root/.payos.env && ! -L $deploy_root/.payos.env && ! -L $deploy_root/.payos-compose.yaml ]] || fail 'PayOS deployment files must be regular files.'
-  compose+=(--env-file "$deploy_root/.env" --env-file "$deploy_root/.payos.env" --file "$deploy_root/.payos-compose.yaml")
-fi
 "${compose[@]}" version >/dev/null
 
 # Protect against manual deployments or another runner touching the same WAR.

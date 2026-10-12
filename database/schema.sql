@@ -305,17 +305,12 @@ CREATE TABLE payment (
                          amount           DECIMAL(12,0)   NOT NULL,
                          paid_at          DATETIME        NULL,
                          transaction_ref  VARCHAR(100)    NULL,
-                         payos_order_code BIGINT          NULL,
-                         payos_payment_link_id VARCHAR(100) NULL,
-                         payos_checkout_url VARCHAR(512)  NULL,
                          created_at       DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
                          updated_at       DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP
                              ON UPDATE CURRENT_TIMESTAMP,
                          CONSTRAINT pk_payment PRIMARY KEY (payment_id),
                          CONSTRAINT uq_payment_order UNIQUE (order_id),
                          CONSTRAINT uq_payment_transaction_ref UNIQUE (transaction_ref),
-                         CONSTRAINT uq_payment_payos_order_code UNIQUE (payos_order_code),
-                         CONSTRAINT uq_payment_payos_link UNIQUE (payos_payment_link_id),
                          CONSTRAINT fk_payment_order FOREIGN KEY (order_id)
                              REFERENCES customer_order(order_id)
                              ON UPDATE CASCADE ON DELETE CASCADE,

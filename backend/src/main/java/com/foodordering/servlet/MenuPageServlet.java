@@ -1,6 +1,5 @@
 package com.foodordering.servlet;
 
-import com.foodordering.dto.FoodSummaryResponse;
 import com.foodordering.enums.FoodStatus;
 import com.foodordering.exception.ResourceNotFoundException;
 import com.foodordering.service.MenuService;
@@ -11,9 +10,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
 import java.io.IOException;
-import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 @WebServlet(name = "menuPageServlet", urlPatterns = {
         "/menu",
@@ -57,24 +54,7 @@ public class MenuPageServlet extends HttpServlet {
                 String categoryId = request.getParameter("categoryId");
                 String keyword = request.getParameter("keyword");
                 request.setAttribute("categories", menuService.getCategories());
-                List<FoodSummaryResponse> allFoods = menuService.getMenu(null, null);
-                request.setAttribute("categoryFoods", allFoods.stream()
-                        .filter(food -> food.imageUrl() != null && !food.imageUrl().isBlank())
-                        .collect(Collectors.groupingBy(FoodSummaryResponse::categoryId)));
-                List<FoodSummaryResponse> foods = (categoryId == null || categoryId.isBlank())
-                        && (keyword == null || keyword.isBlank()) ? allFoods : menuService.getMenu(categoryId, keyword);
-                int pageSize = 12;
-                int totalPages = Math.max(1, (foods.size() + pageSize - 1) / pageSize);
-                int currentPage = Math.min(totalPages, parsePage(request.getParameter("page")));
-                int first = (currentPage - 1) * pageSize;
-                request.setAttribute("foods", foods.subList(first, Math.min(first + pageSize, foods.size())));
-                request.setAttribute("totalFoods", foods.size());
-                request.setAttribute("currentPage", currentPage);
-                request.setAttribute("totalPages", totalPages);
-                request.setAttribute("pageStart", foods.isEmpty() ? 0 : first + 1);
-                request.setAttribute("pageEnd", Math.min(first + pageSize, foods.size()));
-                request.setAttribute("paginationStart", Math.max(1, currentPage - 2));
-                request.setAttribute("paginationEnd", Math.min(totalPages, currentPage + 2));
+                request.setAttribute("foods", menuService.getMenu(categoryId, keyword));
                 request.setAttribute("currentCategoryId", categoryId);
                 request.setAttribute("keyword", keyword);
             } else if ("/menu/detail".equals(path)) {
@@ -111,14 +91,6 @@ public class MenuPageServlet extends HttpServlet {
 
         request.setAttribute("pageTitle", page.title());
         request.getRequestDispatcher(page.jsp()).forward(request, response);
-    }
-
-    private static int parsePage(String value) {
-        try {
-            return Math.max(1, Integer.parseInt(value));
-        } catch (NumberFormatException ignored) {
-            return 1;
-        }
     }
 
     private record Page(String title, String jsp) {
