@@ -57,7 +57,7 @@
 .order-page .card h2,
 .order-page .card h3 {
     color: var(--text);
-    font-family: Georgia, serif;
+    font-family: 'Plus Jakarta Sans', 'Nunito', ui-sans-serif, system-ui, -apple-system, sans-serif;
 }
 
 /* --- Input & Select (dark) --- */
@@ -125,7 +125,7 @@
 
 .checkout-left h1 {
     margin: 0 0 0.5rem;
-    font-family: Georgia, serif;
+    font-family: 'Plus Jakarta Sans', 'Nunito', ui-sans-serif, system-ui, -apple-system, sans-serif;
     font-size: clamp(2rem, 4vw, 2.8rem);
     color: var(--text);
 }
@@ -265,7 +265,7 @@
    ============================================================ */
 .tracking-header h1 {
     margin: 0;
-    font-family: Georgia, serif;
+    font-family: 'Plus Jakarta Sans', 'Nunito', ui-sans-serif, system-ui, -apple-system, sans-serif;
     font-size: clamp(1.8rem, 4vw, 2.5rem);
     color: var(--text);
 }
