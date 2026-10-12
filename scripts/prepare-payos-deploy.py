@@ -8,6 +8,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import urllib.error
 import urllib.request
 from urllib.parse import urlsplit
 
@@ -130,7 +131,8 @@ def main():
         public_url = values['PAYOS_PUBLIC_BASE_URL'] + '/api/payments/payos/webhook'
         request = urllib.request.Request('https://api-merchant.payos.vn/confirm-webhook', method='POST',
             data=json.dumps({'webhookUrl': public_url}).encode(), headers={
-                'Content-Type': 'application/json', 'x-client-id': values['PAYOS_CLIENT_ID'],
+                'Content-Type': 'application/json', 'Accept': 'application/json',
+                'User-Agent': 'Crave-Deployment/1.0', 'x-client-id': values['PAYOS_CLIENT_ID'],
                 'x-api-key': values['PAYOS_API_KEY']})
         with urllib.request.urlopen(request, timeout=30) as response:
             body = json.load(response)
@@ -160,6 +162,8 @@ if __name__ == '__main__':
         main()
     except subprocess.CalledProcessError:
         sys.exit('PayOS preparation command failed; credentials were not logged.')
+    except urllib.error.HTTPError as error:
+        sys.exit(f'PayOS preparation failed: HTTP {error.code}.')
     except Exception as error:
         # Never include provider responses or resolved Compose configuration in logs.
         sys.exit('PayOS preparation failed: ' + (str(error) if isinstance(error, ValueError) else type(error).__name__))
