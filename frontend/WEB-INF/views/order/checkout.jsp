@@ -1,76 +1,40 @@
-<%@ page contentType="text/html;charset=UTF-8" language="java" %>
+<%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
-<!DOCTYPE html>
-<html lang="vi">
-<head>
-    <title>Thanh toán | Crave</title>
-    <link rel="stylesheet" href="<c:url value='/assets/css/styles.css' />">
-    <style>
-        .checkout-container { max-width: 800px; margin: 40px auto; display: flex; gap: 20px; }
-        .form-section { flex: 2; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-        .summary-section { flex: 1; background: #fafafa; padding: 20px; border-radius: 8px; border: 1px solid #ddd; }
-        .form-group { margin-bottom: 15px; }
-        .form-group label { display: block; margin-bottom: 5px; font-weight: bold; }
-        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
-        .btn-submit { background: var(--primary-color, #e74c3c); color: white; border: none; padding: 12px 20px; border-radius: 4px; cursor: pointer; width: 100%; font-size: 16px; font-weight: bold; }
-        .btn-submit:hover { background: #c0392b; }
-        .alert { padding: 10px; margin-bottom: 15px; display: none; border-radius: 4px; }
-        .alert.error { background: #fee; color: #c0392b; border: 1px solid #fcc; }
-        .alert.success { background: #efe; color: #27ae60; border: 1px solid #cfc; }
-    </style>
-</head>
-<body data-context-path="<c:out value='${pageContext.request.contextPath}' />">
-    <div class="checkout-container">
-        <div class="form-section">
-            <h2>Thông tin giao hàng</h2>
-            <div id="checkoutAlert" class="alert"></div>
-            <p><a href="<c:url value='/cart' />">Quay lại giỏ hàng</a></p>
-            <button type="button" id="retryCheckoutBtn" hidden>Thử tải lại</button>
+<c:set var="pageTitle" value="Thanh toán" />
+<c:set var="pageStyle" value="order" />
+<c:set var="pageBodyClass" value="order-page" />
+<%@ include file="/WEB-INF/views/components/header.jspf" %>
+<main class="page-container checkout-page" id="main-content">
+    <header class="customer-page-heading">
+        <p class="eyebrow">Hoàn tất đặt món</p>
+        <h1>Thanh toán</h1>
+        <p>Kiểm tra thông tin nhận món và tổng tiền trước khi đặt hàng.</p>
+    </header>
+    <div class="checkout-grid">
+        <section class="card checkout-form-card" aria-labelledby="delivery-title">
+            <h2 id="delivery-title">Thông tin nhận món</h2>
+            <div id="checkoutAlert" class="alert" role="alert" aria-live="polite"></div>
+            <p><a href="<c:url value='/cart'/>">← Quay lại giỏ hàng</a></p>
+            <button type="button" id="retryCheckoutBtn" class="button outline" hidden>Thử tải lại</button>
             <form id="checkoutForm">
-                <div class="form-group">
-                    <label>Hình thức nhận hàng</label>
-                    <select name="fulfillmentType" id="fulfillmentType">
-                        <option value="DELIVERY">Giao hàng tận nơi</option>
-                        <option value="PICKUP">Lấy tại quán</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Người nhận</label>
-                    <input type="text" name="receiverName" id="receiverName" required />
-                </div>
-                <div class="form-group">
-                    <label>Số điện thoại</label>
-                    <input type="text" name="receiverPhone" id="receiverPhone" required />
-                </div>
-                <div class="form-group" id="addressGroup">
-                    <label>Địa chỉ nhận hàng</label>
-                    <input type="text" name="deliveryAddress" id="deliveryAddress" required />
-                </div>
-                <div class="form-group">
-                    <label>Phương thức thanh toán</label>
-                    <select name="paymentMethod" id="paymentMethod">
-                        <option value="CASH">Tiền mặt</option>
-                        <option value="BANK_TRANSFER">Chuyển khoản ngân hàng</option>
-                        <option value="E_WALLET">Ví điện tử (Momo, ZaloPay...)</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Ghi chú (Không bắt buộc)</label>
-                    <textarea name="customerNote" id="customerNote" rows="3"></textarea>
-                </div>
-                <button type="submit" id="placeOrderBtn" class="btn-submit" disabled>Đặt hàng</button>
+                <div class="form-group"><label for="fulfillmentType">Hình thức nhận món</label><select name="fulfillmentType" id="fulfillmentType"><option value="DELIVERY">Giao hàng tận nơi</option><option value="PICKUP">Lấy tại quán</option></select></div>
+                <div class="form-group"><label for="receiverName">Người nhận</label><input type="text" name="receiverName" id="receiverName" autocomplete="name" maxlength="100" placeholder="Họ và tên người nhận" required></div>
+                <div class="form-group"><label for="receiverPhone">Số điện thoại</label><input type="tel" name="receiverPhone" id="receiverPhone" autocomplete="tel" inputmode="tel" maxlength="15" placeholder="0901234567" required></div>
+                <div class="form-group" id="addressGroup"><label for="deliveryAddress">Địa chỉ nhận hàng</label><input type="text" name="deliveryAddress" id="deliveryAddress" autocomplete="street-address" maxlength="255" placeholder="Số nhà, đường, phường/xã, tỉnh/thành" required></div>
+                <div class="form-group"><label for="paymentMethod">Phương thức thanh toán</label><select name="paymentMethod" id="paymentMethod"><option value="CASH">Tiền mặt</option><option value="BANK_TRANSFER">Chuyển khoản ngân hàng</option><option value="E_WALLET">Ví điện tử</option></select></div>
+                <div class="form-group"><label for="customerNote">Ghi chú <span class="optional-label">(không bắt buộc)</span></label><textarea name="customerNote" id="customerNote" rows="3" maxlength="500" placeholder="Ví dụ: gọi trước khi giao"></textarea></div>
+                <button type="submit" id="placeOrderBtn" class="btn-primary" disabled>Đặt hàng</button>
             </form>
-        </div>
-        <div class="summary-section">
-            <h3>Tóm tắt đơn hàng</h3>
-            <p><strong>Tạm tính:</strong> <span id="summarySubtotal">Đang tải...</span></p>
-            <p><strong>Phí giao hàng:</strong> <span id="summaryFee">15,000 đ</span></p>
-            <p id="summaryDiscountRow" hidden><strong>Giảm giá:</strong> <span id="summaryDiscount">0 đ</span></p>
-            <hr>
-            <h4>Tổng cộng: <span id="summaryTotal">...</span></h4>
-        </div>
+        </section>
+        <aside class="order-summary" aria-labelledby="summary-title">
+            <h2 id="summary-title">Tóm tắt đơn hàng</h2>
+            <div class="summary-row"><span>Tạm tính</span><strong id="summarySubtotal">Đang tải...</strong></div>
+            <div class="summary-row"><span>Phí giao hàng</span><strong id="summaryFee">Đang tải...</strong></div>
+            <div class="summary-row discount-row" id="summaryDiscountRow" hidden><span>Giảm giá</span><strong id="summaryDiscount">0 đ</strong></div>
+            <div class="summary-row total"><span>Tổng cộng</span><strong id="summaryTotal">Đang tải...</strong></div>
+            <p class="summary-hint">Phí giao hàng được cập nhật theo hình thức nhận món. Mã ưu đãi được kiểm tra lại trước khi đặt đơn.</p>
+        </aside>
     </div>
-
-    <script src="<c:url value='/assets/js/checkout.js' />"></script>
-</body>
-</html>
+</main>
+<script src="<c:url value='/assets/js/checkout.js'/>"></script>
+<%@ include file="/WEB-INF/views/components/footer.jspf" %>

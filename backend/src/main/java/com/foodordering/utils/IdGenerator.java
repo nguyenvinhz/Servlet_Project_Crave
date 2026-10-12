@@ -2,6 +2,7 @@ package com.foodordering.utils;
 
 import java.security.SecureRandom;
 import java.util.Random;
+import java.util.UUID;
 
 /**
  * Tiện ích sinh mã định danh tự động theo quy chuẩn của Crave (ví dụ: GH01, CTGH01, KM01).
@@ -26,11 +27,11 @@ public class IdGenerator {
     }
 
     public static String generateCartId() {
-        return generateId("GH", 6);
+        return "GH" + UUID.randomUUID().toString().replace("-", "").substring(0, 8).toUpperCase();
     }
 
     public static String generateCartItemId() {
-        return generateId("CTGH", 4);
+        return "CT" + UUID.randomUUID().toString().replace("-", "").substring(0, 8).toUpperCase();
     }
 
     public static String generatePromotionId() {

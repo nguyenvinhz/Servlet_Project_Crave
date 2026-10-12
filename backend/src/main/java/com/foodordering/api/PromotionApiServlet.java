@@ -54,7 +54,7 @@ public class PromotionApiServlet extends BaseApiServlet {
             String customerId = SessionAuth.requireCustomer(req).id();
             ValidatePromotionRequest requestDto = readJson(req, ValidatePromotionRequest.class);
             if (requestDto == null) {
-                badRequest(resp, "Request body must contain a promotion validation object.");
+                badRequest(resp, "Vui lòng gửi thông tin mã khuyến mãi cần kiểm tra.");
                 return;
             }
             PromotionValidationResultDto result = promotionService.validatePromotion(requestDto, customerId);

@@ -1,28 +1,12 @@
-<%@ page contentType="text/html;charset=UTF-8" language="java" %>
+<%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
-<!DOCTYPE html>
-<html lang="vi">
-<head>
-    <title>Theo dõi đơn hàng | Crave</title>
-    <link rel="stylesheet" href="<c:url value='/assets/css/styles.css' />">
-    <link rel="stylesheet" href="<c:url value='/assets/css/order.css' />">
-</head>
-<body class="order-theme order-page" data-context-path="<c:out value='${pageContext.request.contextPath}' />">
-    <%@ include file="../components/header.jspf" %>
-
-    <main class="page-shell">
-        <div class="container detail-container" style="max-width: 900px; margin: 40px auto; padding: 0 1rem;">
-            <a href="<c:url value='/orders' />" class="btn-back" style="display: inline-block; margin-bottom: 1.5rem; text-decoration: none; color: var(--accent); font-weight: 600;">← Quay lại danh sách đơn hàng</a>
-            <div id="orderContent">
-                <div class="card" style="padding: 2.5rem; text-align: center; color: var(--text-muted);">
-                    <p>Đang tải thông tin chi tiết đơn hàng...</p>
-                </div>
-            </div>
-        </div>
-    </main>
-
-    <%@ include file="../components/footer.jspf" %>
-
-    <script src="<c:url value='/assets/js/order-detail.js' />"></script>
-</body>
-</html>
+<c:set var="pageTitle" value="Chi tiết đơn hàng" />
+<c:set var="pageStyle" value="order" />
+<c:set var="pageBodyClass" value="order-page" />
+<%@ include file="/WEB-INF/views/components/header.jspf" %>
+<main class="page-container detail-container" id="main-content">
+    <a href="<c:url value='/orders'/>" class="btn-back">← Quay lại đơn hàng của bạn</a>
+    <div id="orderContent" aria-live="polite"><div class="card order-loading"><p>Đang tải chi tiết đơn hàng...</p></div></div>
+</main>
+<script src="<c:url value='/assets/js/order-detail.js'/>"></script>
+<%@ include file="/WEB-INF/views/components/footer.jspf" %>

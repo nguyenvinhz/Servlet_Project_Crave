@@ -1,50 +1,20 @@
-<%@ page contentType="text/html;charset=UTF-8" language="java" %>
+<%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
-<!DOCTYPE html>
-<html lang="vi">
-<head>
-    <title>Quản lý đơn hàng (Admin) | Crave</title>
-    <link rel="stylesheet" href="<c:url value='/assets/css/styles.css' />">
-    <link rel="stylesheet" href="<c:url value='/assets/css/order.css' />">
-</head>
-<body class="order-theme order-page" data-context-path="<c:out value='${pageContext.request.contextPath}' />">
-    <%@ include file="../components/header.jspf" %>
-
-    <main class="page-shell">
-        <div class="container admin-container" style="max-width: 1100px; margin: 40px auto; padding: 0 1rem;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
-                <div>
-                    <h1 style="font-family: Georgia, serif; margin: 0; font-size: clamp(1.8rem, 3.5vw, 2.4rem);">Quản lý đơn hàng</h1>
-                    <p style="color: var(--text-muted); margin: 0.25rem 0 0; font-size: 0.95rem;">Dành cho nhân viên xử lý đơn hàng (Order Staff)</p>
-                </div>
-                <button type="button" id="refreshBtn" class="admin-action-btn" style="padding: 0.6rem 1.2rem; font-size: 0.9rem;">🔄 Tải lại danh sách</button>
-            </div>
-
-            <div id="adminAlert" class="alert" style="display: none; padding: 1rem; margin-bottom: 1.25rem; border-radius: 8px;"></div>
-
-            <div class="card" style="overflow-x: auto; padding: 0; border-radius: 12px;">
-                <table class="admin-table">
-                    <thead>
-                        <tr>
-                            <th>Mã Đơn</th>
-                            <th>Khách Hàng</th>
-                            <th>Thời Gian</th>
-                            <th>Tổng Tiền</th>
-                            <th>Trạng Thái Đơn</th>
-                            <th>Thanh Toán</th>
-                            <th>Thao Tác</th>
-                        </tr>
-                    </thead>
-                    <tbody id="adminOrderList">
-                        <tr><td colspan="7" style="text-align: center; padding: 2.5rem; color: var(--text-muted);">Đang tải danh sách đơn hàng...</td></tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </main>
-
-    <%@ include file="../components/footer.jspf" %>
-
-    <script src="<c:url value='/assets/js/admin-orders.js' />"></script>
-</body>
-</html>
+<c:set var="adminPage" value="orders"/>
+<c:set var="pageTitle" value="Đơn hàng"/>
+<%@ include file="/WEB-INF/views/admin/components/begin.jspf" %>
+<main class="admin-content">
+    <header class="page-header"><div><h1>Đơn hàng</h1><p>Theo dõi đơn hàng, cập nhật tiến độ và xác nhận thanh toán.</p></div><button type="button" id="refreshBtn" class="button outline">Tải lại dữ liệu</button></header>
+    <section class="stats-grid" aria-label="Thống kê đơn hàng">
+        <div class="stat-card"><span class="stat-icon"><svg class="icon"><use href="#icon-orders"/></svg></span><div><span class="stat-label">Tổng đơn hàng</span><strong class="stat-num" id="orderTotal">—</strong></div></div>
+        <div class="stat-card"><span class="stat-icon">◷</span><div><span class="stat-label">Chờ xác nhận</span><strong class="stat-num" id="orderPending">—</strong></div></div>
+        <div class="stat-card"><span class="stat-icon">✓</span><div><span class="stat-label">Hoàn tất</span><strong class="stat-num" id="orderCompleted">—</strong></div></div>
+        <div class="stat-card"><span class="stat-icon">↗</span><div><span class="stat-label">Đang xử lý</span><strong class="stat-num" id="orderProcessing">—</strong></div></div>
+    </section>
+    <div id="adminAlert" class="alert" hidden role="alert"></div>
+    <div class="admin-toolbar"><div class="filter-row"><div class="search-field"><input id="orderSearch" type="search" placeholder="Tìm mã đơn, tên hoặc số điện thoại..." aria-label="Tìm đơn hàng"></div><select id="orderStatusFilter" aria-label="Lọc trạng thái"><option value="">Tất cả trạng thái</option><option value="PENDING_CONFIRMATION">Chờ xác nhận</option><option value="PREPARING">Đang chuẩn bị</option><option value="DELIVERING">Đang giao</option><option value="COMPLETED">Hoàn tất</option><option value="CANCELLED">Đã hủy</option></select><select id="orderTypeFilter" aria-label="Lọc hình thức nhận"><option value="">Tất cả hình thức</option><option value="DELIVERY">Giao tận nơi</option><option value="PICKUP">Nhận tại cửa hàng</option></select></div></div>
+    <section class="admin-card"><div class="table-responsive"><table class="admin-table"><thead><tr><th>Mã đơn</th><th>Khách hàng</th><th>Thời gian</th><th>Tổng tiền</th><th>Trạng thái</th><th>Thanh toán</th><th>Thao tác</th></tr></thead><tbody id="adminOrderList"><tr><td colspan="7" class="loading-state">Đang tải đơn hàng...</td></tr></tbody></table></div><div class="table-footer"><span id="orderResultCount"></span><div><button class="button outline" id="orderPrev" type="button">Trước</button> <button class="button outline" id="orderNext" type="button">Sau</button></div></div></section>
+</main>
+<div id="orderDetailModal" class="modal-backdrop" hidden role="dialog" aria-modal="true" aria-labelledby="orderDetailTitle"><div class="modal-dialog modal-lg"><div class="modal-header"><div><h3 id="orderDetailTitle">Chi tiết đơn hàng</h3><p id="orderDetailSubtitle" class="text-muted"></p></div><button type="button" class="modal-close" id="closeOrderDetail" aria-label="Đóng chi tiết">×</button></div><div id="orderDetailBody" class="modal-body"></div><div class="modal-footer"><button class="button outline" id="closeOrderDetailFooter" type="button">Đóng</button></div></div></div>
+<script src="<c:url value='/assets/js/admin-orders.js'/>"></script>
+<%@ include file="/WEB-INF/views/admin/components/end.jspf" %>

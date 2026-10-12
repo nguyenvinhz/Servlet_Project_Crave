@@ -7,7 +7,9 @@ import jakarta.persistence.DiscriminatorValue;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.OneToMany;
+import jakarta.persistence.OneToOne;
 import jakarta.persistence.PrimaryKeyJoinColumn;
 import jakarta.persistence.Table;
 
@@ -31,6 +33,9 @@ public class Customer extends User {
 
     @OneToMany(mappedBy = "customer", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Address> addresses = new ArrayList<>();
+
+    @OneToOne(mappedBy = "customer", fetch = FetchType.LAZY)
+    private Cart cart;
 
     public Customer() {
     }
@@ -57,6 +62,10 @@ public class Customer extends User {
 
     public List<Address> getAddresses() {
         return Collections.unmodifiableList(addresses);
+    }
+
+    public Cart getCart() {
+        return cart;
     }
 
     public void addAddress(Address address) {

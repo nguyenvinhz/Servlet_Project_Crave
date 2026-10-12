@@ -1,21 +1,23 @@
 <%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
 <%@ taglib prefix="fmt" uri="jakarta.tags.fmt" %>
-<%@ include file="/WEB-INF/views/components/header.jspf" %>
+<fmt:setLocale value="vi_VN"/>
+<c:set var="adminPage" value="menu"/>
+<c:set var="pageTitle" value="Món ăn - Thức uống"/>
+<%@ include file="/WEB-INF/views/admin/components/begin.jspf" %>
 
 <main class="page-container admin-page">
     <header class="admin-header">
         <div class="admin-header-title">
-            <p class="eyebrow">Trang quản trị</p>
-            <h1>Quản lý thực đơn & Món ăn</h1>
-            <p class="lead">Quản lý toàn bộ món ăn, giá bán, tình trạng sẵn có và cấu hình các tùy chọn (size, topping).</p>
+            <h1>Món ăn - Thức uống</h1>
+            <p class="lead">Quản lý thực đơn, giá bán và các tùy chọn cho từng món.</p>
         </div>
         <div class="admin-header-actions">
             <button type="button" class="button primary" onclick="openCreateFoodModal()">
                 <span>＋ Thêm món mới</span>
             </button>
             <a href="<c:url value='/admin/categories'/>" class="button outline">
-                <span>📁 Quản lý danh mục</span>
+                <span>Quản lý danh mục</span>
             </a>
         </div>
     </header>
@@ -118,10 +120,10 @@
                     <c:forEach var="food" items="${foods}">
                         <tr id="foodRow-<c:out value='${food.id}'/>">
                             <td>
-                                <img src="<c:out value='${not empty food.imageUrl ? food.imageUrl : pageContext.request.contextPath.concat(\"/assets/images/placeholder.jpg\")}'/>"
+                                <img src="<c:out value='${not empty food.imageUrl ? food.imageUrl : pageContext.request.contextPath.concat(\"/assets/images/food-placeholder.svg\")}'/>"
                                      alt="<c:out value='${food.name}'/>"
                                      class="admin-thumb"
-                                     onerror="this.onerror=null;this.src='https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=120&q=80';">
+                                     onerror="this.onerror=null;this.src='${pageContext.request.contextPath}/assets/images/food-placeholder.svg';">
                             </td>
                             <td><code><c:out value="${food.id}"/></code></td>
                             <td>
@@ -147,7 +149,7 @@
                                         data-food-id="<c:out value='${food.id}'/>"
                                         data-food-name="<c:out value='${food.name}'/>"
                                         onclick="handleOpenOptionsClick(this)">
-                                    ⚙ Tùy chọn
+                                    Tùy chọn
                                 </button>
                             </td>
                             <td style="text-align: right;">
@@ -156,14 +158,14 @@
                                             data-food-id="<c:out value='${food.id}'/>"
                                             onclick="handleEditFoodClick(this)"
                                             title="Sửa món">
-                                        ✏️ Sửa
+                                        Sửa
                                     </button>
                                     <button type="button" class="action-btn delete-btn"
                                             data-food-id="<c:out value='${food.id}'/>"
                                             data-food-name="<c:out value='${food.name}'/>"
                                             onclick="handleDeleteFoodClick(this)"
                                             title="Xóa món">
-                                        🗑️ Xóa
+                                        Xóa
                                     </button>
                                 </div>
                             </td>
@@ -180,7 +182,7 @@
     <div class="modal-dialog">
         <div class="modal-header">
             <h3 id="foodModalTitle">Thêm món ăn mới</h3>
-            <button type="button" class="modal-close" onclick="closeFoodModal()">&times;</button>
+            <button type="button" class="modal-close" onclick="closeFoodModal()" aria-label="Đóng hộp thoại">&times;</button>
         </div>
         <form id="foodForm" onsubmit="event.preventDefault(); submitFoodForm();">
             <input type="hidden" id="foodModalId" value="">
@@ -242,7 +244,7 @@
                 <h3>Quản lý tùy chọn món</h3>
                 <p class="text-muted" id="optionsModalFoodName">Món: ...</p>
             </div>
-            <button type="button" class="modal-close" onclick="closeOptionsModal()">&times;</button>
+            <button type="button" class="modal-close" onclick="closeOptionsModal()" aria-label="Đóng hộp thoại">&times;</button>
         </div>
         <div class="modal-body">
             <div id="optionsModalAlert" class="alert-box" style="display: none;"></div>
@@ -275,11 +277,11 @@
                         <div class="field">
                             <label for="newOptType">Loại tùy chọn</label>
                             <select id="newOptType" required>
-                                <option value="SIZE">Kích cỡ (SIZE)</option>
-                                <option value="TOPPING">Topping thêm (TOPPING)</option>
-                                <option value="SUGAR_LEVEL">Mức đường (SUGAR_LEVEL)</option>
-                                <option value="ICE_LEVEL">Mức đá (ICE_LEVEL)</option>
-                                <option value="OTHER">Khác (OTHER)</option>
+                                <option value="SIZE">Kích cỡ</option>
+                                <option value="TOPPING">Topping thêm</option>
+                                <option value="SUGAR_LEVEL">Mức đường</option>
+                                <option value="ICE_LEVEL">Mức đá</option>
+                                <option value="OTHER">Khác</option>
                             </select>
                         </div>
                         <div class="field">
@@ -308,4 +310,4 @@
 
 <script src="<c:url value='/assets/js/menu-admin.js'/>"></script>
 
-<%@ include file="/WEB-INF/views/components/footer.jspf" %>
+<%@ include file="/WEB-INF/views/admin/components/end.jspf" %>

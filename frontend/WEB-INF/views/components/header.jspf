@@ -1,30 +1,47 @@
+<%@ page pageEncoding="UTF-8" %>
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
 <!doctype html>
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title><c:out value="${pageTitle}"/> · crave.</title>
+    <title><c:out value="${empty pageTitle ? 'Món ngon mỗi ngày' : pageTitle}"/> · crave.</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Nunito:wght@600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="<c:url value='/assets/css/styles.css'/>">
+    <c:if test="${not empty pageStyle}">
+        <link rel="stylesheet" href="<c:url value='/assets/css/${pageStyle}.css'/>">
+    </c:if>
     <script>window.CONTEXT_PATH = '${pageContext.request.contextPath}';</script>
 </head>
-<body class="crave-body" data-context-path="<c:out value='${pageContext.request.contextPath}'/>">
+<body class="crave-body ${pageBodyClass}" data-context-path="<c:out value='${pageContext.request.contextPath}'/>">
+<a class="skip-link" href="#main-content">Chuyển đến nội dung</a>
 <header class="site-header">
     <div class="site-header-inner">
         <a class="brand" href="<c:url value='/menu'/>">crave<span>.</span></a>
         <nav class="main-nav" aria-label="Điều hướng chính">
             <a href="<c:url value='/menu'/>" class="${pageTitle == 'Thực đơn' ? 'active' : ''}">Thực đơn</a>
-            <a href="<c:url value='/promotions'/>" class="${pageTitle == 'Khuyến mãi' ? 'active' : ''}">Khuyến mãi</a>
-            <a href="<c:url value='/cart'/>" class="${pageTitle == 'Giỏ hàng' ? 'active' : ''}">Giỏ hàng</a>
+            <a href="<c:url value='/promotions'/>" class="${pageTitle == 'Ưu đãi & Khuyến mãi' ? 'active' : ''}">Khuyến mãi</a>
+            <c:if test="${sessionScope.currentUser.accountType != 'EMPLOYEE'}">
+                <a href="<c:url value='/cart'/>" class="${pageTitle == 'Giỏ hàng của bạn' ? 'active' : ''}">Giỏ hàng</a>
+            </c:if>
+            <c:if test="${sessionScope.currentUser.accountType == 'CUSTOMER'}">
+                <a href="<c:url value='/orders'/>" class="${pageTitle == 'Đơn hàng của bạn' ? 'active' : ''}">Đơn hàng</a>
+            </c:if>
             <c:if test="${sessionScope.currentUser.role == 'ADMIN' or sessionScope.currentUser.role == 'MENU_MANAGER'}">
                 <a href="<c:url value='/admin/menu'/>" class="${pageTitle == 'Quản lý thực đơn' ? 'active' : ''}">Quản lý món</a>
                 <a href="<c:url value='/admin/categories'/>" class="${pageTitle == 'Quản lý danh mục' ? 'active' : ''}">Quản lý danh mục</a>
             </c:if>
+            <c:if test="${sessionScope.currentUser.role == 'ADMIN' or sessionScope.currentUser.role == 'ORDER_STAFF'}">
+                <a href="<c:url value='/admin/orders'/>">Quản lý đơn hàng</a>
+            </c:if>
         </nav>
         <div class="header-actions header-actions-right">
+            <c:if test="${sessionScope.currentUser.accountType == 'EMPLOYEE'}">
+                <a href="<c:url value='/admin'/>" class="header-login-link">Trang quản trị</a>
+            </c:if>
+            <c:if test="${sessionScope.currentUser.accountType != 'EMPLOYEE'}">
             <a href="<c:url value='/cart'/>" class="header-cart-icon-btn" title="Giỏ hàng" aria-label="Giỏ hàng">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                     <circle cx="9" cy="21" r="1"></circle>
@@ -33,6 +50,7 @@
                 </svg>
                 <span class="cart-badge-count">0</span>
             </a>
+            </c:if>
             <c:choose>
                 <c:when test="${not empty sessionScope.currentUser}">
                     <a href="<c:url value='/customer/profile'/>" class="header-login-link">Hồ sơ</a>

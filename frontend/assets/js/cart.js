@@ -25,6 +25,7 @@
     let elements = {};
 
     const API_BASE = document.body.dataset.contextPath || '';
+    let modalReturnFocus;
 
     function apiErrorMessage(data, fallback) {
         return data?.error?.message || data?.message || fallback;
@@ -113,7 +114,7 @@
             elements.voucherRemoveBtn.addEventListener('click', handleRemoveVoucher);
         }
         if (elements.viewPromosBtn) {
-            elements.viewPromosBtn.addEventListener('click', openPromotionsModal);
+            elements.viewPromosBtn.addEventListener('click', event => { event.preventDefault(); openPromotionsModal(); });
         }
         if (elements.promosModalClose) {
             elements.promosModalClose.addEventListener('click', closePromotionsModal);
@@ -123,6 +124,15 @@
                 if (e.target === elements.promosModal) {
                     closePromotionsModal();
                 }
+            });
+            elements.promosModal.addEventListener('keydown', event => {
+                if (event.key === 'Escape') closePromotionsModal();
+                if (event.key !== 'Tab') return;
+                const controls = [...elements.promosModal.querySelectorAll('button:not(:disabled), a[href], input:not(:disabled), [tabindex="0"]')];
+                if (!controls.length) return;
+                const first = controls[0], last = controls.at(-1);
+                if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+                if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
             });
         }
         if (elements.clearCartBtn) {
@@ -393,7 +403,7 @@
             if (requestId !== state.voucherRequest) return;
             state.appliedVoucher = null;
             clearStoredVoucher();
-            setVoucherFeedback("Không thể xác thực lại voucher. Vui lòng áp dụng lại mã trước khi thanh toán.", "error");
+            setVoucherFeedback("Không thể kiểm tra lại mã khuyến mãi. Vui lòng áp dụng lại mã trước khi thanh toán.", "error");
         } finally {
             if (requestId === state.voucherRequest) {
                 state.voucherPending = false;
@@ -405,7 +415,10 @@
 
     async function openPromotionsModal() {
         if (!elements.promosModal) return;
+        modalReturnFocus = document.activeElement;
         elements.promosModal.classList.add('active');
+        elements.promosModal.setAttribute('aria-hidden', 'false');
+        elements.promosModalClose?.focus();
 
         if (elements.promosModalList) {
             elements.promosModalList.innerHTML = `
@@ -446,6 +459,8 @@
     function closePromotionsModal() {
         if (elements.promosModal) {
             elements.promosModal.classList.remove('active');
+            elements.promosModal.setAttribute('aria-hidden', 'true');
+            modalReturnFocus?.focus();
         }
     }
 
@@ -566,17 +581,18 @@
             // Screenshot format: "$12.90 × 1" in orange
             const priceTagText = `${linePriceFormatted} × ${item.quantity}`;
 
-            const imageUrl = item.foodImageUrl
-                ? (item.foodImageUrl.startsWith('http') || item.foodImageUrl.startsWith('/')
-                    ? item.foodImageUrl
-                    : `${API_BASE}/${item.foodImageUrl}`)
-                : `${API_BASE}/assets/images/food-placeholder.jpg`;
+            const itemImageUrl = item.imageUrl || item.foodImageUrl;
+            const imageUrl = itemImageUrl
+                ? (itemImageUrl.startsWith('http') || itemImageUrl.startsWith('/')
+                    ? itemImageUrl
+                    : `${API_BASE}/${itemImageUrl}`)
+                : `${API_BASE}/assets/images/food-placeholder.svg`;
 
             return `
                 <div class="cart-item-card" data-id="${escapeHtml(item.cartItemId)}">
                     <div class="cart-item-image-wrapper">
-                        <img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(item.foodName || 'Food')}" class="cart-item-image"
-                             onerror="this.src='https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=200&auto=format&fit=crop&q=80'">
+                        <img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(item.foodName || 'Món ăn')}" class="cart-item-image"
+                             onerror="this.onerror=null;this.src='${API_BASE}/assets/images/food-placeholder.svg'">
                     </div>
                     <div class="cart-item-info">
                         <h3 class="cart-item-title">${escapeHtml(item.foodName || 'Món ăn')}</h3>

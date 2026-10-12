@@ -17,9 +17,12 @@ public class OrderDetail {
     @JoinColumn(name = "order_id", nullable = false)
     private CustomerOrder order;
 
-    // Lưu tạm Food ID (Huân chưa tạo Food)
     @Column(name = "food_id", length = 10, nullable = false)
     private String foodId;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "food_id", insertable = false, updatable = false)
+    private Food food;
 
     @Column(name = "food_name_snapshot", length = 150, nullable = false)
     private String foodNameSnapshot;
@@ -46,7 +49,15 @@ public class OrderDetail {
     public CustomerOrder getOrder() { return order; }
     public void setOrder(CustomerOrder order) { this.order = order; }
     public String getFoodId() { return foodId; }
-    public void setFoodId(String foodId) { this.foodId = foodId; }
+    public void setFoodId(String foodId) {
+        this.foodId = foodId;
+        if (foodId == null || (food != null && !foodId.equals(food.getId()))) this.food = null;
+    }
+    public Food getFood() { return food; }
+    public void setFood(Food food) {
+        this.food = food;
+        this.foodId = food != null ? food.getId() : null;
+    }
     public String getFoodNameSnapshot() { return foodNameSnapshot; }
     public void setFoodNameSnapshot(String foodNameSnapshot) { this.foodNameSnapshot = foodNameSnapshot; }
     public Integer getQuantity() { return quantity; }

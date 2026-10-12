@@ -47,5 +47,6 @@ Báo cáo được nhóm theo chức năng; ngày trong tên file là ngày tạ
 |---|---|---|---|
 | 2026-10-10 | Nguyễn Quang Vinh | Sắp xếp thư mục tài liệu và cập nhật liên kết | [Bố cục docs](documentation/2026-10-10-nguyen-quang-vinh-docs-layout.md) |
 | 2026-10-12 | Nguyễn Quang Vinh | CI/CD: kiểm thử và tự deploy main lên EC2 | [CI/CD EC2](documentation/2026-10-12-nguyen-quang-vinh-ci-cd-ec2.md) |
+| 2026-10-12 | Nguyễn Quang Vinh | Hoàn thiện giao diện, admin, kiến trúc và kiểm tra chạy thật | [UI/admin/runtime](documentation/2026-10-12-nguyen-quang-vinh-ui-admin-runtime.md) |
 
 Khi tạo báo cáo mới, dùng `docs/reports/<scope>/YYYY-MM-DD-<ho-ten-thanh-vien>-<task>.md` và thêm liên kết vào nhóm tương ứng ở trên. Xem [quy tắc báo cáo](../project/quy-tac-git-github.md#91-vị-trí-và-tên-file) để giữ một báo cáo cho mỗi task/branch.

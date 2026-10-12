@@ -1,8 +1,11 @@
 package com.foodordering.service;
 
 import com.foodordering.entity.Payment;
+import com.foodordering.entity.CustomerOrder;
+import com.foodordering.enums.OrderStatus;
 import com.foodordering.enums.PaymentStatus;
 import com.foodordering.exception.ResourceNotFoundException;
+import com.foodordering.exception.BadRequestException;
 import com.foodordering.repository.PaymentRepository;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
@@ -13,6 +16,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
+import java.time.LocalDateTime;
 
 class PaymentServiceTest {
 
@@ -31,6 +35,7 @@ class PaymentServiceTest {
 
         when(emf.createEntityManager()).thenReturn(em);
         when(em.getTransaction()).thenReturn(tx);
+        when(tx.isActive()).thenReturn(true);
 
         paymentService = new PaymentServiceImpl(paymentRepository, emf);
     }
@@ -91,5 +96,81 @@ class PaymentServiceTest {
         assertThrows(ResourceNotFoundException.class,
                 () -> paymentService.processPayment("UNKNOWN_PAYMENT"));
         verify(em).close();
+    }
+
+    @Test
+    void successfulPaymentCannotBeRevertedToFailed() {
+        Payment payment = payment(PaymentStatus.SUCCESS);
+        LocalDateTime paidAt = LocalDateTime.of(2026, 10, 1, 12, 0);
+        payment.setPaidAt(paidAt);
+
+        assertThrows(BadRequestException.class,
+                () -> paymentService.updatePaymentStatus("TT01", PaymentStatus.FAILED, "OTHER"));
+
+        assertEquals(PaymentStatus.SUCCESS, payment.getStatus());
+        assertEquals(paidAt, payment.getPaidAt());
+        verify(tx).rollback();
+    }
+
+    @Test
+    void refundPreservesOriginalPaymentTime() {
+        Payment payment = payment(PaymentStatus.SUCCESS);
+        LocalDateTime paidAt = LocalDateTime.of(2026, 10, 1, 12, 0);
+        payment.setPaidAt(paidAt);
+
+        paymentService.updatePaymentStatus("TT01", PaymentStatus.REFUNDED, "REFUND01");
+
+        assertEquals(PaymentStatus.REFUNDED, payment.getStatus());
+        assertEquals(paidAt, payment.getPaidAt());
+        verify(tx).commit();
+    }
+
+    @Test
+    void pendingPaymentCannotBeRefunded() {
+        Payment payment = payment(PaymentStatus.PENDING);
+
+        assertThrows(BadRequestException.class,
+                () -> paymentService.updatePaymentStatus("TT01", PaymentStatus.REFUNDED, null));
+
+        assertEquals(PaymentStatus.PENDING, payment.getStatus());
+        verify(tx).rollback();
+    }
+
+    @Test
+    void repeatedSuccessKeepsOriginalPaymentSnapshot() {
+        Payment payment = payment(PaymentStatus.SUCCESS);
+        LocalDateTime paidAt = LocalDateTime.of(2026, 10, 1, 12, 0);
+        payment.setPaidAt(paidAt);
+        payment.setTransactionRef("ORIGINAL");
+
+        paymentService.updatePaymentStatus("TT01", PaymentStatus.SUCCESS, "DUPLICATE");
+
+        assertEquals(paidAt, payment.getPaidAt());
+        assertEquals("ORIGINAL", payment.getTransactionRef());
+        verify(em, never()).merge(any());
+        verify(tx).commit();
+    }
+
+    @Test
+    void cancelledOrderCannotBePaid() {
+        Payment payment = payment(PaymentStatus.PENDING);
+        CustomerOrder order = new CustomerOrder();
+        order.setStatus(OrderStatus.CANCELLED);
+        payment.setOrder(order);
+
+        assertThrows(BadRequestException.class,
+                () -> paymentService.updatePaymentStatus("TT01", PaymentStatus.SUCCESS, null));
+
+        assertEquals(PaymentStatus.PENDING, payment.getStatus());
+        assertNull(payment.getPaidAt());
+        verify(tx).rollback();
+    }
+
+    private Payment payment(PaymentStatus status) {
+        Payment payment = new Payment();
+        payment.setId("TT01");
+        payment.setStatus(status);
+        when(em.find(Payment.class, "TT01")).thenReturn(payment);
+        return payment;
     }
 }

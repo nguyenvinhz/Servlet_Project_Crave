@@ -1,20 +1,21 @@
 <%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
-<%@ include file="/WEB-INF/views/components/header.jspf" %>
+<c:set var="adminPage" value="categories"/>
+<c:set var="pageTitle" value="Danh mục"/>
+<%@ include file="/WEB-INF/views/admin/components/begin.jspf" %>
 
 <main class="page-container admin-page">
     <header class="admin-header">
         <div class="admin-header-title">
-            <p class="eyebrow">Trang quản trị</p>
-            <h1>Quản lý danh mục món ăn</h1>
-            <p class="lead">Tạo mới, chỉnh sửa thông tin hoặc xóa danh mục (chỉ xóa được danh mục chưa có món ăn).</p>
+            <h1>Danh mục</h1>
+            <p class="lead">Sắp xếp thực đơn theo nhóm món ăn và thức uống.</p>
         </div>
         <div class="admin-header-actions">
             <button type="button" class="button primary" onclick="openCreateCategoryModal()">
                 <span>＋ Thêm danh mục mới</span>
             </button>
             <a href="<c:url value='/admin/menu'/>" class="button outline">
-                <span>◀ Quay lại quản lý món</span>
+                <span>Quản lý món ăn</span>
             </a>
         </div>
     </header>
@@ -65,7 +66,7 @@
                                             data-cat-desc="<c:out value='${cat.description}'/>"
                                             onclick="handleEditCategoryClick(this)"
                                             title="Sửa danh mục">
-                                        ✏️ Sửa
+                                        Sửa
                                     </button>
                                     <button type="button" class="action-btn delete-btn"
                                             data-cat-id="<c:out value='${cat.id}'/>"
@@ -74,7 +75,7 @@
                                             onclick="handleDeleteCategoryClick(this)"
                                             title="${cat.foodCount > 0 ? 'Không thể xóa danh mục đang có món' : 'Xóa danh mục'}"
                                             ${cat.foodCount > 0 ? 'disabled style="opacity: 0.5; cursor: not-allowed;"' : ''}>
-                                        🗑️ Xóa
+                                        Xóa
                                     </button>
                                 </div>
                             </td>
@@ -91,7 +92,7 @@
     <div class="modal-dialog">
         <div class="modal-header">
             <h3 id="categoryModalTitle">Thêm danh mục mới</h3>
-            <button type="button" class="modal-close" onclick="closeCategoryModal()">&times;</button>
+            <button type="button" class="modal-close" onclick="closeCategoryModal()" aria-label="Đóng hộp thoại">&times;</button>
         </div>
         <form id="categoryForm" onsubmit="event.preventDefault(); submitCategoryForm();">
             <input type="hidden" id="categoryModalId" value="">
@@ -121,4 +122,4 @@
 
 <script src="<c:url value='/assets/js/menu-admin.js'/>"></script>
 
-<%@ include file="/WEB-INF/views/components/footer.jspf" %>
+<%@ include file="/WEB-INF/views/admin/components/end.jspf" %>

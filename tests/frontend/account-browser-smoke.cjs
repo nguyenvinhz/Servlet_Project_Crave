@@ -128,6 +128,17 @@ const cases = [
   ['login-auth-loop','/crave/auth/login','/crave/customer/profile'],
   ['login-valid-return','/crave/menu?category=1','/crave/menu?category=1']
  ].map(([name,returnTo,redirect])=>({name,page:'auth/login',query:'returnTo='+encodeURIComponent(returnTo),setup:`const fixtureFetch=async()=>reply(200,profile);`,run:`setFields({email:'a@example.com',password:'password1'});submit('loginForm');`,redirect})),
+ ...[
+  ['ADMIN', '/admin'], ['MENU_MANAGER', '/admin/menu'], ['ORDER_STAFF', '/admin/orders'],
+  ['PROMOTION_MANAGER', '/admin/promotions'], ['HR_MANAGER', '/admin/employees']
+ ].map(([role, destination]) => ({name:'login-role-'+role.toLowerCase(), page:'auth/login',
+   setup:`const fixtureFetch=async()=>reply(200,{...profile,accountType:'EMPLOYEE',role:'${role}'});`,
+   run:`setFields({email:'staff@example.com',password:'password1'});submit('loginForm');`, redirect:'/crave'+destination})),
+ {name:'login-staff-rejects-customer-return',page:'auth/login',query:'returnTo=%2Fcrave%2Fcheckout',
+  setup:`const fixtureFetch=async()=>reply(200,{...profile,accountType:'EMPLOYEE',role:'ORDER_STAFF'});`,
+  run:`setFields({email:'staff@example.com',password:'password1'});submit('loginForm');`,redirect:'/crave/admin/orders'},
+ {name:'login-customer-rejects-admin-return',page:'auth/login',query:'returnTo=%2Fcrave%2Fadmin%2Fmenu',
+  setup:`const fixtureFetch=async()=>reply(200,profile);`,run:`setFields({email:'a@example.com',password:'password1'});submit('loginForm');`,redirect:'/crave/customer/profile'},
  {name:'session-expiry-redirect',page:'customer/profile',setup:`const fixtureFetch=async()=>reply(401,null,{message:'Unauthorized'});`,run:``,redirect:'/crave/auth/login?reason=session-expired&returnTo=%2Fcrave%2Fcustomer%2Fprofile'},
  {name:'logout-redirect',page:'customer/profile',setup:`const fixtureFetch=async r=>reply(200,r.method==='GET'?profile:{message:'Signed out'});`,run:`document.getElementById('logoutForm').dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));`,redirect:'/crave/auth/login?loggedOut=1'}
 ];
@@ -152,7 +163,7 @@ const addressHelpers=`
 `;
 const cartFixture = `
  const cart={cartId:'GH01',subtotal:100000,totalItems:1,items:[
- {cartItemId:'CT01',foodName:'Burger',foodImageUrl:'/assets/images/fixture.svg',quantity:1,unitPrice:100000,options:[]}
+ {cartItemId:'CT01',foodName:'Burger',imageUrl:'/assets/images/fixture.svg',quantity:1,unitPrice:100000,options:[]}
  ]};
  window.confirm=()=>true;
 `;
@@ -175,6 +186,7 @@ cases.push(
  if(request.url.endsWith('/active'))return reply(503,null,{message:'Promotions unavailable'});
  throw new Error('Unexpected cart request');};`,run:`
  await waitFor(()=>document.querySelector('.btn-inc'));
+ assert(document.querySelector('.cart-item-image').getAttribute('src')==='/assets/images/fixture.svg','Cart ignored canonical imageUrl field');
  document.querySelector('.btn-inc').click();
  await waitFor(()=>document.querySelector('.crave-toast')?.textContent==='Quantity rejected');
  assert(calls.at(-1).body.cartItemId==='CT01'&&calls.at(-1).body.quantity===2,'Quantity request incorrect');
@@ -465,7 +477,9 @@ cases.push(
  document.body.append(frame);await loaded;
  const screen=frame.contentWindow,doc=frame.contentDocument,main=doc.querySelector('main');
  assert(screen.innerWidth===320,'Fixture did not use exact 320px viewport');
- assert(doc.querySelectorAll('header nav a').length===${role?5:3},'Fixture did not render expected role navigation');
+ assert(doc.querySelectorAll('header nav a').length===${role==='ADMIN'?5:role==='MENU_MANAGER'?4:accountType==='CUSTOMER'?4:3},'Fixture did not render expected role navigation');
+ if(${accountType==='CUSTOMER'})assert(doc.querySelector('header nav a[href$="/orders"]'),'Customer navigation omitted order history');
+ if(${Boolean(role)})assert(doc.querySelector('a[href$="/admin"]'),'Employee navigation omitted admin entry');
   if(${page==='customer/profile'})assert(Boolean(doc.querySelector('.account-sidebar a[href$="/customer/addresses"]'))===${accountType==='CUSTOMER'},'Profile sidebar disagrees with account type');
  if(${Boolean(role)})assert(screen.getComputedStyle(doc.querySelector('header nav')).flexWrap==='wrap','Staff navigation does not wrap onto rows');
  assert(main.getBoundingClientRect().right<=screen.innerWidth,'Account layout extends beyond viewport');
@@ -651,16 +665,43 @@ cases.push(
  `}
 );
 
+cases.push(
+ {name:'order-pickup-timeline-completed',page:'order/order-detail',route:'orders/DH01',setup:`
+ const fixtureFetch=async()=>reply(200,{orderId:'DH01',status:'COMPLETED',fulfillmentType:'PICKUP',orderedAt:'2026-10-12T08:00:00',receiverName:'Khach',receiverPhone:'0901234567',details:[],totalAmount:45000});`,run:`
+ await waitFor(()=>document.querySelector('.stepper'));
+ assert(document.querySelectorAll('.step').length===3,'Pickup incorrectly includes delivery step');
+ assert(document.querySelector('.step.active .step-label').textContent==='Hoàn tất','Completed pickup did not reach final step');
+ assert(document.querySelector('.step.active .step-icon').textContent==='3','Pickup final step has wrong number');
+ `},
+ {name:'order-delivery-timeline-preparing',page:'order/order-detail',route:'orders/DH01',setup:`
+ const fixtureFetch=async()=>reply(200,{orderId:'DH01',status:'PREPARING',fulfillmentType:'DELIVERY',orderedAt:'2026-10-12T08:00:00',receiverName:'Khach',receiverPhone:'0901234567',details:[],totalAmount:60000});`,run:`
+ await waitFor(()=>document.querySelector('.stepper'));
+ assert(document.querySelectorAll('.step').length===4,'Delivery timeline is missing a step');
+ assert(document.querySelector('.step.active .step-label').textContent==='Đang chuẩn bị','Preparing delivery highlights wrong status');
+ `},
+ {name:'order-server-error-is-escaped',page:'order/order-detail',route:'orders/DH01',setup:`
+ const fixtureFetch=async()=>reply(500,null,{message:'<img src=x onerror=window.evil=1>'});`,run:`
+ await waitFor(()=>document.getElementById('orderContent').textContent.includes('onerror'));
+ assert(!document.getElementById('orderContent').querySelector('img')&&!window.evil,'Server error was inserted as executable HTML');
+ `}
+);
 const selectedCases = cases.filter(test => !process.argv[2] || new RegExp(process.argv[2]).test(test.name));
 if (!selectedCases.length) throw new Error('No browser cases matched.');
 let current;
 function renderTags(source) {
  const accountType=current.accountType||(current.page.startsWith('customer/')?'CUSTOMER':null);
- return source.replace(/<c:if test="\$\{([^}]+)\}">([^]*?)<\/c:if>/g,(_,condition,content)=>{
+ const pageStyle=current.page.startsWith('cart/')?'cart':current.page.startsWith('order/')?'order':'account';
+ return source.replace(/<c:set[^]*?\/>/g,'').replace(/<c:if test="\$\{([^}]+)\}">([^]*?)<\/c:if>/g,(_,condition,content)=>{
    if(condition==="sessionScope.currentUser.role == 'ADMIN' or sessionScope.currentUser.role == 'MENU_MANAGER'")return ['ADMIN','MENU_MANAGER'].includes(current.role)?content:'';
+   if(condition==="sessionScope.currentUser.role == 'ADMIN' or sessionScope.currentUser.role == 'ORDER_STAFF'")return ['ADMIN','ORDER_STAFF'].includes(current.role)?content:'';
    if(condition==="sessionScope.currentUser.accountType == 'CUSTOMER'")return accountType==='CUSTOMER'?content:'';
+   if(condition==="sessionScope.currentUser.accountType == 'EMPLOYEE'")return accountType==='EMPLOYEE'?content:'';
+   if(condition==="sessionScope.currentUser.accountType != 'EMPLOYEE'")return accountType!=='EMPLOYEE'?content:'';
+   if(condition==='not empty pageStyle')return content;
    throw new Error('Unrecognized JSP condition: '+condition);
  })
+ .replace(/\$\{pageStyle\}/g,pageStyle).replace(/\$\{pageBodyClass\}/g,current.page.startsWith('order/')?'order-page':'')
+ .replace(/\$\{empty pageTitle[^}]*\}/g,'')
  .replace(/<%@[^]*?%>/g,'').replace(/<c:url value='([^']*)'\s*\/>/g,(_,p)=>(current.context??'/crave')+p)
  .replace(/<c:out value='\$\{pageContext.request.contextPath\}'\s*\/>/g,current.context??'/crave')
  .replace(/<c:out[^]*?\/>/g,'')
@@ -686,9 +727,9 @@ function footerMarkup() {
 }
 const server=http.createServer((req,res)=>{
  const context=current.context??'/crave';
- const script=/\/assets\/js\/(account|cart|checkout)\.js$/.exec(req.url);
+ const script=/\/assets\/js\/(account|cart|checkout|orders|order-detail)\.js$/.exec(req.url);
  if(script){res.setHeader('Content-Type','text/javascript; charset=utf-8');res.end(fs.readFileSync(path.join(project,'frontend/assets/js',script[1]+'.js')));return;}
- const stylesheet=/\/assets\/css\/(styles|account|cart)\.css$/.exec(req.url);
+ const stylesheet=/\/assets\/css\/(styles|account|cart|order)\.css$/.exec(req.url);
  if(stylesheet){res.setHeader('Content-Type','text/css; charset=utf-8');res.end(fs.readFileSync(path.join(project,'frontend/assets/css',stylesheet[1]+'.css')));return;}
  if(req.url==='/assets/images/fixture.svg'){res.setHeader('Content-Type','image/svg+xml');res.end('<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"></svg>');return;}
  res.setHeader('Content-Type','text/html; charset=utf-8');
@@ -697,7 +738,8 @@ const server=http.createServer((req,res)=>{
  if(req.url!==current.redirect){res.end(`<pre id="smoke-result">FAIL unexpected redirect ${req.url} expected ${current.redirect}</pre>`);return;}
  res.end(`<!doctype html><html><body><script>try{${current.redirectCheck||''}document.body.innerHTML='<pre id="smoke-result">PASS ${current.name}</pre>';}catch(e){document.body.innerHTML='<pre id="smoke-result">FAIL '+e.message+'</pre>';}</script></body></html>`);return;}
  const run=current.redirect?current.run:current.run+`finish('PASS ${current.name}');`;
- const shell=current.realHeader?headerMarkup():`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="${context}/assets/css/styles.css"></head><body data-context-path="${context}">`;
+ const pageStyle=current.page.startsWith('cart/')?'cart':current.page.startsWith('order/')?'order':'account';
+ const shell=current.realHeader?headerMarkup():`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="${context}/assets/css/styles.css"><link rel="stylesheet" href="${context}/assets/css/${pageStyle}.css"></head><body data-context-path="${context}">`;
  const footer=current.realHeader?footerMarkup():`<form id="logoutForm" action="${context}/api/auth/logout"><button type="submit">Logout</button></form><p id="logout-error"></p>`;
  res.end(`${shell}${markup(current.page)}${footer}
  <script>${common}${current.setup}</script><script src="${context}/assets/js/account.js"></script>

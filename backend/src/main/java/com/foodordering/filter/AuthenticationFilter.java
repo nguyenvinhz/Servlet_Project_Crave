@@ -93,12 +93,18 @@ public class AuthenticationFilter implements Filter {
     private static void authorize(HttpServletRequest request, String path, ProfileResponse user) {
         if (under(path, "/admin") || under(path, "/api/admin")) {
             String resource = path.startsWith("/api/") ? path.substring(4) : path;
+            if (resource.equals("/admin") || resource.equals("/admin/")) {
+                SessionAuth.requireEmployee(request, EmployeeRole.values());
+                return;
+            }
             EmployeeRole expected = under(resource, "/admin/orders") || under(resource, "/admin/payments")
                     ? EmployeeRole.ORDER_STAFF
                     : under(resource, "/admin/menu") || under(resource, "/admin/foods")
                     || under(resource, "/admin/categories") || under(resource, "/admin/options")
                     ? EmployeeRole.MENU_MANAGER
-                    : under(resource, "/admin/promotions") ? EmployeeRole.PROMOTION_MANAGER : EmployeeRole.ADMIN;
+                    : under(resource, "/admin/promotions") ? EmployeeRole.PROMOTION_MANAGER
+                    : under(resource, "/admin/customers") || under(resource, "/admin/employees")
+                    ? EmployeeRole.HR_MANAGER : EmployeeRole.ADMIN;
             SessionAuth.requireEmployee(request, expected);
         } else if (!path.equals("/api/profile") && !path.equals("/customer/profile")
                 && user.accountType() != AccountType.CUSTOMER) {

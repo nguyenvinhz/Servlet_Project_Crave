@@ -95,14 +95,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                     </div>
                 `;
             } else {
-                stepperCard.appendChild(buildStepper(o.status));
+                stepperCard.appendChild(buildStepper(o.status, o.fulfillmentType));
             }
             container.appendChild(stepperCard);
             
             // 3. Info Grid (Người nhận & Thanh toán)
             const grid = document.createElement('div');
             grid.style.display = 'grid';
-            grid.style.gridTemplateColumns = 'repeat(auto-fit, minmax(280px, 1fr))';
+            grid.style.gridTemplateColumns = 'repeat(auto-fit, minmax(min(280px, 100%), 1fr))';
             grid.style.gap = '1.5rem';
             grid.style.marginBottom = '1.5rem';
             
@@ -204,7 +204,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 </div>
                 ${discount > 0 ? `
                     <div style="display: flex; justify-content: space-between; padding: 0.35rem 0; color: #4ade80;">
-                        <span>Voucher giảm giá:</span>
+                        <span>Mã khuyến mãi:</span>
                         <span>-${discount.toLocaleString('vi-VN')} đ</span>
                     </div>
                 ` : ''}
@@ -218,7 +218,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         } else {
             container.innerHTML = `
                 <div class="card" style="padding: 2rem; text-align: center; color: #f87171;">
-                    <p>${data?.error?.message || data?.message || 'Không tìm thấy thông tin đơn hàng.'}</p>
+                    <p>${escapeHtml(data?.error?.message || data?.message || 'Không tìm thấy thông tin đơn hàng.')}</p>
                     <a href="${API_BASE}/orders" class="btn-primary" style="display: inline-block; width: auto; margin-top: 1rem; text-decoration: none;">Quay lại danh sách đơn</a>
                 </div>
             `;
@@ -233,22 +233,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 });
 
-function buildStepper(currentStatus) {
+function buildStepper(currentStatus, fulfillmentType) {
     const steps = [
         { key: 'PENDING_CONFIRMATION', num: '1', label: 'Chờ xác nhận' },
         { key: 'PREPARING', num: '2', label: 'Đang chuẩn bị' },
         { key: 'DELIVERING', num: '3', label: 'Đang giao hàng' },
         { key: 'COMPLETED', num: '4', label: 'Hoàn tất' }
-    ];
+    ].filter(step => fulfillmentType !== 'PICKUP' || step.key !== 'DELIVERING');
 
-    const orderIndex = {
-        'PENDING_CONFIRMATION': 0,
-        'PREPARING': 1,
-        'DELIVERING': 2,
-        'COMPLETED': 3
-    };
-
-    const curIdx = orderIndex[currentStatus] ?? -1;
+    const curIdx = steps.findIndex(step => step.key === currentStatus);
 
     const stepperDiv = document.createElement('div');
     stepperDiv.className = 'stepper';
@@ -261,7 +254,7 @@ function buildStepper(currentStatus) {
 
         const iconEl = document.createElement('div');
         iconEl.className = 'step-icon';
-        iconEl.textContent = idx < curIdx ? '✓' : s.num;
+        iconEl.textContent = idx < curIdx ? '✓' : String(idx + 1);
 
         const labelEl = document.createElement('div');
         labelEl.className = 'step-label';

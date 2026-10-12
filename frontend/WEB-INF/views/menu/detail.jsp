@@ -1,9 +1,10 @@
 <%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
 <%@ taglib prefix="fmt" uri="jakarta.tags.fmt" %>
+<fmt:setLocale value="vi_VN" />
 <%@ include file="/WEB-INF/views/components/header.jspf" %>
 
-<main class="page-container product-detail-page">
+<main id="main-content" class="page-container product-detail-page">
     <c:if test="${empty food}">
         <div class="empty-state not-found-detail">
             <span class="empty-icon-art">🍽️</span>
@@ -28,9 +29,9 @@
             <div class="product-media-panel">
                 <div class="product-image-container">
                     <img id="foodImage"
-                         src="<c:out value='${not empty food.imageUrl ? food.imageUrl : pageContext.request.contextPath.concat(\"/assets/images/placeholder.jpg\")}'/>"
+                         src="<c:out value='${not empty food.imageUrl ? food.imageUrl : pageContext.request.contextPath.concat("/assets/images/food-placeholder.svg")}'/>"
                          alt="<c:out value='${food.name}'/>"
-                         onerror="this.onerror=null;this.src='https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=600&q=80';">
+                         onerror="this.onerror=null;this.src='<c:url value='/assets/images/food-placeholder.svg'/>';">
                     <div class="product-media-badges">
                         <span class="category-pill"><c:out value="${food.categoryName}"/></span>
                         <span class="status-pill ${food.status == 'AVAILABLE' ? 'available' : 'unavailable'}">
@@ -71,7 +72,7 @@
                 <form id="orderCustomizationForm" class="customization-form" data-food-id="<c:out value='${food.id}'/>" onsubmit="event.preventDefault(); handleAddToCart();">
                     <c:if test="${not empty food.options}">
                         <section class="options-container" id="foodOptionsContainer">
-                            <h3 class="options-title">Tùy chọn & Thêm món</h3>
+                            <h3 class="options-title">Tùy chọn cho món ăn</h3>
 
                         <c:set var="hasSize" value="false" />
                         <c:forEach var="opt" items="${food.options}">
@@ -79,12 +80,12 @@
                         </c:forEach>
                         <c:if test="${hasSize}">
                             <fieldset class="option-group">
-                                <legend class="option-group-title">Kích cỡ (Size)</legend>
+                                <legend class="option-group-title">Kích cỡ</legend>
                                 <div class="option-items-grid">
                                     <label class="option-card">
                                         <input type="radio" name="option_size" value="0" data-extra="0" checked onchange="updateTotalPrice()">
                                         <span class="option-card-inner">
-                                            <span class="opt-label">Tiêu chuẩn (M)</span>
+                                            <span class="opt-label">Tiêu chuẩn</span>
                                             <span class="opt-price">+0 ₫</span>
                                         </span>
                                     </label>
@@ -109,7 +110,7 @@
                         </c:forEach>
                         <c:if test="${hasTopping}">
                             <fieldset class="option-group">
-                                <legend class="option-group-title">Món thêm (Topping)</legend>
+                                <legend class="option-group-title">Món thêm</legend>
                                 <div class="option-items-grid">
                                     <c:forEach var="opt" items="${food.options}">
                                         <c:if test="${opt.optionType == 'TOPPING'}">
@@ -225,118 +226,6 @@
     </c:if>
 </main>
 
-<script>
-function changeQuantity(delta) {
-    const qtyInput = document.getElementById('orderQuantity');
-    let current = parseInt(qtyInput.value) || 1;
-    current = Math.max(1, current + delta);
-    qtyInput.value = current;
-    updateTotalPrice();
-}
-
-function updateTotalPrice() {
-    const basePriceElem = document.getElementById('basePriceDisplay');
-    if (!basePriceElem) return;
-    const basePrice = parseFloat(basePriceElem.dataset.basePrice) || 0;
-
-    let extraTotal = 0;
-    // Radio & Checkbox options
-    const checkedOptions = document.querySelectorAll('#orderCustomizationForm input:checked');
-    checkedOptions.forEach(opt => {
-        const extra = parseFloat(opt.dataset.extra) || 0;
-        extraTotal += extra;
-    });
-
-    const qty = parseInt(document.getElementById('orderQuantity').value) || 1;
-    const singleItemPrice = basePrice + extraTotal;
-    const grandTotal = singleItemPrice * qty;
-
-    const totalDisplay = document.getElementById('totalPriceDisplay');
-    if (totalDisplay) {
-        totalDisplay.textContent = grandTotal.toLocaleString('vi-VN') + ' ₫';
-    }
-}
-
-async function handleAddToCart() {
-    const btn = document.getElementById('addToCartBtn');
-    if (!btn || btn.disabled) return;
-    const originalText = btn.innerHTML;
-    btn.disabled = true;
-    btn.innerHTML = '<span>⏳ Đang thêm vào giỏ...</span>';
-
-    const form = document.getElementById('orderCustomizationForm');
-    const foodId = form ? form.dataset.foodId : '';
-    const quantity = parseInt(document.getElementById('orderQuantity').value) || 1;
-    const optionIds = [];
-    document.querySelectorAll('#orderCustomizationForm input:checked').forEach(opt => {
-        if (opt.value && opt.value !== '0') {
-            optionIds.push(opt.value);
-        }
-    });
-
-    const ctx = typeof window.CONTEXT_PATH === 'string' ? window.CONTEXT_PATH : '';
-    const cartUrl = ctx + '/api/cart/items';
-
-    try {
-        const response = await fetch(cartUrl, {
-            method: 'POST',
-            credentials: 'same-origin',
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-            },
-            body: JSON.stringify({ foodId, quantity, optionIds, note: '' })
-        });
-
-        if (response.status === 401) {
-            btn.innerHTML = '<span>⚠️ Vui lòng đăng nhập</span>';
-            btn.style.background = '#dc2626';
-            const returnTo = encodeURIComponent(window.location.pathname + window.location.search);
-            setTimeout(() => {
-                window.location.href = ctx + '/auth/login?reason=session-expired&returnTo=' + returnTo;
-            }, 800);
-            return;
-        }
-
-        if (response.status === 403) {
-            alert('Tài khoản nhân viên hoặc quản trị không thể mua hàng. Vui lòng đăng nhập bằng tài khoản khách hàng.');
-            btn.innerHTML = originalText;
-            btn.style.background = '';
-            btn.disabled = false;
-            return;
-        }
-
-        const data = await response.json();
-        if (response.ok && data.success) {
-            btn.innerHTML = '<span>✅ Đã thêm món vào giỏ!</span>';
-            btn.style.background = '#18794e';
-            const badge = document.querySelector('.cart-badge-count');
-            if (badge) {
-                let currentCount = parseInt(badge.textContent) || 0;
-                badge.textContent = currentCount + quantity;
-                badge.style.display = 'inline-flex';
-            }
-            const dot = document.querySelector('.cart-badge-dot');
-            if (dot) dot.style.display = 'block';
-            setTimeout(() => {
-                btn.innerHTML = originalText;
-                btn.style.background = '';
-                btn.disabled = false;
-            }, 2000);
-        } else {
-            const msg = data.error?.message || data.message || 'Không thể thêm vào giỏ hàng.';
-            alert(msg);
-            btn.innerHTML = originalText;
-            btn.style.background = '';
-            btn.disabled = false;
-        }
-    } catch (e) {
-        alert('Lỗi kết nối khi thêm giỏ hàng: ' + e.message);
-        btn.innerHTML = originalText;
-        btn.style.background = '';
-        btn.disabled = false;
-    }
-}
-</script>
+<script src="<c:url value='/assets/js/menu-detail.js'/>"></script>
 
 <%@ include file="/WEB-INF/views/components/footer.jspf" %>

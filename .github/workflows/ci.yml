@@ -75,11 +75,11 @@ jobs:
             "$MYSQL_PORT" >> "$GITHUB_ENV"
 
       - name: Build WAR and run all backend tests
-        run: mvn --batch-mode --no-transfer-progress --file backend/pom.xml clean verify
+        run: mvn --batch-mode --no-transfer-progress --file backend/pom.xml -Pdev clean verify
 
       - name: Run cart and promotion assertions
         run: |
-          mvn --batch-mode --no-transfer-progress --file backend/pom.xml \
+          mvn --batch-mode --no-transfer-progress --file backend/pom.xml -Pdev \
             org.apache.maven.plugins:maven-dependency-plugin:3.10.0:build-classpath \
             -DincludeScope=test -Dmdep.outputFile=target/test-classpath.txt
           java -ea -cp "backend/target/test-classes:backend/target/classes:$(cat backend/target/test-classpath.txt)" \
@@ -88,7 +88,10 @@ jobs:
       - name: Check frontend JavaScript syntax
         run: |
           find frontend/assets/js -type f -name '*.js' -print0 | xargs -0 -r -n 1 node --check
-          node --check frontend/tests/account-browser-smoke.cjs
+          node --check tests/frontend/account-browser-smoke.cjs
+          node --check tests/frontend/admin-management-browser-smoke.cjs
+          node --check tests/frontend/admin-orders-dashboard-browser-smoke.cjs
+          node --check tests/runtime/http-smoke.cjs
 
       - name: Verify deployment and rollback script
         run: bash scripts/tests/deploy-ec2-test.sh
@@ -97,7 +100,70 @@ jobs:
         run: |
           export CHROME_PATH="$(command -v google-chrome)"
           "$CHROME_PATH" --version
-          node frontend/tests/account-browser-smoke.cjs
+          node tests/frontend/account-browser-smoke.cjs
+          node tests/frontend/admin-management-browser-smoke.cjs
+          node tests/frontend/admin-orders-dashboard-browser-smoke.cjs
+
+      - name: Run packaged WAR HTTP smoke tests
+        env:
+          CRAVE_SMOKE_BASE_URL: http://127.0.0.1:8081/crave
+          CRAVE_SMOKE_ADMIN_EMAIL: ci-runtime@crave.example
+        run: |
+          set -euo pipefail
+          mvn --batch-mode --no-transfer-progress --file backend/pom.xml -Pdev \
+            org.apache.maven.plugins:maven-dependency-plugin:3.10.0:build-classpath \
+            -DincludeScope=test \
+            -DincludeGroupIds=org.apache.tomcat.embed,org.apache.tomcat,org.eclipse.jdt \
+            -Dmdep.outputFile=target/dev-classpath.txt
+
+          # Only this job's disposable database receives this generated admin account.
+          export CRAVE_ADMIN_PASSWORD="$(node -e "process.stdout.write(require('node:crypto').randomBytes(24).toString('base64url'))")"
+          printf '::add-mask::%s\n' "$CRAVE_ADMIN_PASSWORD"
+          export CRAVE_SMOKE_ADMIN_PASSWORD="$CRAVE_ADMIN_PASSWORD"
+          java -Dfile.encoding=UTF-8 \
+            -cp "backend/target/test-classes:backend/target/classes:$(cat backend/target/test-classpath.txt)" \
+            com.foodordering.dev.CreateEmployee "$CRAVE_SMOKE_ADMIN_EMAIL" "CI Runtime Admin" "0999285721" ADMIN
+
+          jar tf backend/target/crave.war > backend/target/war-entries.txt
+          if grep -Eq '^WEB-INF/(classes/com/foodordering/dev/|lib/tomcat-embed-)' backend/target/war-entries.txt; then
+            echo 'Development launcher or embedded Tomcat leaked into the production WAR.' >&2
+            exit 1
+          fi
+
+          server_pid=''
+          runtime_log='backend/target/runtime-smoke-tomcat.log'
+          health_file='backend/target/runtime-health.json'
+          cleanup() {
+            if [[ -n "$server_pid" ]] && kill -0 "$server_pid" 2>/dev/null; then
+              kill "$server_pid" || true
+              wait "$server_pid" || true
+            fi
+          }
+          trap cleanup EXIT
+          java -Dfile.encoding=UTF-8 \
+            -cp "backend/target/test-classes:$(cat backend/target/dev-classpath.txt)" \
+            com.foodordering.dev.DevServer backend/target/crave.war 8081 > "$runtime_log" 2>&1 &
+          server_pid=$!
+
+          ready=0
+          for attempt in $(seq 1 60); do
+            if ! kill -0 "$server_pid" 2>/dev/null; then
+              cat "$runtime_log"
+              exit 1
+            fi
+            if curl --fail --silent --max-time 2 "$CRAVE_SMOKE_BASE_URL/api/health" > "$health_file" \
+              && node -e "const p=JSON.parse(require('node:fs').readFileSync(process.argv[1],'utf8'));process.exit(p.success && p.data?.database==='UP' ? 0 : 1)" "$health_file"; then
+              ready=1
+              break
+            fi
+            sleep 1
+          done
+          if [[ "$ready" != 1 ]]; then
+            cat "$runtime_log"
+            echo 'The packaged WAR did not become healthy.' >&2
+            exit 1
+          fi
+          node tests/runtime/http-smoke.cjs
 
       - name: Upload tested WAR
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -113,6 +179,17 @@ jobs:
         with:
           name: backend-test-reports
           path: backend/target/surefire-reports/
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Upload runtime smoke diagnostics
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: runtime-smoke-diagnostics
+          path: |
+            backend/target/runtime-smoke-tomcat.log
+            backend/target/runtime-health.json
           if-no-files-found: ignore
           retention-days: 7
 

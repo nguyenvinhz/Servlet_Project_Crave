@@ -4,12 +4,34 @@ import jakarta.persistence.DiscriminatorValue;
 import jakarta.persistence.Inheritance;
 import jakarta.persistence.InheritanceType;
 import jakarta.persistence.Table;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 class EntityMappingTest {
+
+    @Test
+    void diagramOrderAssociationsUseExistingForeignKeysWithoutDuplicateWrites() throws Exception {
+        assertReadOnlyRelationship(CustomerOrder.class, "promotion", "promotion_id");
+        assertReadOnlyRelationship(CustomerOrder.class, "assignedEmployee", "assigned_employee_id");
+        assertReadOnlyRelationship(OrderDetail.class, "food", "food_id");
+        assertReadOnlyRelationship(OrderStatusHistory.class, "changedByEmployee", "changed_by_employee_id");
+    }
+
+    private void assertReadOnlyRelationship(Class<?> entity, String fieldName, String columnName) throws Exception {
+        var field = entity.getDeclaredField(fieldName);
+        assertNotNull(field.getAnnotation(ManyToOne.class));
+        JoinColumn column = field.getAnnotation(JoinColumn.class);
+        assertNotNull(column);
+        assertEquals(columnName, column.name());
+        assertFalse(column.insertable());
+        assertFalse(column.updatable());
+    }
 
     @Test
     void entitiesMapToExistingSchemaTables() {

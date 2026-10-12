@@ -7,6 +7,8 @@ import com.foodordering.entity.CartItemOption;
 import com.foodordering.entity.Food;
 import com.foodordering.entity.FoodOption;
 import com.foodordering.enums.FoodStatus;
+import com.foodordering.validator.OptionSelectionValidator;
+import com.foodordering.exception.ApiException;
 import com.foodordering.utils.IdGenerator;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityTransaction;
@@ -58,7 +60,7 @@ public class CartItemRepository {
                     .setParameter("cartItemId", cartItemId)
                     .getResultList();
         } catch (Exception e) {
-            return Collections.emptyList();
+            throw new RuntimeException("Không thể tải tùy chọn món trong giỏ hàng", e);
         }
     }
 
@@ -119,14 +121,18 @@ public class CartItemRepository {
         EntityManager em = DatabaseConfig.getEntityManager();
         if (em == null) return optionIds;
         try {
-            String jpql = "SELECT fo.id FROM FoodOption fo WHERE fo.food.id = :foodId AND fo.status = :status AND fo.id IN (:optionIds)";
-            return em.createQuery(jpql, String.class)
+            String jpql = "SELECT fo FROM FoodOption fo WHERE fo.food.id = :foodId AND fo.status = :status AND fo.id IN (:optionIds)";
+            List<FoodOption> options = em.createQuery(jpql, FoodOption.class)
                     .setParameter("foodId", foodId)
                     .setParameter("status", com.foodordering.enums.OptionStatus.ACTIVE)
                     .setParameter("optionIds", optionIds)
                     .getResultList();
+            OptionSelectionValidator.validate(options.stream().map(FoodOption::getOptionType).toList());
+            return options.stream().map(FoodOption::getId).toList();
+        } catch (ApiException e) {
+            throw e;
         } catch (Exception e) {
-            return Collections.emptyList();
+            throw new RuntimeException("Không thể kiểm tra tùy chọn món ăn", e);
         } finally {
             em.close();
         }
@@ -184,7 +190,7 @@ public class CartItemRepository {
         try {
             tx.begin();
             if (item.getCartItemId() == null || item.getCartItemId().trim().isEmpty()) {
-                item.setCartItemId(getNextCartItemId(em));
+                item.setCartItemId(IdGenerator.generateCartItemId());
             }
 
             Cart cartRef = em.getReference(Cart.class, item.getCartId());
@@ -298,23 +304,4 @@ public class CartItemRepository {
         }
     }
 
-    private String getNextCartItemId(EntityManager em) {
-        try {
-            List<String> lastIds = em.createQuery("SELECT ci.cartItemId FROM CartItem ci ORDER BY ci.cartItemId DESC", String.class)
-                    .setMaxResults(1)
-                    .getResultList();
-            if (!lastIds.isEmpty()) {
-                String lastId = lastIds.get(0);
-                if (lastId != null && lastId.startsWith("CTGH")) {
-                    try {
-                        int num = Integer.parseInt(lastId.substring(4));
-                        return String.format("CTGH%02d", num + 1);
-                    } catch (NumberFormatException ignored) {
-                    }
-                }
-            }
-        } catch (Exception ignored) {
-        }
-        return IdGenerator.generateCartItemId();
-    }
 }

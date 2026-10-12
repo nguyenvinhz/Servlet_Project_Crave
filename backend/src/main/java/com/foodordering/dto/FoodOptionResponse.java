@@ -13,4 +13,10 @@ public record FoodOptionResponse(
         BigDecimal extraPrice,
         OptionStatus status
 ) {
+    public String getId() { return id; }
+    public String getFoodId() { return foodId; }
+    public OptionType getOptionType() { return optionType; }
+    public String getName() { return name; }
+    public BigDecimal getExtraPrice() { return extraPrice; }
+    public OptionStatus getStatus() { return status; }
 }
