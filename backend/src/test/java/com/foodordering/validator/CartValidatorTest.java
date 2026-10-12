@@ -8,10 +8,22 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.util.Collections;
+import java.util.Arrays;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 class CartValidatorTest {
+
+    @Test
+    void addToCartRejectsDuplicateAndBlankOptionIds() {
+        for (List<String> options : List.of(List.of("TC01", "TC01"), List.of(""), Arrays.asList((String) null))) {
+            AddToCartRequest request = new AddToCartRequest("MA01", 1, null, options);
+            BadRequestException failure = assertThrows(BadRequestException.class,
+                    () -> CartValidator.validateAddToCart(request));
+            assertEquals(ErrorCode.INVALID_OPTION, failure.getErrorCode());
+        }
+    }
 
     @Test
     @DisplayName("validateCustomerId chặn customerId null hoặc rỗng")

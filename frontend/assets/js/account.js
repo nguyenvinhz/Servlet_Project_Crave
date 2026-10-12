@@ -212,9 +212,24 @@ document.addEventListener("DOMContentLoaded", () => {
         url.searchParams.set("returnTo", returnTo);
         link.href = `${url.pathname}${url.search}`;
     });
-    bindForm(loginForm, () => {
+    function accountDestination(user) {
+        if (user?.accountType !== "EMPLOYEE") return localUrl("/customer/profile");
+        return localUrl({ADMIN: "/admin", MENU_MANAGER: "/admin/menu", ORDER_STAFF: "/admin/orders", PROMOTION_MANAGER: "/admin/promotions", HR_MANAGER: "/admin/employees"}[user.role] || "/customer/profile");
+    }
+
+    function compatibleReturnTo(value, user) {
+        if (!value) return null;
+        const route = new URL(value, window.location.origin).pathname.substring(contextPath.length);
+        if (user?.accountType !== "EMPLOYEE") return /^\/admin(?:[;/]|$)/.test(route) ? null : value;
+        if (/^\/(?:cart|checkout|orders|customer\/addresses)(?:[;/]|$)/.test(route)) return null;
+        if (!/^\/admin(?:[;/]|$)/.test(route) || user.role === "ADMIN") return value;
+        const allowed = {MENU_MANAGER: /^\/admin\/(?:menu|categories)(?:[;/]|$)/, ORDER_STAFF: /^\/admin\/orders(?:[;/]|$)/, PROMOTION_MANAGER: /^\/admin\/promotions(?:[;/]|$)/, HR_MANAGER: /^\/admin\/(?:customers|employees)(?:[;/]|$)/};
+        return allowed[user.role]?.test(route) ? value : null;
+    }
+
+    bindForm(loginForm, (user) => {
         clearCheckoutVoucher();
-        window.location.assign(returnTo || localUrl("/customer/profile"));
+        window.location.assign(compatibleReturnTo(returnTo, user) || accountDestination(user));
     });
     if (loginForm) {
         const query = new URLSearchParams(window.location.search);

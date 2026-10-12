@@ -1,31 +1,15 @@
-<%@ page contentType="text/html;charset=UTF-8" language="java" %>
+<%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
-<!DOCTYPE html>
-<html lang="vi">
-<head>
-    <title>Lịch sử đơn hàng | Crave</title>
-    <link rel="stylesheet" href="<c:url value='/assets/css/styles.css' />">
-    <link rel="stylesheet" href="<c:url value='/assets/css/order.css' />">
-</head>
-<body class="order-theme order-page" data-context-path="<c:out value='${pageContext.request.contextPath}' />">
-    <%@ include file="../components/header.jspf" %>
-
-    <main class="page-shell">
-        <div class="container orders-container" style="max-width: 900px; margin: 40px auto; padding: 0 1rem;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
-                <h1 style="font-family: Georgia, serif; margin: 0; font-size: clamp(1.8rem, 3.5vw, 2.4rem);">Lịch sử đơn hàng</h1>
-                <a href="<c:url value='/menu' />" class="btn-primary" style="width: auto; margin: 0; padding: 0.65rem 1.25rem; text-decoration: none; display: inline-flex; align-items: center; gap: 0.4rem;">+ Đặt món mới</a>
-            </div>
-            <div id="orderList" class="orders-list">
-                <div class="card" style="padding: 2.5rem; text-align: center; color: var(--text-muted);">
-                    <p>Đang tải danh sách đơn hàng...</p>
-                </div>
-            </div>
-        </div>
-    </main>
-
-    <%@ include file="../components/footer.jspf" %>
-
-    <script src="<c:url value='/assets/js/orders.js' />"></script>
-</body>
-</html>
+<c:set var="pageTitle" value="Đơn hàng của bạn" />
+<c:set var="pageStyle" value="order" />
+<c:set var="pageBodyClass" value="order-page" />
+<%@ include file="/WEB-INF/views/components/header.jspf" %>
+<main class="page-container orders-container" id="main-content">
+    <header class="customer-page-heading heading-with-action">
+        <div><p class="eyebrow">Theo dõi bữa ngon</p><h1>Đơn hàng của bạn</h1><p>Xem trạng thái và chi tiết các đơn đã đặt.</p></div>
+        <a href="<c:url value='/menu'/>" class="button primary">+ Đặt món mới</a>
+    </header>
+    <div id="orderList" class="orders-list" aria-live="polite"><div class="card order-loading"><p>Đang tải danh sách đơn hàng...</p></div></div>
+</main>
+<script src="<c:url value='/assets/js/orders.js'/>"></script>
+<%@ include file="/WEB-INF/views/components/footer.jspf" %>

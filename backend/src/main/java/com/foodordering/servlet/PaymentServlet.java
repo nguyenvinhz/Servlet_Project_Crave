@@ -51,7 +51,7 @@ public class PaymentServlet extends BaseApiServlet {
 
             String pathInfo = req.getPathInfo();
             if (pathInfo == null || !pathInfo.matches("/[^/]+/status")) {
-                badRequest(resp, "Invalid endpoint. Expected /{paymentId}/status");
+                badRequest(resp, "Đường dẫn cập nhật thanh toán không hợp lệ.");
                 return;
             }
             
@@ -61,10 +61,12 @@ public class PaymentServlet extends BaseApiServlet {
             
             UpdatePaymentStatusRequest updateReq = readJson(req, UpdatePaymentStatusRequest.class);
             if (updateReq == null || updateReq.getStatus() == null || updateReq.getStatus().isBlank()) {
-                badRequest(resp, "Request body must contain a payment status.");
+                badRequest(resp, "Vui lòng chọn trạng thái thanh toán.");
                 return;
             }
-            PaymentStatus status = PaymentStatus.valueOf(updateReq.getStatus());
+            PaymentStatus status;
+            try { status = PaymentStatus.valueOf(updateReq.getStatus()); }
+            catch (IllegalArgumentException invalid) { badRequest(resp, "Trạng thái thanh toán không hợp lệ."); return; }
             
             paymentService.updatePaymentStatus(paymentId, status, updateReq.getTransactionRef());
             

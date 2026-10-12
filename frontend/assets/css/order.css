@@ -436,3 +436,44 @@
         display: none;
     }
 }
+
+/* Customer order pages share the brown and orange Crave palette. */
+.crave-body.order-page {
+    --bg: var(--paper); --bg-card: var(--surface); --bg-card-alt: #35261e;
+    --bg-input: #211711; --text: var(--ink); --text-muted: var(--muted); --border: var(--line);
+}
+.crave-body.order-page .card { border: 1px solid var(--line); border-radius: 20px; }
+.crave-body.order-page .card h2, .crave-body.order-page .card h3, .crave-body.order-page .tracking-header h1 { font-family: 'Nunito', sans-serif; }
+.crave-body.order-page .checkout-grid { grid-template-columns: minmax(0, 1.5fr) minmax(280px, 1fr); }
+.customer-page-heading { margin: 8px 0 32px; }
+.customer-page-heading h1 { margin: 0; font-size: clamp(2rem, 4vw, 3rem); }
+.customer-page-heading p { color: var(--muted); margin: 8px 0; }
+.heading-with-action { display: flex; justify-content: space-between; align-items: center; gap: 20px; flex-wrap: wrap; }
+.checkout-form-card { padding: clamp(20px, 4vw, 32px); }
+.checkout-form-card h2 { margin-top: 0; }
+.checkout-form-card .form-group { margin: 0 0 12px; }
+.checkout-form-card .form-group label { margin: 12px 0 4px; }
+.optional-label, .summary-hint { color: var(--muted); font-weight: 400; font-size: .85rem; }
+.order-summary { position: sticky; top: 100px; }
+.order-page .summary-row { gap: 12px; }
+.order-page .summary-row strong { white-space: nowrap; }
+.order-page .summary-row.total { color: var(--accent); }
+.order-page .discount-row { color: var(--success); }
+.order-page .alert { display: none; padding: 14px 16px; border-radius: 12px; }
+.order-page .alert.error { background: #48251f; color: var(--error); border: 1px solid #8c4939; }
+.order-page .alert.success { background: #20392a; color: var(--success); border: 1px solid #397449; }
+.order-page .btn-back { display: inline-block; margin: 12px 0 24px; font-weight: 600; }
+.order-page .order-loading { padding: 36px; text-align: center; color: var(--muted); }
+.order-page .order-card { gap: 20px; }
+.order-page .order-card-info { min-width: 0; overflow-wrap: anywhere; }
+.order-page .stepper { margin: 0; }
+.order-page .stepper::before { top: 50px; transform: none; }
+.order-page .step { flex: 1; }
+@media (max-width: 800px) {
+    .crave-body.order-page .checkout-grid { grid-template-columns: minmax(0, 1fr); }
+    .order-summary { position: static; }
+    .order-page .order-card { flex-wrap: wrap; }
+    .order-page .order-card-right { text-align: left; }
+    .order-page .step { flex-direction: row; gap: 16px; }
+    .order-page .step-label { max-width: none; text-align: left; }
+}

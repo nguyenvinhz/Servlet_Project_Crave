@@ -28,6 +28,10 @@ public class CustomerOrder {
     @Column(name = "assigned_employee_id", length = 10)
     private String assignedEmployeeId;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "assigned_employee_id", insertable = false, updatable = false)
+    private Employee assignedEmployee;
+
     @Column(name = "promotion_id", length = 10)
     private String promotionId;
 
@@ -81,7 +85,8 @@ public class CustomerOrder {
     @Transient
     private String customerId;
 
-    @Transient
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "promotion_id", insertable = false, updatable = false)
     private Promotion promotion;
 
     public CustomerOrder() {
@@ -168,6 +173,18 @@ public class CustomerOrder {
 
     public void setAssignedEmployeeId(String assignedEmployeeId) {
         this.assignedEmployeeId = assignedEmployeeId;
+        if (assignedEmployeeId == null || (assignedEmployee != null && !assignedEmployeeId.equals(assignedEmployee.getId()))) {
+            this.assignedEmployee = null;
+        }
+    }
+
+    public Employee getAssignedEmployee() {
+        return assignedEmployee;
+    }
+
+    public void setAssignedEmployee(Employee assignedEmployee) {
+        this.assignedEmployee = assignedEmployee;
+        this.assignedEmployeeId = assignedEmployee != null ? assignedEmployee.getId() : null;
     }
 
     public Promotion getPromotion() {

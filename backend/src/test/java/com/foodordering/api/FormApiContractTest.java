@@ -104,15 +104,25 @@ class FormApiContractTest {
             HttpServletResponse response = mock(HttpServletResponse.class);
             StringWriter body = new StringWriter();
             when(response.getWriter()).thenReturn(new PrintWriter(body));
-            when(context.getAttribute(DatabaseContextListener.DATABASE_STATUS_ATTRIBUTE)).thenReturn(databaseStatus);
-
-            method.invoke(servlet, request, response);
+            // The health endpoint must probe the connection rather than trust startup status.
+            when(context.getAttribute(DatabaseContextListener.DATABASE_STATUS_ATTRIBUTE))
+                    .thenReturn("UP".equals(databaseStatus) ? "DOWN" : "UP");
+            try (MockedStatic<DatabaseConfig> database = mockStatic(DatabaseConfig.class)) {
+                if ("DOWN".equals(databaseStatus)) {
+                    database.when(DatabaseConfig::verifyConnection)
+                            .thenThrow(new IllegalStateException("Database unavailable"));
+                }
+                method.invoke(servlet, request, response);
+                database.verify(DatabaseConfig::verifyConnection);
+            }
 
             verify(response).setStatus("UP".equals(databaseStatus)
                     ? HttpServletResponse.SC_OK : HttpServletResponse.SC_SERVICE_UNAVAILABLE);
             assertTrue(body.toString().contains("UP".equals(databaseStatus)
                     ? "\"database\":\"UP\"" : "DATABASE_UNAVAILABLE"));
         }
+        verify(context).setAttribute(DatabaseContextListener.DATABASE_STATUS_ATTRIBUTE, "UP");
+        verify(context).setAttribute(DatabaseContextListener.DATABASE_STATUS_ATTRIBUTE, "DOWN");
     }
 
     @Test

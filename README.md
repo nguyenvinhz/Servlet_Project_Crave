@@ -17,6 +17,8 @@ WAR cũ nếu deploy lỗi. Cài runner EC2 một lần theo
 
 Yêu cầu: JDK 17+, Maven 3.9+, Docker (nếu chưa có MySQL) và Tomcat 10.1+.
 
+Xem [cấu trúc mã nguồn và sơ đồ lớp](docs/architecture/README.md).
+
 1. Tạo cấu hình database cục bộ:
 
    ```powershell
@@ -61,6 +63,37 @@ Yêu cầu: JDK 17+, Maven 3.9+, Docker (nếu chưa có MySQL) và Tomcat 10.1+
    - `/crave/auth/register`
    - `/crave/customer/profile`
    - `/crave/customer/addresses`
+
+   Hoặc chạy Tomcat 10.1 tích hợp bằng một lệnh từ thư mục gốc:
+
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File scripts/dev/run.ps1
+   # Cổng khác: thêm -Port 8081
+   ```
+
+   Trên Linux/macOS: `bash scripts/dev/run.sh 8080` (JDK 17/21 trên PATH).
+   Mở `http://localhost:8080/crave/menu`; nhấn Ctrl+C để dừng.
+   Profile `dev` chỉ dùng cho launcher, không thêm Tomcat vào WAR production.
+
+## Quản trị
+
+Mẫu giao diện khách hàng tham khảo [Crave trên Framer](https://thrilled-calendar-459980.framer.app/),
+giao diện quản trị dựa trên mẫu `food-admin-dashboard` người dùng cung cấp.
+Trang quản trị dùng API và database của ứng dụng Servlet/JSP.
+
+Tài khoản seed chưa có mật khẩu hợp lệ. Tạo tài khoản quản trị bằng công cụ cục bộ
+(mật khẩu được nhập ẩn, băm bằng PBKDF2; email/số điện thoại phải chưa tồn tại):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/dev/create-admin.ps1 -Email admin@example.com -FullName 'Quản trị Crave' -Phone 0901234567
+```
+
+Đăng nhập tại `/crave/auth/login`, mở `/crave/admin`. Có thể truyền `-Role`
+với `MENU_MANAGER`, `ORDER_STAFF`, `PROMOTION_MANAGER` hoặc `HR_MANAGER` để tạo nhân viên.
+Admin truy cập mọi chức năng; nhân viên chỉ thấy chức năng phù hợp vai trò.
+
+Không chạy lại `database/schema.sql` trên database có dữ liệu cần giữ:
+đây là script bootstrap có `DROP DATABASE`. Dùng `database/migrations/` cho database hiện có.
 
 Phần tài khoản Ngày 2 đã hoàn thiện: đăng ký, đăng nhập/đăng xuất, session,
 cập nhật hồ sơ và quản lý địa chỉ giao hàng. Hợp đồng nằm tại
@@ -112,10 +145,22 @@ riêng và dọn dữ liệu của mình sau khi chạy.
 Kiểm thử giao diện tài khoản, giỏ hàng và checkout bằng Node 22+ và Chrome/Edge (API giả lập):
 
 ```powershell
-node frontend/tests/account-browser-smoke.cjs
+node tests/frontend/account-browser-smoke.cjs
+node tests/frontend/admin-management-browser-smoke.cjs
+node tests/frontend/admin-orders-dashboard-browser-smoke.cjs
 ```
 
 Nếu browser chưa được tìm thấy tự động, đặt `CHROME_PATH` tới file thực thi Chrome/Edge.
+
+Kiểm thử HTTP trên WAR/Tomcat/MySQL thật (chạy với database test riêng đã seed,
+công cụ sẽ tạo dữ liệu thử cho tài khoản, món ăn, khuyến mãi và đơn hàng):
+
+```powershell
+$env:CRAVE_SMOKE_BASE_URL = 'http://localhost:8080/crave'
+$env:CRAVE_SMOKE_ADMIN_EMAIL = '<email admin của database test>'
+$env:CRAVE_SMOKE_ADMIN_PASSWORD = '<mật khẩu admin của database test>'
+node tests/runtime/http-smoke.cjs
+```
 
 ## Demo cart/voucher Ngày 3 — Ung Văn Trí
 

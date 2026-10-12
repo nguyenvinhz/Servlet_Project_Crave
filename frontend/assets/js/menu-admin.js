@@ -85,6 +85,7 @@ function openCreateCategoryModal() {
     document.getElementById('catNameInput').value = '';
     document.getElementById('catDescInput').value = '';
     hideAlert('categoryFormAlert');
+    modal.hidden = false;
     modal.style.display = 'flex';
 }
 
@@ -96,12 +97,13 @@ function openEditCategoryModal(id, name, desc) {
     document.getElementById('catNameInput').value = name || '';
     document.getElementById('catDescInput').value = desc && desc !== '—' ? desc : '';
     hideAlert('categoryFormAlert');
+    modal.hidden = false;
     modal.style.display = 'flex';
 }
 
 function closeCategoryModal() {
     const modal = document.getElementById('categoryModal');
-    if (modal) modal.style.display = 'none';
+    if (modal) { modal.hidden = true; modal.style.display = 'none'; }
 }
 
 async function submitCategoryForm() {
@@ -187,6 +189,7 @@ function openCreateFoodModal() {
     document.getElementById('foodDescInput').value = '';
     document.getElementById('foodStatusSelect').value = 'AVAILABLE';
     hideAlert('foodFormAlert');
+    modal.hidden = false;
     modal.style.display = 'flex';
 }
 
@@ -213,6 +216,7 @@ async function openEditFoodModal(id) {
         document.getElementById('foodDescInput').value = food.description || '';
         document.getElementById('foodStatusSelect').value = food.status;
 
+        modal.hidden = false;
         modal.style.display = 'flex';
     } catch (e) {
         if (!e.message.includes('Phiên đăng nhập đã hết hạn')) {
@@ -223,7 +227,7 @@ async function openEditFoodModal(id) {
 
 function closeFoodModal() {
     const modal = document.getElementById('foodModal');
-    if (modal) modal.style.display = 'none';
+    if (modal) { modal.hidden = true; modal.style.display = 'none'; }
 }
 
 async function submitFoodForm() {
@@ -335,6 +339,7 @@ async function openOptionsModal(foodId, foodName) {
     document.getElementById('currentOptionFoodId').value = foodId;
     document.getElementById('optionsModalFoodName').textContent = 'Món ăn: ' + (foodName || '');
     hideAlert('optionsModalAlert');
+    modal.hidden = false;
     modal.style.display = 'flex';
 
     await loadFoodOptions(foodId);
@@ -342,7 +347,7 @@ async function openOptionsModal(foodId, foodName) {
 
 function closeOptionsModal() {
     const modal = document.getElementById('optionsModal');
-    if (modal) modal.style.display = 'none';
+    if (modal) { modal.hidden = true; modal.style.display = 'none'; }
 }
 
 async function loadFoodOptions(foodId) {
@@ -361,7 +366,7 @@ async function loadFoodOptions(foodId) {
 
             tbody.innerHTML = options.map(opt => `
                 <tr id="optRow-${escapeHtml(opt.id)}">
-                    <td><code>${escapeHtml(opt.optionType)}</code></td>
+                    <td>${escapeHtml({SIZE:'Kích cỡ',TOPPING:'Topping thêm',SUGAR_LEVEL:'Mức đường',ICE_LEVEL:'Mức đá',OTHER:'Khác'}[opt.optionType] || 'Khác')}</td>
                     <td><strong>${escapeHtml(opt.name)}</strong></td>
                     <td>+${(opt.extraPrice || 0).toLocaleString('vi-VN')} ₫</td>
                     <td>

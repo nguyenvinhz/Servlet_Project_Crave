@@ -1,6 +1,7 @@
 package com.foodordering.api;
 
 import com.foodordering.config.DatabaseContextListener;
+import com.foodordering.config.DatabaseConfig;
 import com.foodordering.dto.ApiError;
 import com.foodordering.dto.ApiResponse;
 import jakarta.servlet.annotation.WebServlet;
@@ -16,15 +17,20 @@ public class HealthApiServlet extends BaseApiServlet {
 
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        String databaseStatus = (String) getServletContext()
-                .getAttribute(DatabaseContextListener.DATABASE_STATUS_ATTRIBUTE);
-        boolean databaseUp = "UP".equals(databaseStatus);
+        boolean databaseUp;
+        try {
+            DatabaseConfig.verifyConnection();
+            databaseUp = true;
+        } catch (RuntimeException exception) {
+            databaseUp = false;
+        }
+        getServletContext().setAttribute(DatabaseContextListener.DATABASE_STATUS_ATTRIBUTE, databaseUp ? "UP" : "DOWN");
 
         if (!databaseUp) {
             writeJson(response, HttpServletResponse.SC_SERVICE_UNAVAILABLE,
                     ApiResponse.failure(new ApiError(
                             "DATABASE_UNAVAILABLE",
-                            "The application is running but the database connection is unavailable.",
+                            "Ứng dụng đang chạy nhưng chưa kết nối được cơ sở dữ liệu.",
                             Map.of())));
             return;
         }

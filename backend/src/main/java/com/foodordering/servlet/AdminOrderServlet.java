@@ -69,17 +69,19 @@ public class AdminOrderServlet extends BaseApiServlet {
 
             String pathInfo = req.getPathInfo();
             if (pathInfo == null || !pathInfo.matches("/[^/]+/status")) {
-                badRequest(resp, "Invalid endpoint. Expected /{orderId}/status");
+                badRequest(resp, "Đường dẫn cập nhật đơn hàng không hợp lệ.");
                 return;
             }
             String orderId = pathInfo.substring(1, pathInfo.length() - "/status".length());
             
             UpdateOrderStatusRequest updateReq = readJson(req, UpdateOrderStatusRequest.class);
             if (updateReq == null || updateReq.getStatus() == null || updateReq.getStatus().isBlank()) {
-                badRequest(resp, "Request body must contain an order status.");
+                badRequest(resp, "Vui lòng chọn trạng thái đơn hàng.");
                 return;
             }
-            OrderStatus status = OrderStatus.valueOf(updateReq.getStatus());
+            OrderStatus status;
+            try { status = OrderStatus.valueOf(updateReq.getStatus()); }
+            catch (IllegalArgumentException invalid) { badRequest(resp, "Trạng thái đơn hàng không hợp lệ."); return; }
             
             orderService.updateOrderStatus(orderId, status, employeeId, updateReq.getNote());
             

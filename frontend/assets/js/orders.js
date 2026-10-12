@@ -83,7 +83,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         } else {
             listEl.innerHTML = `
                 <div class="card" style="padding: 2rem; text-align: center; color: #f87171;">
-                    <p>${data?.error?.message || data?.message || 'Không thể tải danh sách đơn hàng.'}</p>
+                    <p>${escapeHtml(data?.error?.message || data?.message || 'Không thể tải danh sách đơn hàng.')}</p>
                 </div>
             `;
         }
@@ -116,4 +116,8 @@ function formatStatus(status) {
         'CANCELLED': 'Đã hủy'
     };
     return map[status] || status;
+}
+
+function escapeHtml(value) {
+    return String(value || '').replace(/[&<>"']/g, character => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[character]));
 }

@@ -1,7 +1,9 @@
 <%@ page contentType="text/html;charset=UTF-8" pageEncoding="UTF-8" %>
+<%@ taglib prefix="c" uri="jakarta.tags.core" %>
+<c:set var="pageStyle" value="account" />
 <%@ include file="../components/header.jspf" %>
-<link rel="stylesheet" href="<c:url value='/assets/css/account.css'/>">
-<main class="page auth-page account-ui">
+
+<main id="main-content" class="page auth-page account-ui">
     <section class="intro-panel">
         <p class="eyebrow">Chào mừng trở lại</p>
         <h1>Món ngon đang chờ bạn.</h1>

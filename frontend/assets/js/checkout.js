@@ -116,7 +116,7 @@
                     state.promotionId = validation.data.promotion.promotionId;
                 } else if (validation.error?.code?.startsWith('PROMOTION_') || validation.data?.valid === false) {
                     clearVoucher();
-                    alert(message(validation, validation.data?.message || 'Voucher không còn hợp lệ. Vui lòng kiểm tra tổng tiền trước khi đặt hàng.'));
+                    alert(message(validation, validation.data?.message || 'Mã khuyến mãi không còn hợp lệ. Vui lòng kiểm tra tổng tiền trước khi đặt hàng.'));
                 } else {
                     throw new Error(message(validation, 'Không thể xác thực voucher. Vui lòng thử lại.'));
                 }

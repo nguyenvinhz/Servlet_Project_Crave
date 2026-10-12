@@ -10,6 +10,10 @@ import com.foodordering.dto.RegisterRequest;
 import com.foodordering.dto.UpdateCartItemRequest;
 import com.foodordering.dto.ValidatePromotionRequest;
 import com.foodordering.entity.Category;
+import com.foodordering.entity.CartItem;
+import com.foodordering.entity.CartItemOption;
+import com.foodordering.entity.CustomerOrder;
+import com.foodordering.entity.Payment;
 import com.foodordering.entity.Food;
 import com.foodordering.entity.FoodOption;
 import com.foodordering.entity.Promotion;
@@ -21,6 +25,7 @@ import com.foodordering.enums.OptionStatus;
 import com.foodordering.enums.OptionType;
 import com.foodordering.enums.OrderStatus;
 import com.foodordering.enums.PaymentMethod;
+import com.foodordering.enums.PaymentStatus;
 import com.foodordering.enums.PromotionStatus;
 import com.foodordering.exception.BadRequestException;
 import com.foodordering.exception.PromotionValidationException;
@@ -162,6 +167,9 @@ class CartCheckoutIntegrationTest {
         assertEquals(0, count("SELECT COUNT(*) FROM cart WHERE customer_id = :customer"));
         assertEquals(1, count("SELECT COUNT(*) FROM customer_order WHERE customer_id = :customer"));
         try (EntityManager em = emf.createEntityManager()) {
+            CustomerOrder storedOrder = em.find(CustomerOrder.class, order.getOrderId());
+            assertEquals(promotionId, storedOrder.getPromotion().getPromotionId());
+            assertEquals(foodId, storedOrder.getOrderDetails().get(0).getFood().getId());
             Object[] stored = (Object[]) em.createNativeQuery("""
                     SELECT o.promotion_id, d.unit_price, d.line_total, opt.option_id, opt.extra_price_snapshot
                     FROM customer_order o JOIN order_detail d ON d.order_id = o.order_id
@@ -174,6 +182,90 @@ class CartCheckoutIntegrationTest {
             assertEquals(optionId, stored[3]);
             assertMoney("10000", (BigDecimal) stored[4]);
         }
+    }
+
+    @Test
+    void pickupCheckoutClearsStaleDeliveryAddressAndCompletesWithoutDelivery() {
+        addCart();
+        OrderRequest request = checkout(FulfillmentType.PICKUP);
+        request.setDeliveryAddress("Địa chỉ còn lại khi đổi sang tự đến lấy");
+
+        OrderResponse order = orders.createOrder(owner.id(), request);
+        orders.updateOrderStatus(order.getOrderId(), OrderStatus.PREPARING, null, "Đang chuẩn bị");
+        orders.updateOrderStatus(order.getOrderId(), OrderStatus.COMPLETED, null, "Khách đã nhận món");
+        orders.updateOrderStatus(order.getOrderId(), OrderStatus.COMPLETED, null, "Yêu cầu lặp lại");
+
+        OrderResponse completed = orders.getOrderById(order.getOrderId());
+        assertNull(completed.getDeliveryAddress());
+        assertEquals(OrderStatus.COMPLETED, completed.getStatus());
+        assertEquals(3, completed.getHistory().size());
+    }
+
+    @Test
+    void paymentAndRefundKeepOriginalPaidAtAndRejectInvalidReversal() {
+        addCart();
+        OrderResponse order = orders.createOrder(owner.id(), checkout(FulfillmentType.PICKUP));
+        PaymentService payments = new PaymentServiceImpl(new PaymentRepositoryImpl(), emf);
+        String paymentId = order.getPayment().getPaymentId();
+        String transactionRef = "IT-" + token;
+        payments.updatePaymentStatus(paymentId, PaymentStatus.SUCCESS, transactionRef);
+        LocalDateTime originalPaidAt;
+        try (EntityManager em = emf.createEntityManager()) {
+            originalPaidAt = em.find(Payment.class, paymentId).getPaidAt();
+        }
+
+        assertThrows(BadRequestException.class,
+                () -> payments.updatePaymentStatus(paymentId, PaymentStatus.FAILED, null));
+        payments.updatePaymentStatus(paymentId, PaymentStatus.SUCCESS, "DUPLICATE-" + token);
+        payments.updatePaymentStatus(paymentId, PaymentStatus.REFUNDED, null);
+
+        try (EntityManager em = emf.createEntityManager()) {
+            Payment stored = em.find(Payment.class, paymentId);
+            assertEquals(PaymentStatus.REFUNDED, stored.getStatus());
+            assertEquals(originalPaidAt, stored.getPaidAt());
+            assertEquals(transactionRef, stored.getTransactionRef());
+            assertMoney("130000", stored.getAmount());
+        }
+    }
+
+    @Test
+    void cartRejectsTwoSizesBeforeCreatingAnyItems() {
+        String secondOptionId = "XH" + token.substring(0, 8);
+        transaction(em -> {
+            em.find(FoodOption.class, optionId).setOptionType(OptionType.SIZE);
+            em.persist(new FoodOption(secondOptionId, em.find(Food.class, foodId),
+                    OptionType.SIZE, fixtureName + " second size", money("10000")));
+        });
+
+        BadRequestException failure = assertThrows(BadRequestException.class,
+                () -> carts.addItem(owner.id(), new AddToCartRequest(foodId, 1, null, List.of(optionId, secondOptionId))));
+
+        assertEquals(ErrorCode.INVALID_OPTION, failure.getErrorCode());
+        assertEquals(0, count("SELECT COUNT(*) FROM cart WHERE customer_id = :customer"));
+        assertNoOrderOrPayment();
+    }
+
+    @Test
+    void checkoutRevalidatesExclusiveOptionGroupsAndPreservesInvalidCart() {
+        CartDto cart = addCart();
+        String secondOptionId = "XH" + token.substring(0, 8);
+        transaction(em -> {
+            em.find(FoodOption.class, optionId).setOptionType(OptionType.SIZE);
+            FoodOption second = new FoodOption(secondOptionId, em.find(Food.class, foodId),
+                    OptionType.SIZE, fixtureName + " second size", money("10000"));
+            em.persist(second);
+            em.persist(new CartItemOption(em.find(CartItem.class, cart.getItems().get(0).getCartItemId()), second));
+        });
+
+        BadRequestException failure = assertThrows(BadRequestException.class,
+                () -> orders.createOrder(owner.id(), checkout(FulfillmentType.PICKUP)));
+
+        assertEquals(ErrorCode.INVALID_OPTION, failure.getErrorCode());
+        CartDto preserved = carts.getOrCreateCart(owner.id());
+        assertEquals(cart.getCartId(), preserved.getCartId());
+        assertEquals(2, preserved.getItems().get(0).getOptions().size());
+        assertMoney("180000", preserved.getSubtotal());
+        assertNoOrderOrPayment();
     }
 
     @ParameterizedTest
@@ -305,6 +397,30 @@ class CartCheckoutIntegrationTest {
             assertEquals(1, count("SELECT COUNT(*) FROM customer_order WHERE customer_id = :customer"));
             assertEquals(1, count("SELECT COUNT(*) FROM payment p JOIN customer_order o ON o.order_id = p.order_id WHERE o.customer_id = :customer"));
             assertEquals(0, count("SELECT COUNT(*) FROM cart WHERE customer_id = :customer"));
+        } finally {
+            start.countDown();
+            workers.shutdownNow();
+        }
+    }
+
+    @Test
+    void simultaneousCartCreationReturnsTheSamePersistedCart() throws Exception {
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService workers = Executors.newFixedThreadPool(2);
+        try {
+            java.util.concurrent.Callable<CartDto> attempt = () -> {
+                ready.countDown();
+                if (!start.await(10, TimeUnit.SECONDS)) throw new AssertionError("Cart start timed out");
+                return carts.getOrCreateCart(owner.id());
+            };
+            Future<CartDto> first = workers.submit(attempt);
+            Future<CartDto> second = workers.submit(attempt);
+            assertTrue(ready.await(10, TimeUnit.SECONDS));
+            start.countDown();
+
+            assertEquals(first.get(20, TimeUnit.SECONDS).getCartId(), second.get(20, TimeUnit.SECONDS).getCartId());
+            assertEquals(1, count("SELECT COUNT(*) FROM cart WHERE customer_id = :customer"));
         } finally {
             start.countDown();
             workers.shutdownNow();

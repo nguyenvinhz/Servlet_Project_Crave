@@ -6,7 +6,9 @@ import com.foodordering.dto.OrderResponse;
 import com.foodordering.dto.OrderSummaryResponse;
 import com.foodordering.entity.*;
 import com.foodordering.enums.ErrorCode;
+import com.foodordering.enums.FulfillmentType;
 import com.foodordering.enums.OrderStatus;
+import com.foodordering.enums.OptionType;
 import com.foodordering.enums.PaymentStatus;
 import com.foodordering.exception.ApiException;
 import com.foodordering.exception.AppException;
@@ -15,13 +17,17 @@ import com.foodordering.exception.ResourceNotFoundException;
 import com.foodordering.repository.CustomerOrderRepository;
 import com.foodordering.repository.PaymentRepository;
 import com.foodordering.validator.PromotionValidator;
+import com.foodordering.validator.OrderValidator;
+import com.foodordering.validator.OptionSelectionValidator;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import jakarta.persistence.EntityTransaction;
 import jakarta.persistence.Query;
+import jakarta.persistence.LockModeType;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.ArrayList;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -51,17 +57,7 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
 
     @Override
     public OrderResponse createOrder(String customerId, OrderRequest request) {
-        if (request.getReceiverName() == null || request.getReceiverName().trim().isEmpty()) {
-            throw new IllegalArgumentException("Tên người nhận không được để trống");
-        }
-        if (request.getReceiverPhone() == null || request.getReceiverPhone().trim().isEmpty()) {
-            throw new IllegalArgumentException("Số điện thoại không được để trống");
-        }
-        if (com.foodordering.enums.FulfillmentType.DELIVERY.equals(request.getFulfillmentType())) {
-            if (request.getDeliveryAddress() == null || request.getDeliveryAddress().trim().isEmpty()) {
-                throw new IllegalArgumentException("Địa chỉ giao hàng không được để trống khi chọn giao tận nơi");
-            }
-        }
+        OrderValidator.validate(request);
 
         EntityManager em = getEntityManager();
         EntityTransaction tx = em.getTransaction();
@@ -139,13 +135,14 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
                 detail.setNote((String) item[5]);
 
                 // Copy tùy chọn (options)
-                Query optionsQuery = em.createNativeQuery("SELECT cio.option_id, fo.name, fo.extra_price, fo.status, fo.food_id " +
+                Query optionsQuery = em.createNativeQuery("SELECT cio.option_id, fo.name, fo.extra_price, fo.status, fo.food_id, fo.option_type " +
                         "FROM cart_item_option cio JOIN food_option fo ON fo.option_id = cio.option_id " +
                         "WHERE cio.cart_item_id = ?");
                 optionsQuery.setParameter(1, cartItemId);
                 List<Object[]> options = optionsQuery.getResultList();
 
                 BigDecimal optionTotal = BigDecimal.ZERO;
+                List<OptionType> optionTypes = new ArrayList<>();
                 for (Object[] opt : options) {
                     if (!"ACTIVE".equals(opt[3]) || !detail.getFoodId().equals(opt[4])) {
                         throw new BadRequestException(ErrorCode.INVALID_OPTION);
@@ -158,7 +155,9 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
                     detailOpt.setExtraPriceSnapshot(extraPrice);
                     detail.getOptions().add(detailOpt);
                     optionTotal = optionTotal.add(extraPrice);
+                    optionTypes.add(OptionType.valueOf((String) opt[5]));
                 }
+                OptionSelectionValidator.validate(optionTypes);
 
                 detail.setUnitPrice(price.add(optionTotal));
                 em.persist(detail);
@@ -261,14 +260,25 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
 
     @Override
     public void updateOrderStatus(String orderId, OrderStatus status, String employeeId, String note) {
+        if (status == null) {
+            throw new BadRequestException("Trạng thái đơn hàng không được để trống");
+        }
+        if (note != null && note.trim().length() > 255) {
+            throw new BadRequestException("Ghi chú trạng thái không được vượt quá 255 ký tự");
+        }
         EntityManager em = getEntityManager();
         EntityTransaction tx = em.getTransaction();
         try {
             tx.begin();
             CustomerOrder order = em.find(CustomerOrder.class, orderId);
             if (order == null) throw new ResourceNotFoundException("Đơn hàng không tồn tại");
+            em.refresh(order, LockModeType.PESSIMISTIC_WRITE);
 
             OrderStatus currentStatus = order.getStatus();
+            if (currentStatus == status) {
+                tx.commit();
+                return;
+            }
             if (currentStatus == OrderStatus.COMPLETED || currentStatus == OrderStatus.CANCELLED) {
                 throw new BadRequestException("Không thể cập nhật đơn hàng đã " + (currentStatus == OrderStatus.COMPLETED ? "hoàn tất" : "hủy"));
             }
@@ -277,7 +287,9 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
             if (currentStatus == OrderStatus.PENDING_CONFIRMATION) {
                 isValidTransition = (status == OrderStatus.PREPARING || status == OrderStatus.CANCELLED);
             } else if (currentStatus == OrderStatus.PREPARING) {
-                isValidTransition = (status == OrderStatus.DELIVERING || status == OrderStatus.CANCELLED);
+                isValidTransition = status == OrderStatus.CANCELLED
+                        || (order.getFulfillmentType() == FulfillmentType.PICKUP
+                            ? status == OrderStatus.COMPLETED : status == OrderStatus.DELIVERING);
             } else if (currentStatus == OrderStatus.DELIVERING) {
                 isValidTransition = (status == OrderStatus.COMPLETED);
             }
@@ -294,7 +306,7 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
             history.setOrder(order);
             history.setStatus(status);
             history.setChangedByEmployeeId(employeeId);
-            history.setNote(note);
+            history.setNote(note != null ? note.trim() : null);
             em.persist(history);
 
             tx.commit();

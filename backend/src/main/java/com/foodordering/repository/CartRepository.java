@@ -4,8 +4,11 @@ import com.foodordering.config.DatabaseConfig;
 import com.foodordering.entity.Cart;
 import com.foodordering.entity.Customer;
 import com.foodordering.utils.IdGenerator;
+import com.foodordering.exception.ResourceNotFoundException;
+import com.foodordering.exception.ApiException;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityTransaction;
+import jakarta.persistence.LockModeType;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -53,8 +56,19 @@ public class CartRepository {
         EntityTransaction tx = em.getTransaction();
         try {
             tx.begin();
-            String newCartId = getNextCartId(em);
-            Customer customerRef = em.getReference(Customer.class, customerId);
+            Customer customerRef = em.find(Customer.class, customerId, LockModeType.PESSIMISTIC_WRITE);
+            if (customerRef == null) {
+                throw new ResourceNotFoundException("Khách hàng không tồn tại");
+            }
+            List<Cart> existing = em.createQuery("SELECT c FROM Cart c WHERE c.customer.id = :customerId", Cart.class)
+                    .setParameter("customerId", customerId)
+                    .setLockMode(LockModeType.PESSIMISTIC_WRITE)
+                    .getResultList();
+            if (!existing.isEmpty()) {
+                tx.commit();
+                return existing.get(0);
+            }
+            String newCartId = IdGenerator.generateCartId();
             Cart cart = new Cart();
             cart.setCartId(newCartId);
             cart.setCustomer(customerRef);
@@ -63,6 +77,9 @@ public class CartRepository {
             em.persist(cart);
             tx.commit();
             return cart;
+        } catch (ApiException e) {
+            if (tx.isActive()) tx.rollback();
+            throw e;
         } catch (Exception e) {
             if (tx.isActive()) tx.rollback();
             throw new RuntimeException("Lỗi JPA khi tạo mới giỏ hàng: " + e.getMessage(), e);
@@ -90,20 +107,4 @@ public class CartRepository {
         }
     }
 
-    private String getNextCartId(EntityManager em) {
-        try {
-            List<String> lastIds = em.createQuery("SELECT c.cartId FROM Cart c ORDER BY c.cartId DESC", String.class)
-                    .setMaxResults(1)
-                    .getResultList();
-            if (!lastIds.isEmpty()) {
-                String lastId = lastIds.get(0);
-                if (lastId != null && lastId.startsWith("GH")) {
-                    int num = Integer.parseInt(lastId.substring(2)) + 1;
-                    return String.format("GH%02d", num);
-                }
-            }
-        } catch (Exception ignored) {
-        }
-        return IdGenerator.generateCartId();
-    }
 }

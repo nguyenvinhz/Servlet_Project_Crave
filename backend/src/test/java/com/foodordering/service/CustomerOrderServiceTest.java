@@ -57,7 +57,7 @@ class CustomerOrderServiceTest {
         request.setFulfillmentType(FulfillmentType.PICKUP);
         request.setPaymentMethod(PaymentMethod.CASH);
 
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+        BadRequestException ex = assertThrows(BadRequestException.class,
                 () -> orderService.createOrder("C001", request));
         assertTrue(ex.getMessage().contains("Tên người nhận không được để trống"));
     }
@@ -71,7 +71,7 @@ class CustomerOrderServiceTest {
         request.setFulfillmentType(FulfillmentType.PICKUP);
         request.setPaymentMethod(PaymentMethod.CASH);
 
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+        BadRequestException ex = assertThrows(BadRequestException.class,
                 () -> orderService.createOrder("C001", request));
         assertTrue(ex.getMessage().contains("Số điện thoại không được để trống"));
     }
@@ -86,7 +86,7 @@ class CustomerOrderServiceTest {
         request.setDeliveryAddress("   ");
         request.setPaymentMethod(PaymentMethod.CASH);
 
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+        BadRequestException ex = assertThrows(BadRequestException.class,
                 () -> orderService.createOrder("C001", request));
         assertTrue(ex.getMessage().contains("Địa chỉ giao hàng không được để trống khi chọn giao tận nơi"));
     }
@@ -237,5 +237,48 @@ class CustomerOrderServiceTest {
         assertTrue(ex.getMessage().contains("Không thể chuyển trạng thái"));
         verify(tx).rollback();
         verify(em).close();
+    }
+
+    @Test
+    void pickupOrderCanCompleteDirectlyAfterPreparing() {
+        CustomerOrder order = new CustomerOrder();
+        order.setId("DH01");
+        order.setStatus(OrderStatus.PREPARING);
+        order.setFulfillmentType(FulfillmentType.PICKUP);
+        when(em.find(CustomerOrder.class, "DH01")).thenReturn(order);
+
+        orderService.updateOrderStatus("DH01", OrderStatus.COMPLETED, "NV01", "Khách đã nhận món");
+
+        assertEquals(OrderStatus.COMPLETED, order.getStatus());
+        verify(tx).commit();
+    }
+
+    @Test
+    void pickupOrderCannotEnterDeliveryState() {
+        CustomerOrder order = new CustomerOrder();
+        order.setId("DH01");
+        order.setStatus(OrderStatus.PREPARING);
+        order.setFulfillmentType(FulfillmentType.PICKUP);
+        when(em.find(CustomerOrder.class, "DH01")).thenReturn(order);
+
+        assertThrows(BadRequestException.class,
+                () -> orderService.updateOrderStatus("DH01", OrderStatus.DELIVERING, "NV01", null));
+
+        assertEquals(OrderStatus.PREPARING, order.getStatus());
+        verify(tx).rollback();
+    }
+
+    @Test
+    void repeatedStatusUpdateDoesNotCreateDuplicateHistory() {
+        CustomerOrder order = new CustomerOrder();
+        order.setId("DH01");
+        order.setStatus(OrderStatus.COMPLETED);
+        when(em.find(CustomerOrder.class, "DH01")).thenReturn(order);
+
+        orderService.updateOrderStatus("DH01", OrderStatus.COMPLETED, "NV01", null);
+
+        verify(em, never()).persist(any());
+        verify(em, never()).merge(any());
+        verify(tx).commit();
     }
 }

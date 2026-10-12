@@ -1,16 +1,17 @@
 <%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
 <c:set var="pageTitle" value="Giỏ hàng của bạn" />
+<c:set var="pageStyle" value="cart" />
 <%@ include file="/WEB-INF/views/components/header.jspf" %>
 
-<link rel="stylesheet" href="<c:url value='/assets/css/cart.css'/>">
 
-<main class="cart-page-wrapper">
+
+<main id="main-content" class="cart-page-wrapper">
     <div class="cart-container">
 
         <!-- Page Title matching Framer screenshot -->
         <header class="cart-header-section">
-            <h1 class="cart-page-title">Your cart</h1>
+            <h1 class="cart-page-title">Giỏ hàng của bạn</h1>
             <p class="cart-subtitle">Quản lý các món ăn đã chọn và áp dụng mã giảm giá tốt nhất.</p>
         </header>
 
@@ -114,44 +115,44 @@
             <!-- Right Column: Order Summary (Matching Screenshot) -->
             <div class="cart-summary-column">
                 <div class="order-summary-card">
-                    <h2 class="order-summary-title">Order summary</h2>
+                    <h2 class="order-summary-title">Tóm tắt đơn hàng</h2>
 
                     <!-- Subtotal Row -->
                     <div class="summary-row">
-                        <span>Subtotal</span>
-                        <span id="summarySubtotal" style="font-weight: 600; color: var(--crave-text);">$0.00</span>
+                        <span>Tạm tính</span>
+                        <span id="summarySubtotal" style="font-weight: 600; color: var(--crave-text);">0 đ</span>
                     </div>
 
                     <!-- Delivery Fee Row -->
                     <div class="summary-row">
-                        <span>Delivery fee</span>
-                        <span id="summaryDeliveryFee" style="font-weight: 600; color: var(--crave-text);">$2.50</span>
+                        <span>Phí giao hàng dự kiến</span>
+                        <span id="summaryDeliveryFee" style="font-weight: 600; color: var(--crave-text);">15.000 đ</span>
                     </div>
 
                     <!-- Discount Row (Shown when voucher applied) -->
                     <div class="summary-row discount-row" id="summaryDiscountRow" style="display: none;">
-                        <span>Discount</span>
-                        <span id="summaryDiscount">-$0.00</span>
+                        <span>Giảm giá</span>
+                        <span id="summaryDiscount">-0 đ</span>
                     </div>
 
                     <div class="summary-divider"></div>
 
                     <!-- Total Row (Matching Screenshot: "Total $12.82") -->
                     <div class="summary-total-row">
-                        <span class="summary-total-label">Total</span>
-                        <span class="summary-total-value" id="summaryTotal">$0.00</span>
+                        <span class="summary-total-label">Tổng cộng</span>
+                        <span class="summary-total-value" id="summaryTotal">0 đ</span>
                     </div>
 
                     <!-- Voucher / Promotion Area (Khu vực nhập voucher) -->
                     <div class="voucher-section">
                         <div class="voucher-section-title">
-                            <span>Mã khuyến mãi (Voucher)</span>
-                            <a href="javascript:void(0)" class="voucher-view-all-link" id="viewPromosBtn">Xem mã có sẵn</a>
+                            <span>Mã khuyến mãi</span>
+                            <a href="<c:url value='/promotions'/>" class="voucher-view-all-link" id="viewPromosBtn">Xem mã có sẵn</a>
                         </div>
 
                         <div class="voucher-input-group">
                             <input type="text" id="voucherCodeInput" class="voucher-input"
-                                   placeholder="Nhập mã ưu đãi (VD: WELCOME10)" autocomplete="off">
+                                   placeholder="Nhập mã ưu đãi" aria-label="Mã khuyến mãi" autocomplete="off">
                             <button type="button" id="voucherApplyBtn" class="voucher-apply-btn">
                                 Áp dụng
                             </button>
@@ -169,12 +170,12 @@
                         </div>
 
                         <!-- Feedback Message -->
-                        <div id="voucherFeedback" class="voucher-feedback"></div>
+                        <div id="voucherFeedback" class="voucher-feedback" role="status" aria-live="polite"></div>
                     </div>
 
                     <!-- Checkout Button (Matching Screenshot: Orange Button) -->
                     <button type="button" class="btn-checkout" id="proceedCheckoutBtn">
-                        Proceed to Checkout
+                        Tiếp tục thanh toán
                     </button>
                 </div>
             </div>
@@ -186,9 +187,9 @@
 
 <!-- PROMOTIONS DRAWER / MODAL -->
 <div id="promosModal" class="promo-modal-backdrop" aria-hidden="true">
-    <div class="promo-modal-dialog">
+    <div class="promo-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="promos-modal-title" tabindex="-1">
         <div class="promo-modal-header">
-            <h3 class="promo-modal-title">Mã khuyến mãi dành cho bạn</h3>
+            <h3 id="promos-modal-title" class="promo-modal-title">Mã khuyến mãi dành cho bạn</h3>
             <button type="button" class="promo-modal-close" id="promosModalClose" aria-label="Đóng">&times;</button>
         </div>
         <p style="color: var(--crave-text-muted); font-size: 0.9rem; margin-top: -10px; margin-bottom: 20px;">

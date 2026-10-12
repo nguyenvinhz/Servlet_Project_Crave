@@ -72,7 +72,7 @@ public class OrderServlet extends BaseApiServlet {
 
             OrderRequest request = readJson(req, OrderRequest.class);
             if (request == null) {
-                badRequest(resp, "Request body must contain an order object.");
+                badRequest(resp, "Vui lòng cung cấp thông tin đặt hàng.");
                 return;
             }
             OrderResponse response = orderService.createOrder(customerId, request);

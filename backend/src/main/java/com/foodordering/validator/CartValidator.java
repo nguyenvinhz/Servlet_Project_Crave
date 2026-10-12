@@ -4,6 +4,7 @@ import com.foodordering.dto.AddToCartRequest;
 import com.foodordering.dto.UpdateCartItemRequest;
 import com.foodordering.enums.ErrorCode;
 import com.foodordering.exception.BadRequestException;
+import java.util.HashSet;
 
 /**
  * Kiểm tra tính hợp lệ của dữ liệu đầu vào cho các thao tác giỏ hàng.
@@ -34,6 +35,12 @@ public class CartValidator {
         }
         if (request.getNote() != null && request.getNote().length() > 255) {
             throw new BadRequestException(ErrorCode.BAD_REQUEST, "Ghi chú món không được vượt quá 255 ký tự");
+        }
+        if (request.getOptionIds() != null) {
+            if (request.getOptionIds().stream().anyMatch(id -> id == null || id.isBlank())
+                    || new HashSet<>(request.getOptionIds()).size() != request.getOptionIds().size()) {
+                throw new BadRequestException(ErrorCode.INVALID_OPTION, "Tùy chọn món không được để trống hoặc trùng lặp");
+            }
         }
     }
 

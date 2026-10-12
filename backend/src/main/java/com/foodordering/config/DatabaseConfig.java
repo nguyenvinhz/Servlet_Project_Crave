@@ -30,13 +30,8 @@ public final class DatabaseConfig {
     }
 
     public static EntityManager getEntityManager() {
-        try {
-            EntityManagerFactory emf = getEntityManagerFactory();
-            return emf != null ? emf.createEntityManager() : null;
-        } catch (Exception e) {
-            System.err.println("Chưa thể tạo EntityManager: " + e.getMessage());
-            return null;
-        }
+        // A failed write must never look successful because an offline repository returned a placeholder.
+        return getEntityManagerFactory().createEntityManager();
     }
 
     public static void verifyConnection() {

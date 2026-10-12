@@ -22,7 +22,7 @@ public abstract class BaseApiServlet extends HttpServlet {
         writeJson(response, HttpServletResponse.SC_NOT_IMPLEMENTED,
                 ApiResponse.failure(new ApiError(
                         "NOT_IMPLEMENTED",
-                        operation + " is contracted but will be implemented on Day 2.",
+                        "Chức năng " + operation + " chưa được hỗ trợ.",
                         Map.of())));
     }
 
@@ -31,7 +31,7 @@ public abstract class BaseApiServlet extends HttpServlet {
         writeJson(response, HttpServletResponse.SC_METHOD_NOT_ALLOWED,
                 ApiResponse.failure(new ApiError(
                         "METHOD_NOT_ALLOWED",
-                        "Allowed methods: " + allowedMethods,
+                        "Phương thức được hỗ trợ: " + allowedMethods,
                         Map.of())));
     }
 

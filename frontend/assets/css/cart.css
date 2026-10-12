@@ -941,3 +941,49 @@ body.crave-body {
     background: var(--crave-brand);
     color: #fff;
 }
+
+/* Keep cart and promotion screens on the shared customer palette. */
+body.crave-body {
+    --crave-brand: var(--accent);
+    --crave-brand-hover: #dd491e;
+    --crave-brand-light: #473024;
+    --crave-text: var(--ink);
+    --crave-text-muted: var(--muted);
+    --crave-bg-page: var(--paper);
+    --crave-bg-card: var(--surface);
+    --crave-border: var(--line);
+    --crave-success: var(--success);
+    --crave-success-bg: #20392a;
+    --crave-danger: var(--error);
+    --crave-danger-bg: #48251f;
+    --crave-font-heading: 'Nunito', system-ui, sans-serif;
+    --crave-font-body: 'Inter', system-ui, sans-serif;
+}
+.crave-body .cart-item-card, .crave-body .order-summary-card, .crave-body .promo-modal-dialog,
+.crave-body .promo-card, .crave-body .skeleton-card, .crave-body .cart-empty-state,
+.crave-body .promo-ticket-card { background: var(--surface); border-color: var(--line); }
+.crave-body .voucher-input, .crave-body .cart-stepper, .crave-body .voucher-apply-btn { background: var(--paper); color: var(--ink); border-color: var(--line); }
+.crave-body .voucher-view-all-link { color: var(--accent); }
+.crave-body .cart-item-image-wrapper { background: var(--cream); }
+.crave-body .promo-modal-dialog { color: var(--ink); }
+.crave-body .cart-error-state { background: #48251f; border-color: #8c4939; }
+.crave-body .cart-error-title, .crave-body .cart-error-desc { color: var(--error); }
+.crave-body .btn-retry { background: #b42318; color: #fff; }
+.crave-body .btn-link-action:hover, .crave-body .btn-copy-code:hover { background: var(--cream); color: var(--accent); }
+.crave-body .cart-stepper-btn { background: var(--surface); color: var(--ink); }
+.crave-body .voucher-apply-btn { flex-shrink: 0; white-space: nowrap; }
+.crave-body .voucher-input { min-width: 0; }
+.crave-body .cart-summary-column { min-width: 0; }
+.crave-body .voucher-section-title { flex-wrap: wrap; gap: 8px; }
+.crave-body .cart-bottom-actions { flex-wrap: wrap; gap: 8px; }
+@media (max-width: 520px) {
+    .crave-body .cart-page-wrapper, .crave-body .promos-page-wrapper { padding: 28px 16px 48px; }
+    .crave-body .cart-page-title, .crave-body .promos-hero-title { font-size: 2rem; }
+    .crave-body .cart-item-card { flex-wrap: wrap; padding: 16px; gap: 12px; }
+    .crave-body .cart-item-info { flex: 1; min-width: 140px; }
+    .crave-body .cart-item-price-tag { width: 100%; text-align: right; }
+    .crave-body .voucher-input-group { flex-wrap: wrap; }
+    .crave-body .voucher-input { min-width: 0; }
+    .crave-body .promos-grid { grid-template-columns: minmax(0, 1fr); }
+    .crave-body .promo-ticket-top { flex-wrap: wrap; gap: 12px; }
+}

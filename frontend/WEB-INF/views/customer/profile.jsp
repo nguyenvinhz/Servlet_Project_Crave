@@ -1,7 +1,9 @@
 <%@ page contentType="text/html;charset=UTF-8" pageEncoding="UTF-8" %>
+<%@ taglib prefix="c" uri="jakarta.tags.core" %>
+<c:set var="pageStyle" value="account" />
 <%@ include file="../components/header.jspf" %>
-<link rel="stylesheet" href="<c:url value='/assets/css/account.css'/>">
-<main class="page account-page account-ui">
+
+<main id="main-content" class="page account-page account-ui">
     <aside class="account-sidebar">
         <p class="eyebrow">Tài khoản</p>
         <h1>Thông tin của bạn</h1>
