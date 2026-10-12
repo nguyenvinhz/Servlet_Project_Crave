@@ -61,4 +61,6 @@ jobs:
         env:
           DEPLOY_COMMIT: ${{ github.sha }}
         run: |
+          # Markdown backticks are literal.
+          # shellcheck disable=SC2016
           printf 'Deployed commit `%s` to EC2. Health check passed.\n' "$DEPLOY_COMMIT" >> "$GITHUB_STEP_SUMMARY"

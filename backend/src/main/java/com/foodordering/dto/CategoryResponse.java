@@ -6,4 +6,9 @@ public record CategoryResponse(
         String description,
         long foodCount
 ) {
+    // Tomcat 10.1 JSP EL resolves JavaBean getters rather than record accessors.
+    public String getId() { return id; }
+    public String getName() { return name; }
+    public String getDescription() { return description; }
+    public long getFoodCount() { return foodCount; }
 }

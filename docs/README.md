@@ -4,7 +4,7 @@ Tài liệu được chia theo mục đích sử dụng. Xem [README của dự 
 
 | Nhóm | Nội dung | Tài liệu |
 |---|---|---|
-| `project/` | Phân công, kế hoạch, CI/CD và cách phối hợp | [Phân công nhiệm vụ 3 ngày](project/phan-cong-nhiem-vu-3-ngay.md), [Quy tắc Git/GitHub](project/quy-tac-git-github.md), [CI/CD lên EC2](project/ci-cd-ec2.md) |
+| `project/` | Phân công, kế hoạch, CI/CD và cách phối hợp | [Phân công nhiệm vụ 3 ngày](project/phan-cong-nhiem-vu-3-ngay.md), [Quy tắc Git/GitHub](project/quy-tac-git-github.md), [Kiểm thử CI](project/ci.md), [CI/CD lên EC2](project/ci-cd-ec2.md) |
 | `api/` | Hợp đồng API dạng OpenAPI | [Tài khoản, hồ sơ và địa chỉ](api/api-auth-profile-address.yaml), [Đơn hàng và thanh toán](api/api-order-payment.yaml) |
 | `reports/` | Báo cáo công việc và đánh giá theo chức năng | [Mục lục báo cáo](reports/README.md) |
 

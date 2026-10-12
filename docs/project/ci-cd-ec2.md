@@ -23,10 +23,12 @@ Merge PR / push main ──> CI thành công ──> artifact crave-war
                               thất bại ──> khôi phục WAR cũ
 ```
 
-- [ci.yml](../../.github/workflows/ci.yml): JDK 17, MySQL 8.4 tạm thời, Maven
-  `clean verify`, assertion giỏ hàng/voucher, kiểm tra cú pháp JavaScript,
-  kiểm thử trình duyệt và kiểm thử script deploy/rollback. Schema/seed chỉ được
-  chạy trong database CI tạm thời.
+- [ci.yml](../../.github/workflows/ci.yml): kiểm tra workflow/shell/JavaScript,
+  JUnit trên JDK 17 và MySQL 8.4 bằng tài khoản `crave_app`, thử migration,
+  kiểm thử browser dùng API giả lập và chạy WAR trên Tomcat với Chrome thật.
+  Job `CI required` yêu cầu mọi nhóm kiểm tra thành công trước khi xuất tên WAR
+  cho CD. Schema/seed chỉ chạy trong database CI tạm thời; xem
+  [hướng dẫn kiểm thử CI](ci.md).
 - [deploy.yml](../../.github/workflows/deploy.yml): chỉ nhận sự kiện `push` vào
   `main`, bao gồm commit tạo khi merge PR và push trực tiếp. Gọi CI, chỉ khi CI
   thành công mới tải artifact của cùng lần chạy rồi gọi
@@ -171,7 +173,8 @@ workflow CI chạy; review và Approve không đổi website trên EC2. Sau khi 
 commit mới trên `main` tạo sự kiện `push`, workflow **CI/CD - main to EC2** tự
 chạy. Push trực tiếp vào `main` cũng dùng đúng luồng này. Xem tab **Actions**:
 
-1. `CI / Build and test` phải thành công và tạo artifact `crave-war`.
+1. Các job CI phải thành công, gồm `CI required`. Artifact `crave-war` đã được
+   kiểm tra trên Tomcat và là WAR được dùng cho deploy.
 2. `Deploy EC2` lấy artifact, lưu WAR hiện tại vào
    `/home/ubuntu/crave/.deploy-backups/crave.war.previous`, thay WAR và recreate `app`.
 3. Endpoint health phải trả HTTP 200 với `success: true`,

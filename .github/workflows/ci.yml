@@ -3,27 +3,80 @@ name: CI
 on:
   pull_request:
     branches: [main]
+  workflow_dispatch:
   workflow_call:
     outputs:
       artifact-name:
-        description: Tested WAR artifact from this workflow run
-        value: ${{ jobs.build-test.outputs.artifact-name }}
+        description: WAR that passed all CI checks
+        value: ${{ jobs.quality-gate.outputs.artifact-name }}
 
 permissions:
   contents: read
 
+concurrency:
+  group: crave-ci-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
-  build-test:
-    name: Build and test
+  checks:
+    name: Workflow, scripts and frontend
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          package-manager-cache: false
+
+      - name: Install workflow checker
+        env:
+          ACTIONLINT_VERSION: 1.7.12
+        run: |
+          tools_dir="$RUNNER_TEMP/actionlint"
+          mkdir -p "$tools_dir"
+          cd "$tools_dir"
+          release="https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}"
+          curl --fail --silent --show-error --location --retry 3 \
+            "$release/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz" --output actionlint.tar.gz
+          curl --fail --silent --show-error --location --retry 3 \
+            "$release/actionlint_${ACTIONLINT_VERSION}_checksums.txt" --output checksums.txt
+          mv actionlint.tar.gz "actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          sha256sum --check --ignore-missing checksums.txt
+          tar -xzf "actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz" actionlint
+          printf '%s\n' "$tools_dir" >> "$GITHUB_PATH"
+
+      - name: Check workflows, shell scripts and JavaScript
+        run: bash scripts/ci/checks.sh
+
+      - name: Verify deployment and rollback script
+        run: bash scripts/tests/deploy-ec2-test.sh
+
+      - name: Run frontend browser tests with API fixtures
+        run: |
+          CHROME_PATH="$(command -v google-chrome)"
+          export CHROME_PATH
+          "$CHROME_PATH" --version
+          node frontend/tests/account-browser-smoke.cjs
+
+  backend:
+    name: Backend and database migration
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     outputs:
       artifact-name: crave-war
     env:
       TZ: Asia/Ho_Chi_Minh
-      DB_USER: root
-      # This credential belongs only to the temporary CI database.
-      DB_PASSWORD: ci-root-password
+      CI_DISPOSABLE_DATABASE: 'true'
+      MYSQL_ROOT_PASSWORD: ci-root-password
+      DB_USER: crave_app
+      DB_PASSWORD: ci-app-password
     services:
       mysql:
         image: mysql:8.4
@@ -39,7 +92,6 @@ jobs:
           --health-timeout=5s
           --health-retries=30
           --health-start-period=20s
-
     steps:
       - name: Checkout source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -56,50 +108,24 @@ jobs:
           cache-dependency-path: backend/pom.xml
           overwrite-settings: false
 
-      - name: Set up Node.js 24
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: '24'
-          package-manager-cache: false
+      - name: Verify migration from the previous schema
+        env:
+          MYSQL_CONTAINER_ID: ${{ job.services.mysql.id }}
+        run: bash scripts/ci/test-migrations.sh
 
-      - name: Initialize isolated CI database
+      - name: Initialize current schema and application privileges
         env:
           MYSQL_CONTAINER_ID: ${{ job.services.mysql.id }}
           MYSQL_PORT: ${{ job.services.mysql.ports['3306'] }}
         run: |
-          docker exec -i -e MYSQL_PWD="$DB_PASSWORD" "$MYSQL_CONTAINER_ID" \
-            mysql --user=root --default-character-set=utf8mb4 < database/schema.sql
-          docker exec -i -e MYSQL_PWD="$DB_PASSWORD" "$MYSQL_CONTAINER_ID" \
-            mysql --user=root --default-character-set=utf8mb4 < database/seed.sql
+          bash scripts/ci/prepare-database.sh
           printf 'DB_URL=jdbc:mysql://127.0.0.1:%s/crave?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Ho_Chi_Minh&characterEncoding=UTF-8\n' \
             "$MYSQL_PORT" >> "$GITHUB_ENV"
 
-      - name: Build WAR and run all backend tests
+      - name: Build WAR and run all JUnit tests as crave_app
         run: mvn --batch-mode --no-transfer-progress --file backend/pom.xml clean verify
 
-      - name: Run cart and promotion assertions
-        run: |
-          mvn --batch-mode --no-transfer-progress --file backend/pom.xml \
-            org.apache.maven.plugins:maven-dependency-plugin:3.10.0:build-classpath \
-            -DincludeScope=test -Dmdep.outputFile=target/test-classpath.txt
-          java -ea -cp "backend/target/test-classes:backend/target/classes:$(cat backend/target/test-classpath.txt)" \
-            com.foodordering.CartPromotionServiceTest
-
-      - name: Check frontend JavaScript syntax
-        run: |
-          find frontend/assets/js -type f -name '*.js' -print0 | xargs -0 -r -n 1 node --check
-          node --check frontend/tests/account-browser-smoke.cjs
-
-      - name: Verify deployment and rollback script
-        run: bash scripts/tests/deploy-ec2-test.sh
-
-      - name: Run browser smoke tests
-        run: |
-          export CHROME_PATH="$(command -v google-chrome)"
-          "$CHROME_PATH" --version
-          node frontend/tests/account-browser-smoke.cjs
-
-      - name: Upload tested WAR
+      - name: Upload WAR for runtime verification
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: crave-war
@@ -121,3 +147,101 @@ jobs:
         env:
           MYSQL_CONTAINER_ID: ${{ job.services.mysql.id }}
         run: docker logs "$MYSQL_CONTAINER_ID"
+
+  runtime-smoke:
+    name: Tomcat, JSP and real browser session
+    needs: backend
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      TZ: Asia/Ho_Chi_Minh
+      CI_DISPOSABLE_DATABASE: 'true'
+      MYSQL_ROOT_PASSWORD: ci-root-password
+      DB_USER: crave_app
+      DB_PASSWORD: ci-app-password
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          TZ: Asia/Ho_Chi_Minh
+          MYSQL_ROOT_PASSWORD: ci-root-password
+          MYSQL_ROOT_HOST: '%'
+        ports:
+          - 3306/tcp
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -pci-root-password"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=30
+          --health-start-period=20s
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          package-manager-cache: false
+
+      - name: Download the WAR built by backend CI
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ${{ needs.backend.outputs.artifact-name }}
+          path: backend/target
+
+      - name: Initialize runtime test database
+        env:
+          MYSQL_CONTAINER_ID: ${{ job.services.mysql.id }}
+          MYSQL_PORT: ${{ job.services.mysql.ports['3306'] }}
+        run: |
+          bash scripts/ci/prepare-database.sh
+          source scripts/ci/mysql-client.sh
+          mysql_root crave < scripts/ci/runtime-fixtures.sql
+          printf 'DB_URL=jdbc:mysql://127.0.0.1:%s/crave?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Ho_Chi_Minh&characterEncoding=UTF-8\n' \
+            "$MYSQL_PORT" >> "$GITHUB_ENV"
+
+      - name: Exercise tested WAR on Tomcat with a real browser
+        env:
+          SMOKE_ARTIFACTS_DIR: ${{ runner.temp }}/crave-runtime-smoke
+        run: |
+          CHROME_PATH="$(command -v google-chrome)"
+          export CHROME_PATH
+          bash scripts/ci/runtime-smoke.sh
+
+      - name: Upload runtime diagnostics
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: runtime-smoke-reports
+          path: ${{ runner.temp }}/crave-runtime-smoke/
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Show MySQL logs on failure
+        if: failure()
+        env:
+          MYSQL_CONTAINER_ID: ${{ job.services.mysql.id }}
+        run: docker logs "$MYSQL_CONTAINER_ID"
+
+  quality-gate:
+    name: CI required
+    if: always()
+    needs: [checks, backend, runtime-smoke]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    outputs:
+      artifact-name: ${{ needs.backend.outputs.artifact-name }}
+    steps:
+      - name: Require every CI job to succeed before deployment
+        env:
+          CHECKS_RESULT: ${{ needs.checks.result }}
+          BACKEND_RESULT: ${{ needs.backend.result }}
+          RUNTIME_RESULT: ${{ needs.runtime-smoke.result }}
+        run: |
+          for result in "$CHECKS_RESULT" "$BACKEND_RESULT" "$RUNTIME_RESULT"; do
+            [[ "$result" == success ]] || { printf 'Required CI job result: %s\n' "$result" >&2; exit 1; }
+          done

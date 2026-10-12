@@ -13,6 +13,11 @@ tự deploy ứng dụng vào `/home/ubuntu/crave` trên EC2, kiểm tra health 
 WAR cũ nếu deploy lỗi. Cài runner EC2 một lần theo
 [hướng dẫn CI/CD](docs/project/ci-cd-ec2.md) để bật deploy tự động.
 
+CI kiểm tra workflow/shell/JavaScript, chạy toàn bộ JUnit bằng `crave_app`,
+thử migration và chạy WAR trên Tomcat với Chrome thật. Check **CI required**
+chỉ thành công khi tất cả nhóm kiểm tra đều đạt. Xem
+[hướng dẫn kiểm thử CI](docs/project/ci.md) để chạy các bước cục bộ và đọc báo cáo.
+
 ## Chạy môi trường phát triển
 
 Yêu cầu: JDK 17+, Maven 3.9+, Docker (nếu chưa có MySQL) và Tomcat 10.1+.

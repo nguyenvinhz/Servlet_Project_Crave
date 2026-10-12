@@ -45,7 +45,9 @@ health_interval=${HEALTH_INTERVAL_SECONDS:-5}
 
 docker_command=(docker)
 if ! docker info >/dev/null 2>&1; then
-  command -v sudo >/dev/null && sudo -n docker info >/dev/null 2>&1 || fail 'Runner needs Docker access or passwordless sudo docker.'
+  if ! command -v sudo >/dev/null || ! sudo -n docker info >/dev/null 2>&1; then
+    fail 'Runner needs Docker access or passwordless sudo docker.'
+  fi
   docker_command=(sudo -n docker)
 fi
 compose=("${docker_command[@]}" compose --project-directory "$deploy_root" --file "$compose_file")
