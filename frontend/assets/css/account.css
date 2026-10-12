@@ -22,11 +22,13 @@
 
 .account-ui .intro-panel h1,
 .account-ui .account-sidebar h1,
-.account-ui .card-heading h2 {
-    font-family: 'Plus Jakarta Sans', 'Nunito', ui-sans-serif, system-ui, -apple-system, sans-serif;
+.account-ui .card-heading h2,
+#profile-title {
+    font-family: 'Nunito', 'Plus Jakarta Sans', ui-sans-serif, system-ui, -apple-system, sans-serif;
     margin: 0.25rem 0 1rem;
     font-size: clamp(2rem, 4vw, 3rem);
     line-height: 1.2;
+    letter-spacing: normal;
 }
 
 .account-ui .intro-panel p:last-child,
