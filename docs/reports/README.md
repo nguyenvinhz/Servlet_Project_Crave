@@ -38,6 +38,8 @@ Báo cáo được nhóm theo chức năng; ngày trong tên file là ngày tạ
 | 2026-10-06 | Nền đơn hàng và thanh toán | [Order/payment](order-payment/2026-10-06-nguyen-duc-phat-order-payment.md) |
 | 2026-10-07 | Sửa sau review Ngày 1 | [Order/payment Day 1 fix](order-payment/2026-10-07-nguyen-duc-phat-order-payment-day1-fix.md) |
 | 2026-10-08 | Đợt sửa tiếp theo của Ngày 1 | [Order/payment Day 1 fix 2](order-payment/2026-10-08-nguyen-duc-phat-order-payment-day1-fix2.md) |
+| 2026-10-10 | Đơn hàng và thanh toán Ngày 2 | [Order/payment Day 2](2026-10-10/01-nguyen-duc-phat-order-payment-day2.md) |
+| 2026-10-12 | Tích hợp, kiểm thử và hoàn thiện Đơn hàng Ngày 3 | [Order/payment Day 3](order-payment/2026-10-12-nguyen-duc-phat-order-payment-day3.md) |
 
 ## Tài liệu dự án
 
