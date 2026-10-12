@@ -13,6 +13,7 @@ import tempfile
 from types import SimpleNamespace
 import unittest
 from unittest import mock
+from urllib.error import HTTPError
 
 
 SCRIPT = Path(__file__).resolve().parents[1] / 'prepare-payos-deploy.py'
@@ -296,6 +297,8 @@ class PayosPreparationTest(unittest.TestCase):
             request = provider.call_args.args[0]
             self.assertEqual('https://api-merchant.payos.vn/confirm-webhook', request.full_url)
             self.assertEqual('POST', request.method)
+            self.assertEqual('Crave-Deployment/1.0', request.get_header('User-agent'))
+            self.assertEqual('application/json', request.get_header('Accept'))
             self.assertEqual('fixture-client-secret', request.get_header('X-client-id'))
             self.assertEqual('fixture-api-secret', request.get_header('X-api-key'))
             self.assertEqual({'webhookUrl': 'https://kitchen.example/crave/api/payments/payos/webhook'},
@@ -304,6 +307,27 @@ class PayosPreparationTest(unittest.TestCase):
         self.assertFalse(self.mutation_calls())
         self.assertFalse((self.production / '.payos.env').exists())
         self.assert_no_secrets_logged()
+
+    def test_http_rejection_logs_only_status_without_provider_body_headers_or_secrets(self):
+        body = io.BytesIO(b'<html>private-database-password fixture-api-secret</html>')
+        error = HTTPError('https://api-merchant.payos.vn/confirm-webhook?token=fixture-api-secret',
+                          403, 'Forbidden fixture-checksum-secret',
+                          {'X-Provider-Debug': 'fixture-client-secret'}, body)
+        self.addCleanup(error.close)
+        with self.isolated() as (_, provider), \
+                mock.patch.object(sys, 'argv', [str(SCRIPT), '--confirm-webhook']):
+            provider.side_effect = error
+            with self.assertRaises(SystemExit) as exited:
+                exec(compile(SCRIPT.read_text(encoding='utf-8'), str(SCRIPT), 'exec'), {'__name__': '__main__'})
+        self.assertEqual('PayOS preparation failed: HTTP 403.', exited.exception.code)
+        self.assert_no_secrets_logged(exited.exception.code)
+        self.assertNotIn('X-Provider-Debug', str(exited.exception.code))
+        self.assertNotIn('Forbidden', str(exited.exception.code))
+        self.assertNotIn('<html>', str(exited.exception.code))
+        self.assertNotIn('api-merchant.payos.vn', str(exited.exception.code))
+        self.assertEqual(0, body.tell(), 'HTTP error response body was read into diagnostics')
+        self.assertFalse(self.mutation_calls())
+        self.assertFalse((self.production / '.payos.env').exists())
 
     def test_provider_rejection_does_not_log_its_response_or_write_files(self):
         response = mock.MagicMock()

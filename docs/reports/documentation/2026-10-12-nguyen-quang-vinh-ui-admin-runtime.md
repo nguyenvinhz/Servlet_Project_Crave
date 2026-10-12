@@ -112,3 +112,19 @@ Không có khóa thật trong WAR source, ảnh hay mô tả PR.
 
 Chưa thực hiện chuyển tiền thật. Theo quy tắc thanh toán có sẵn, đơn đã bị cửa hàng
 hủy cần đối soát thủ công nếu khách chuyển tiền sau thời điểm hủy.
+
+## Kiểm tra sau merge và triển khai
+
+PR [#34](https://github.com/nguyenvinhz/Servlet_Project_Crave/pull/34) đã merge vào
+`main` tại `797875d`. CI Linux đạt 414/414 backend, 111/111 trình duyệt,
+91 request HTTP, 22 tình huống deploy/rollback và 17 bài chuẩn bị production.
+WAR triển khai thành công; 9 kiểm tra health/asset hash/UTF-8/webhook công khai
+đều đạt. Chrome production xác nhận menu/ưu đãi desktop và mobile dùng đúng font,
+6 ảnh danh mục tải được và tự đổi, không tràn ngang, ký tự hỏng hoặc scrollbar trắng.
+
+Bước đăng ký webhook ban đầu bị HTTP 403 với header mặc định của Python `urllib`.
+Cùng khóa và URL, Node trả HTTP 200/code `00`; request Python với
+`User-Agent: Crave-Deployment/1.0` và `Accept: application/json` cũng thành công.
+Đã đăng ký webhook thật và bổ sung hai header vào CD; lỗi HTTP chỉ ghi status,
+không ghi response body hoặc khóa. Thay đổi này được commit/PR tiếp trên
+`fix/admin-ui-project-review` trước khi tự merge theo yêu cầu người dùng.
