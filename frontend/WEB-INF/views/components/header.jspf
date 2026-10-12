@@ -16,7 +16,6 @@
     <script>window.CONTEXT_PATH = '${pageContext.request.contextPath}';</script>
 </head>
 <body class="crave-body ${pageBodyClass}" data-context-path="<c:out value='${pageContext.request.contextPath}'/>">
-<a class="skip-link" href="#main-content">Chuyển đến nội dung</a>
 <header class="site-header">
     <div class="site-header-inner">
         <a class="brand" href="<c:url value='/menu'/>">crave<span>.</span></a>

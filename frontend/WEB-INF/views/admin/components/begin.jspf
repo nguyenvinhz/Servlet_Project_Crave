@@ -11,7 +11,6 @@
     <link rel="stylesheet" href="<c:url value='/assets/css/admin.css'/>">
 </head>
 <body class="admin-body" data-page="<c:out value='${adminPage}'/>" data-context-path="<c:out value='${pageContext.request.contextPath}'/>" data-role="<c:out value='${sessionScope.role}'/>" data-user-id="<c:out value='${sessionScope.currentUser.id}'/>">
-<a class="skip-link" href="#main-content">Chuyển đến nội dung</a>
 <svg class="icon-definitions" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
     <symbol id="icon-chef" viewBox="0 0 24 24"><path d="M6 14a5 5 0 0 1-1-9 5 5 0 0 1 7-2 5 5 0 0 1 7 2 5 5 0 0 1-1 9v6H6zM6 17h12"/></symbol>
     <symbol id="icon-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></symbol>
