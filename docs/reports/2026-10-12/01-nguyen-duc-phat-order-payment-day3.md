@@ -107,23 +107,20 @@ Hoàn thành toàn diện các nhiệm vụ Ngày 3 theo bản phân công nghi�
 
 ---
 
-## Danh sách file đã thay đổi và bổ sung
+## File hoặc khu vực đã thay đổi
 
-1. **Backend Service & Exception Handling:**
-   - [`CustomerOrderServiceImpl.java`](file:///d:/TAI_LIEU_HOC_TAP_DAI_HOC/Lap%20trinh%20Web/CRAVE/Servlet_Project_Crave/backend/src/main/java/com/foodordering/service/CustomerOrderServiceImpl.java)
-   - [`PaymentServiceImpl.java`](file:///d:/TAI_LIEU_HOC_TAP_DAI_HOC/Lap%20trinh%20Web/CRAVE/Servlet_Project_Crave/backend/src/main/java/com/foodordering/service/PaymentServiceImpl.java)
-2. **Frontend Views & Scripts:**
-   - [`orders.jsp`](file:///d:/TAI_LIEU_HOC_TAP_DAI_HOC/Lap%20trinh%20Web/CRAVE/Servlet_Project_Crave/frontend/WEB-INF/views/order/orders.jsp)
-   - [`order-detail.jsp`](file:///d:/TAI_LIEU_HOC_TAP_DAI_HOC/Lap%20trinh%20Web/CRAVE/Servlet_Project_Crave/frontend/WEB-INF/views/order/order-detail.jsp)
-   - [`admin-orders.jsp`](file:///d:/TAI_LIEU_HOC_TAP_DAI_HOC/Lap%20trinh%20Web/CRAVE/Servlet_Project_Crave/frontend/WEB-INF/views/admin/admin-orders.jsp)
-   - [`orders.js`](file:///d:/TAI_LIEU_HOC_TAP_DAI_HOC/Lap%20trinh%20Web/CRAVE/Servlet_Project_Crave/frontend/assets/js/orders.js)
-   - [`order-detail.js`](file:///d:/TAI_LIEU_HOC_TAP_DAI_HOC/Lap%20trinh%20Web/CRAVE/Servlet_Project_Crave/frontend/assets/js/order-detail.js)
-   - [`admin-orders.js`](file:///d:/TAI_LIEU_HOC_TAP_DAI_HOC/Lap%20trinh%20Web/CRAVE/Servlet_Project_Crave/frontend/assets/js/admin-orders.js)
-3. **Unit Tests:**
-   - [`CustomerOrderServiceTest.java`](file:///d:/TAI_LIEU_HOC_TAP_DAI_HOC/Lap%20trinh%20Web/CRAVE/Servlet_Project_Crave/backend/src/test/java/com/foodordering/service/CustomerOrderServiceTest.java)
-   - [`PaymentServiceTest.java`](file:///d:/TAI_LIEU_HOC_TAP_DAI_HOC/Lap%20trinh%20Web/CRAVE/Servlet_Project_Crave/backend/src/test/java/com/foodordering/service/PaymentServiceTest.java)
-4. **Báo cáo nghiệm thu:**
-   - [`01-nguyen-duc-phat-order-payment-day3.md`](file:///d:/TAI_LIEU_HOC_TAP_DAI_HOC/Lap%20trinh%20Web/CRAVE/Servlet_Project_Crave/docs/reports/2026-10-12/01-nguyen-duc-phat-order-payment-day3.md)
+- `backend/src/main/java/com/foodordering/service/CustomerOrderServiceImpl.java`
+- `backend/src/main/java/com/foodordering/service/PaymentServiceImpl.java`
+- `backend/src/test/java/com/foodordering/service/CustomerOrderServiceTest.java`
+- `backend/src/test/java/com/foodordering/service/PaymentServiceTest.java`
+- `frontend/WEB-INF/views/order/orders.jsp`
+- `frontend/WEB-INF/views/order/order-detail.jsp`
+- `frontend/WEB-INF/views/admin/admin-orders.jsp`
+- `frontend/assets/js/orders.js`
+- `frontend/assets/js/order-detail.js`
+- `frontend/assets/js/admin-orders.js`
+- `docs/reports/2026-10-12/01-nguyen-duc-phat-order-payment-day3.md`
+- `docs/reports/README.md`
 
 ---
 
