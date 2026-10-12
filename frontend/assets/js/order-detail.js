@@ -1,110 +1,323 @@
 document.addEventListener('DOMContentLoaded', async () => {
     const container = document.getElementById('orderContent');
-    // Lấy orderId từ URL. Ví dụ /crave/orders/C12345
-    const pathSegments = window.location.pathname.split('/');
+    const API_BASE = document.body.dataset.contextPath || '';
+    
+    // Lấy orderId từ cuối URL. Ví dụ /orders/DH01 hoặc /crave/orders/DH01
+    const pathSegments = window.location.pathname.split('/').filter(Boolean);
     const orderId = pathSegments[pathSegments.length - 1];
 
+    if (!orderId || orderId === 'orders') {
+        container.innerHTML = `
+            <div class="card" style="padding: 2.5rem; text-align: center; color: #f87171;">
+                <p>Không tìm thấy mã đơn hàng hợp lệ.</p>
+                <a href="${API_BASE}/orders" class="btn-primary" style="display: inline-block; width: auto; margin-top: 1rem; text-decoration: none;">Quay lại danh sách đơn</a>
+            </div>
+        `;
+        return;
+    }
+
     try {
-        const res = await fetch('/crave/api/orders/' + orderId);
+        const res = await fetch(`${API_BASE}/api/orders/${encodeURIComponent(orderId)}`, {
+            credentials: 'same-origin',
+            headers: { 'Accept': 'application/json' }
+        });
+
+        if (res.status === 401) {
+            container.innerHTML = `
+                <div class="card" style="padding: 2.5rem; text-align: center;">
+                    <p style="color: var(--text-muted); margin-bottom: 1rem;">Vui lòng đăng nhập để xem chi tiết đơn hàng này.</p>
+                    <a href="${API_BASE}/auth/login?returnTo=${encodeURIComponent(window.location.pathname)}" class="btn-primary" style="display: inline-block; width: auto; margin: 0 auto; text-decoration: none;">Đăng nhập</a>
+                </div>
+            `;
+            return;
+        }
+
+        if (res.status === 403) {
+            container.innerHTML = `
+                <div class="card" style="padding: 2.5rem; text-align: center;">
+                    <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">🔒</div>
+                    <h3 style="color: #f87171; margin-bottom: 0.5rem;">Không có quyền truy cập</h3>
+                    <p style="color: var(--text-muted); margin-bottom: 1.5rem;">Đơn hàng này không thuộc tài khoản của bạn.</p>
+                    <a href="${API_BASE}/orders" class="btn-primary" style="display: inline-block; width: auto; margin: 0 auto; text-decoration: none;">Quay lại đơn hàng của tôi</a>
+                </div>
+            `;
+            return;
+        }
+
         const data = await res.json();
 
-        if (res.ok && data.success) {
+        if (res.ok && data.success && data.data) {
             const o = data.data;
             container.innerHTML = '';
             
-            // Header
+            // 1. Header
             const header = document.createElement('div');
-            header.className = 'order-header';
-            const h2 = document.createElement('h2');
-            h2.textContent = 'Đơn hàng #' + o.orderId;
-            const pStatus = document.createElement('p');
-            pStatus.innerHTML = 'Trạng thái: <strong>' + o.status + '</strong>';
-            const pDate = document.createElement('p');
-            pDate.textContent = 'Ngày đặt: ' + new Date(o.orderedAt).toLocaleString('vi-VN');
-            header.append(h2, pStatus, pDate);
+            header.className = 'tracking-header card';
+            header.style.padding = '1.75rem';
+            header.style.marginBottom = '1.5rem';
             
-            // Info Grid
+            const titleRow = document.createElement('div');
+            titleRow.style.display = 'flex';
+            titleRow.style.justifyContent = 'space-between';
+            titleRow.style.alignItems = 'center';
+            titleRow.style.flexWrap = 'wrap';
+            titleRow.style.gap = '1rem';
+            
+            const h1 = document.createElement('h1');
+            h1.textContent = 'Đơn hàng #' + o.orderId;
+            
+            const badge = document.createElement('span');
+            badge.className = 'order-status-badge ' + getBadgeClass(o.status);
+            badge.style.fontSize = '0.9rem';
+            badge.style.padding = '0.4rem 1rem';
+            badge.textContent = formatStatus(o.status);
+            
+            titleRow.append(h1, badge);
+            
+            const pDate = document.createElement('p');
+            pDate.textContent = 'Thời gian đặt: ' + new Date(o.orderedAt).toLocaleString('vi-VN');
+            
+            header.append(titleRow, pDate);
+            container.appendChild(header);
+            
+            // 2. Order Stepper / Timeline
+            const stepperCard = document.createElement('div');
+            stepperCard.className = 'card';
+            stepperCard.style.padding = '1.5rem';
+            stepperCard.style.marginBottom = '1.5rem';
+            
+            if (o.status === 'CANCELLED') {
+                stepperCard.innerHTML = `
+                    <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid #f87171; padding: 1.25rem; border-radius: 10px; text-align: center; color: #f87171;">
+                        <span style="font-size: 1.5rem; display: block; margin-bottom: 0.25rem;">✕</span>
+                        <strong>Đơn hàng đã bị hủy</strong>
+                        <p style="margin: 0.25rem 0 0; font-size: 0.85rem; color: var(--text-muted);">Đơn hàng đã được ghi nhận hủy trong hệ thống.</p>
+                    </div>
+                `;
+            } else {
+                stepperCard.appendChild(buildStepper(o.status));
+            }
+            container.appendChild(stepperCard);
+            
+            // 3. Info Grid (Người nhận & Thanh toán)
             const grid = document.createElement('div');
-            grid.className = 'info-grid';
+            grid.style.display = 'grid';
+            grid.style.gridTemplateColumns = 'repeat(auto-fit, minmax(280px, 1fr))';
+            grid.style.gap = '1.5rem';
+            grid.style.marginBottom = '1.5rem';
             
             const col1 = document.createElement('div');
-            const h4_1 = document.createElement('h4');
-            h4_1.textContent = 'Thông tin giao hàng';
-            const pName = document.createElement('p');
-            pName.textContent = 'Tên: ' + o.receiverName;
-            const pPhone = document.createElement('p');
-            pPhone.textContent = 'SĐT: ' + o.receiverPhone;
-            const pAddr = document.createElement('p');
-            pAddr.textContent = 'Địa chỉ: ' + (o.deliveryAddress || 'Nhận tại quán');
-            col1.append(h4_1, pName, pPhone, pAddr);
+            col1.className = 'card';
+            col1.style.padding = '1.5rem';
+            col1.innerHTML = `
+                <h3 style="margin-top: 0; margin-bottom: 1rem; font-size: 1.1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem;">📍 Thông tin giao nhận</h3>
+                <p style="margin: 0.4rem 0;"><strong>Người nhận:</strong> ${escapeHtml(o.receiverName)}</p>
+                <p style="margin: 0.4rem 0;"><strong>Số điện thoại:</strong> ${escapeHtml(o.receiverPhone)}</p>
+                <p style="margin: 0.4rem 0;"><strong>Hình thức:</strong> ${o.fulfillmentType === 'DELIVERY' ? 'Giao hàng tận nơi' : 'Lấy tại quán'}</p>
+                <p style="margin: 0.4rem 0;"><strong>Địa chỉ:</strong> ${escapeHtml(o.deliveryAddress || 'Nhận tại quầy nhà hàng')}</p>
+                <p style="margin: 0.4rem 0; color: var(--text-muted); font-size: 0.9rem;"><strong>Ghi chú:</strong> ${escapeHtml(o.customerNote || 'Không có ghi chú')}</p>
+            `;
             
             const col2 = document.createElement('div');
-            const h4_2 = document.createElement('h4');
-            h4_2.textContent = 'Thanh toán';
-            const pFulfill = document.createElement('p');
-            pFulfill.textContent = 'Hình thức: ' + (o.fulfillmentType === 'DELIVERY' ? 'Giao tận nơi' : 'Lấy tại quán');
-            const pNote = document.createElement('p');
-            pNote.textContent = 'Ghi chú: ' + (o.customerNote || 'Không có');
-            col2.append(h4_2, pFulfill, pNote);
+            col2.className = 'card';
+            col2.style.padding = '1.5rem';
+            const payStatus = o.payment?.status ? formatPaymentStatus(o.payment.status) : 'Chưa có thông tin';
+            const payMethod = o.payment?.method ? formatPaymentMethod(o.payment.method) : 'Tiền mặt';
+            col2.innerHTML = `
+                <h3 style="margin-top: 0; margin-bottom: 1rem; font-size: 1.1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem;">💳 Thông tin thanh toán</h3>
+                <p style="margin: 0.4rem 0;"><strong>Phương thức:</strong> ${payMethod}</p>
+                <p style="margin: 0.4rem 0;"><strong>Trạng thái:</strong> <span style="font-weight: 700;">${payStatus}</span></p>
+                ${o.payment?.paymentId ? `<p style="margin: 0.4rem 0; font-size: 0.85rem; color: var(--text-muted);">Mã thanh toán: #${escapeHtml(o.payment.paymentId)}</p>` : ''}
+            `;
             
             grid.append(col1, col2);
+            container.appendChild(grid);
             
-            // Items
-            const itemList = document.createElement('div');
-            itemList.className = 'item-list';
-            const h4_3 = document.createElement('h4');
-            h4_3.textContent = 'Danh sách món';
-            itemList.appendChild(h4_3);
+            // 4. Danh sách món ăn
+            const itemCard = document.createElement('div');
+            itemCard.className = 'card';
+            itemCard.style.padding = '1.5rem';
+            itemCard.style.marginBottom = '1.5rem';
+            
+            const itemTitle = document.createElement('h3');
+            itemTitle.style.marginTop = '0';
+            itemTitle.style.marginBottom = '1rem';
+            itemTitle.style.fontSize = '1.1rem';
+            itemTitle.style.borderBottom = '1px solid var(--border)';
+            itemTitle.style.paddingBottom = '0.5rem';
+            itemTitle.textContent = '🍲 Danh sách món đã đặt';
+            itemCard.appendChild(itemTitle);
             
             if (o.items && o.items.length > 0) {
                 o.items.forEach(item => {
                     const row = document.createElement('div');
-                    row.className = 'item-row';
+                    row.style.display = 'flex';
+                    row.style.justifyContent = 'space-between';
+                    row.style.alignItems = 'flex-start';
+                    row.style.padding = '0.75rem 0';
+                    row.style.borderBottom = '1px dashed var(--border)';
                     
-                    const detailsDiv = document.createElement('div');
-                    detailsDiv.className = 'item-details';
-                    const strongItem = document.createElement('strong');
-                    strongItem.textContent = item.quantity + 'x ' + item.foodNameSnapshot;
-                    const smallNote = document.createElement('small');
-                    smallNote.textContent = item.note || '';
-                    detailsDiv.append(strongItem, smallNote);
+                    const left = document.createElement('div');
+                    left.innerHTML = `
+                        <div style="font-weight: 700; font-size: 1rem;">${item.quantity}x ${escapeHtml(item.foodName || item.foodNameSnapshot)}</div>
+                        ${item.options && item.options.length > 0 ? `
+                            <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.2rem;">
+                                ${item.options.map(opt => `+ ${escapeHtml(opt.optionName)} (${Number(opt.extraPrice).toLocaleString('vi-VN')} đ)`).join(', ')}
+                            </div>
+                        ` : ''}
+                        ${item.note ? `<div style="font-size: 0.85rem; color: var(--accent); font-style: italic; margin-top: 0.2rem;">Ghi chú: ${escapeHtml(item.note)}</div>` : ''}
+                    `;
                     
-                    const priceDiv = document.createElement('div');
-                    priceDiv.textContent = (item.unitPrice * item.quantity).toLocaleString('vi-VN') + ' đ';
+                    const right = document.createElement('div');
+                    right.style.fontWeight = '700';
+                    right.style.fontSize = '1rem';
+                    const lineTotal = Number(item.lineTotal) || (Number(item.unitPrice) * Number(item.quantity)) || 0;
+                    right.textContent = lineTotal.toLocaleString('vi-VN') + ' đ';
                     
-                    row.append(detailsDiv, priceDiv);
-                    itemList.appendChild(row);
+                    row.append(left, right);
+                    itemCard.appendChild(row);
                 });
             } else {
-                const noItemP = document.createElement('p');
-                noItemP.textContent = 'Chưa có chi tiết món ăn';
-                itemList.appendChild(noItemP);
+                itemCard.innerHTML += '<p style="color: var(--text-muted);">Không có chi tiết món ăn.</p>';
             }
+            container.appendChild(itemCard);
             
-            // Totals
-            const totals = document.createElement('div');
-            totals.className = 'totals';
-            const pSub = document.createElement('p');
-            pSub.textContent = 'Tạm tính: ' + (o.subtotal || 0).toLocaleString('vi-VN') + ' đ';
-            const pFee = document.createElement('p');
-            pFee.textContent = 'Phí giao hàng: ' + (o.deliveryFee || 0).toLocaleString('vi-VN') + ' đ';
-            const h3Total = document.createElement('h3');
-            h3Total.textContent = 'Tổng cộng: ' + (o.totalAmount || (o.subtotal + o.deliveryFee)).toLocaleString('vi-VN') + ' đ';
-            totals.append(pSub, pFee, h3Total);
+            // 5. Tổng kết chi phí
+            const summaryCard = document.createElement('div');
+            summaryCard.className = 'card';
+            summaryCard.style.padding = '1.5rem';
             
-            container.append(header, grid, itemList, totals);
+            const subtotal = Number(o.subtotal) || 0;
+            const deliveryFee = Number(o.deliveryFee) || 0;
+            const discount = Number(o.discountAmount) || 0;
+            const total = Number(o.totalAmount) || (subtotal + deliveryFee - discount);
+            
+            summaryCard.innerHTML = `
+                <h3 style="margin-top: 0; margin-bottom: 1rem; font-size: 1.1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem;">🧾 Tổng kết thanh toán</h3>
+                <div style="display: flex; justify-content: space-between; padding: 0.35rem 0;">
+                    <span style="color: var(--text-muted);">Tạm tính món ăn:</span>
+                    <span>${subtotal.toLocaleString('vi-VN')} đ</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; padding: 0.35rem 0;">
+                    <span style="color: var(--text-muted);">Phí vận chuyển:</span>
+                    <span>${deliveryFee.toLocaleString('vi-VN')} đ</span>
+                </div>
+                ${discount > 0 ? `
+                    <div style="display: flex; justify-content: space-between; padding: 0.35rem 0; color: #4ade80;">
+                        <span>Voucher giảm giá:</span>
+                        <span>-${discount.toLocaleString('vi-VN')} đ</span>
+                    </div>
+                ` : ''}
+                <div style="display: flex; justify-content: space-between; padding-top: 1rem; margin-top: 0.5rem; border-top: 1px solid var(--border); font-size: 1.25rem; font-weight: 800; color: var(--accent);">
+                    <span>Tổng cộng:</span>
+                    <span>${total.toLocaleString('vi-VN')} đ</span>
+                </div>
+            `;
+            container.appendChild(summaryCard);
+            
         } else {
-            container.innerHTML = '';
-            const p = document.createElement('p');
-            p.style.color = 'red';
-            p.textContent = data.message;
-            container.appendChild(p);
+            container.innerHTML = `
+                <div class="card" style="padding: 2rem; text-align: center; color: #f87171;">
+                    <p>${data?.error?.message || data?.message || 'Không tìm thấy thông tin đơn hàng.'}</p>
+                    <a href="${API_BASE}/orders" class="btn-primary" style="display: inline-block; width: auto; margin-top: 1rem; text-decoration: none;">Quay lại danh sách đơn</a>
+                </div>
+            `;
         }
     } catch (err) {
-        container.innerHTML = '';
-        const p = document.createElement('p');
-        p.style.color = 'red';
-        p.textContent = 'Lỗi kết nối máy chủ.';
-        container.appendChild(p);
+        container.innerHTML = `
+            <div class="card" style="padding: 2rem; text-align: center; color: #f87171;">
+                <p>Lỗi kết nối máy chủ. Vui lòng thử lại sau.</p>
+                <a href="${API_BASE}/orders" class="btn-primary" style="display: inline-block; width: auto; margin-top: 1rem; text-decoration: none;">Quay lại danh sách</a>
+            </div>
+        `;
     }
 });
+
+function buildStepper(currentStatus) {
+    const steps = [
+        { key: 'PENDING_CONFIRMATION', num: '1', label: 'Chờ xác nhận' },
+        { key: 'PREPARING', num: '2', label: 'Đang chuẩn bị' },
+        { key: 'DELIVERING', num: '3', label: 'Đang giao hàng' },
+        { key: 'COMPLETED', num: '4', label: 'Hoàn tất' }
+    ];
+
+    const orderIndex = {
+        'PENDING_CONFIRMATION': 0,
+        'PREPARING': 1,
+        'DELIVERING': 2,
+        'COMPLETED': 3
+    };
+
+    const curIdx = orderIndex[currentStatus] ?? -1;
+
+    const stepperDiv = document.createElement('div');
+    stepperDiv.className = 'stepper';
+
+    steps.forEach((s, idx) => {
+        const stepEl = document.createElement('div');
+        stepEl.className = 'step';
+        if (idx < curIdx) stepEl.classList.add('done');
+        else if (idx === curIdx) stepEl.classList.add('active');
+
+        const iconEl = document.createElement('div');
+        iconEl.className = 'step-icon';
+        iconEl.textContent = idx < curIdx ? '✓' : s.num;
+
+        const labelEl = document.createElement('div');
+        labelEl.className = 'step-label';
+        labelEl.textContent = s.label;
+
+        stepEl.append(iconEl, labelEl);
+        stepperDiv.appendChild(stepEl);
+    });
+
+    return stepperDiv;
+}
+
+function getBadgeClass(status) {
+    const map = {
+        'PENDING_CONFIRMATION': 'badge-pending',
+        'PREPARING': 'badge-preparing',
+        'DELIVERING': 'badge-delivering',
+        'COMPLETED': 'badge-completed',
+        'CANCELLED': 'badge-cancelled'
+    };
+    return map[status] || 'badge-pending';
+}
+
+function formatStatus(status) {
+    const map = {
+        'PENDING_CONFIRMATION': 'Chờ xác nhận',
+        'PREPARING': 'Đang chuẩn bị',
+        'DELIVERING': 'Đang giao hàng',
+        'COMPLETED': 'Hoàn tất',
+        'CANCELLED': 'Đã hủy'
+    };
+    return map[status] || status;
+}
+
+function formatPaymentStatus(status) {
+    const map = {
+        'PENDING': 'Chờ thanh toán',
+        'SUCCESS': 'Đã thanh toán',
+        'FAILED': 'Thanh toán thất bại',
+        'REFUNDED': 'Đã hoàn tiền'
+    };
+    return map[status] || status;
+}
+
+function formatPaymentMethod(method) {
+    const map = {
+        'CASH': 'Tiền mặt khi nhận hàng (COD)',
+        'BANK_TRANSFER': 'Chuyển khoản ngân hàng',
+        'E_WALLET': 'Ví điện tử'
+    };
+    return map[method] || method;
+}
+
+function escapeHtml(str) {
+    if (!str) return '';
+    return String(str).replace(/[&<>'"]/g, tag => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+    }[tag] || tag));
+}
