@@ -1,0 +1,943 @@
+/* ==========================================================================
+   CRAVE - CART & PROMOTION STYLES
+   Design System matching https://thrilled-calendar-459980.framer.app/food
+   Tokens:
+   --brand: #f4511e
+   --text-dark: #1f2937
+   --text-muted: #6b7280
+   --bg-page: #fff8f3
+   --bg-card: #ffffff
+   --border-color: #f2e6df
+   ========================================================================== */
+
+:root {
+    --crave-brand: #f4511e;
+    --crave-brand-hover: #d84315;
+    --crave-brand-light: #fff0eb;
+    --crave-text: #1f2937;
+    --crave-text-muted: #6b7280;
+    --crave-bg-page: #fff8f3;
+    --crave-bg-card: #ffffff;
+    --crave-border: #f2e6df;
+    --crave-border-focus: #f4511e;
+    --crave-success: #16a34a;
+    --crave-success-bg: #f0fdf4;
+    --crave-danger: #dc2626;
+    --crave-danger-bg: #fef2f2;
+    --crave-radius-sm: 8px;
+    --crave-radius-md: 14px;
+    --crave-radius-lg: 20px;
+    --crave-radius-xl: 24px;
+    --crave-shadow-sm: 0 2px 6px rgba(0, 0, 0, 0.03);
+    --crave-shadow-md: 0 6px 20px rgba(31, 41, 55, 0.05);
+    --crave-shadow-lg: 0 12px 36px rgba(244, 81, 30, 0.12);
+    --crave-font-heading: 'Nunito', sans-serif;
+    --crave-font-body: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+/* Page Container */
+body.crave-body {
+    background-color: var(--crave-bg-page);
+    color: var(--crave-text);
+    font-family: var(--crave-font-body);
+    margin: 0;
+    padding: 0;
+    min-height: 100vh;
+}
+
+.cart-page-wrapper {
+    background-color: var(--crave-bg-page);
+    min-height: calc(100vh - 160px);
+    padding: 40px 24px 80px;
+}
+
+.cart-container {
+    max-width: 1240px;
+    margin: 0 auto;
+}
+
+/* Page Header */
+.cart-header-section {
+    margin-bottom: 32px;
+}
+
+.cart-page-title {
+    font-family: var(--crave-font-heading);
+    font-size: 2.75rem;
+    font-weight: 800;
+    color: var(--crave-text);
+    margin: 0 0 8px 0;
+    letter-spacing: -0.02em;
+}
+
+.cart-subtitle {
+    color: var(--crave-text-muted);
+    font-size: 1rem;
+    margin: 0;
+}
+
+/* Two-column Layout */
+.cart-layout-grid {
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    gap: 36px;
+    align-items: start;
+}
+
+@media (max-width: 992px) {
+    .cart-layout-grid {
+        grid-template-columns: 1fr;
+        gap: 32px;
+    }
+}
+
+/* ==========================================================================
+   LEFT COLUMN - CART ITEMS
+   ========================================================================== */
+
+.cart-items-column {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+/* Individual Cart Item Card (Matching Screenshot) */
+.cart-item-card {
+    background: var(--crave-bg-card);
+    border: 1px solid var(--crave-border);
+    border-radius: var(--crave-radius-lg);
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    box-shadow: var(--crave-shadow-sm);
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+    position: relative;
+}
+
+.cart-item-card:hover {
+    box-shadow: var(--crave-shadow-md);
+    border-color: #ebd3c8;
+}
+
+/* Item Image Thumbnail */
+.cart-item-image-wrapper {
+    width: 88px;
+    height: 88px;
+    min-width: 88px;
+    border-radius: var(--crave-radius-md);
+    overflow: hidden;
+    background-color: var(--crave-bg-page);
+    position: relative;
+}
+
+.cart-item-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    transition: transform 0.3s ease;
+}
+
+.cart-item-card:hover .cart-item-image {
+    transform: scale(1.05);
+}
+
+/* Item Details */
+.cart-item-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.cart-item-title {
+    font-family: var(--crave-font-heading);
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--crave-text);
+    margin: 0 0 4px 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.cart-item-options {
+    color: var(--crave-text-muted);
+    font-size: 0.88rem;
+    line-height: 1.4;
+    margin: 0 0 6px 0;
+}
+
+.cart-item-note {
+    font-size: 0.8rem;
+    color: #9ca3af;
+    font-style: italic;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+/* Item Quantity Stepper */
+.cart-item-actions {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.cart-stepper {
+    display: inline-flex;
+    align-items: center;
+    background: var(--crave-bg-page);
+    border: 1px solid var(--crave-border);
+    border-radius: 999px;
+    padding: 3px 6px;
+    gap: 8px;
+}
+
+.cart-stepper-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: none;
+    background: #fff;
+    color: var(--crave-text);
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s ease;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+
+.cart-stepper-btn:hover:not(:disabled) {
+    background: var(--crave-brand);
+    color: #fff;
+}
+
+.cart-stepper-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.cart-stepper-val {
+    min-width: 22px;
+    text-align: center;
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: var(--crave-text);
+}
+
+/* Price Display (Matches: "$12.90 × 1" in Orange) */
+.cart-item-price-tag {
+    font-family: var(--crave-font-heading);
+    color: var(--crave-brand);
+    font-weight: 800;
+    font-size: 1.15rem;
+    white-space: nowrap;
+    text-align: right;
+}
+
+.cart-item-remove-btn {
+    background: transparent;
+    border: none;
+    color: #9ca3af;
+    cursor: pointer;
+    padding: 6px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s ease;
+}
+
+.cart-item-remove-btn:hover {
+    color: var(--crave-danger);
+    background: var(--crave-danger-bg);
+}
+
+/* Cart Toolbar (Clear / Continue) */
+.cart-bottom-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 16px;
+    padding: 12px 4px;
+}
+
+.btn-link-action {
+    background: none;
+    border: none;
+    color: var(--crave-text-muted);
+    font-size: 0.92rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: var(--crave-radius-sm);
+    transition: all 0.2s ease;
+    text-decoration: none;
+}
+
+.btn-link-action:hover {
+    color: var(--crave-brand);
+    background: #fff;
+    text-decoration: none;
+}
+
+.btn-link-action.danger:hover {
+    color: var(--crave-danger);
+    background: var(--crave-danger-bg);
+}
+
+/* ==========================================================================
+   RIGHT COLUMN - ORDER SUMMARY (Matching Screenshot)
+   ========================================================================== */
+
+.order-summary-card {
+    background: var(--crave-bg-card);
+    border: 1px solid var(--crave-border);
+    border-radius: var(--crave-radius-xl);
+    padding: 28px 24px;
+    box-shadow: var(--crave-shadow-sm);
+    position: sticky;
+    top: 96px;
+}
+
+.order-summary-title {
+    font-family: var(--crave-font-heading);
+    font-size: 1.4rem;
+    font-weight: 800;
+    color: var(--crave-text);
+    margin: 0 0 20px 0;
+}
+
+/* Summary Rows */
+.summary-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    font-size: 0.95rem;
+    color: var(--crave-text-muted);
+}
+
+.summary-row.discount-row {
+    color: var(--crave-success);
+    font-weight: 600;
+}
+
+.summary-row.discount-row span:last-child {
+    font-family: var(--crave-font-heading);
+}
+
+.summary-divider {
+    height: 1px;
+    background-color: var(--crave-border);
+    margin: 18px 0;
+}
+
+/* Total Row (Matching Screenshot: "Total $12.82") */
+.summary-total-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 24px;
+}
+
+.summary-total-label {
+    font-family: var(--crave-font-heading);
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: var(--crave-text);
+}
+
+.summary-total-value {
+    font-family: var(--crave-font-heading);
+    font-size: 1.6rem;
+    font-weight: 800;
+    color: var(--crave-text);
+}
+
+/* ==========================================================================
+   VOUCHER / PROMOTION INPUT AREA
+   ========================================================================== */
+
+.voucher-section {
+    margin-bottom: 24px;
+    background: var(--crave-bg-page);
+    border: 1px dashed #e4cfc2;
+    border-radius: var(--crave-radius-md);
+    padding: 16px;
+}
+
+.voucher-section-title {
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: var(--crave-text);
+    margin: 0 0 10px 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.voucher-view-all-link {
+    font-size: 0.8rem;
+    color: var(--crave-brand);
+    font-weight: 700;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.voucher-view-all-link:hover {
+    text-decoration: underline;
+}
+
+/* Input group */
+.voucher-input-group {
+    display: flex;
+    gap: 8px;
+    position: relative;
+}
+
+.voucher-input {
+    flex: 1;
+    background: #fff;
+    border: 1px solid var(--crave-border);
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--crave-text);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    outline: none;
+    transition: all 0.2s ease;
+}
+
+.voucher-input:focus {
+    border-color: var(--crave-border-focus);
+    box-shadow: 0 0 0 3px rgba(244, 81, 30, 0.12);
+}
+
+.voucher-input::placeholder {
+    text-transform: none;
+    letter-spacing: normal;
+    color: #9ca3af;
+    font-weight: 400;
+}
+
+.voucher-apply-btn {
+    background: var(--crave-text);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    padding: 0 18px;
+    font-size: 0.88rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 88px;
+}
+
+.voucher-apply-btn:hover:not(:disabled) {
+    background: #111827;
+}
+
+.voucher-apply-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* Applied Voucher Chip */
+.voucher-applied-chip {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #fff;
+    border: 1px solid #86efac;
+    border-radius: 10px;
+    padding: 10px 14px;
+    margin-top: 10px;
+}
+
+.voucher-chip-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.voucher-code-badge {
+    background: var(--crave-brand-light);
+    color: var(--crave-brand);
+    font-family: var(--crave-font-heading);
+    font-weight: 800;
+    font-size: 0.85rem;
+    padding: 2px 8px;
+    border-radius: 6px;
+}
+
+.voucher-discount-text {
+    font-size: 0.85rem;
+    color: var(--crave-success);
+    font-weight: 600;
+}
+
+.voucher-remove-btn {
+    background: transparent;
+    border: none;
+    color: #9ca3af;
+    font-size: 1.1rem;
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 4px;
+    transition: color 0.15s ease;
+}
+
+.voucher-remove-btn:hover {
+    color: var(--crave-danger);
+}
+
+/* Inline Voucher Messages */
+.voucher-feedback {
+    font-size: 0.82rem;
+    margin-top: 8px;
+    display: none;
+    line-height: 1.4;
+}
+
+.voucher-feedback.error {
+    display: block;
+    color: var(--crave-danger);
+}
+
+.voucher-feedback.success {
+    display: block;
+    color: var(--crave-success);
+}
+
+/* Checkout Button (Matching Screenshot: Orange rounded button) */
+.btn-checkout {
+    width: 100%;
+    background-color: var(--crave-brand);
+    color: #fff;
+    border: none;
+    border-radius: 12px;
+    padding: 16px 24px;
+    font-family: var(--crave-font-heading);
+    font-size: 1.05rem;
+    font-weight: 800;
+    cursor: pointer;
+    box-shadow: var(--crave-shadow-lg);
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    text-decoration: none;
+}
+
+.btn-checkout:hover:not(:disabled) {
+    background-color: var(--crave-brand-hover);
+    transform: translateY(-1px);
+    box-shadow: 0 14px 40px rgba(244, 81, 30, 0.22);
+}
+
+.btn-checkout:active {
+    transform: translateY(0);
+}
+
+.btn-checkout:disabled {
+    background-color: #d1d5db;
+    box-shadow: none;
+    cursor: not-allowed;
+}
+
+/* ==========================================================================
+   REQUIRED STATE 1: EMPTY STATE (TRẠNG THÁI RỖNG)
+   ========================================================================== */
+
+.cart-empty-state {
+    background: #fff;
+    border: 1px solid var(--crave-border);
+    border-radius: var(--crave-radius-xl);
+    padding: 64px 32px;
+    text-align: center;
+    max-width: 620px;
+    margin: 40px auto;
+    box-shadow: var(--crave-shadow-md);
+}
+
+.cart-empty-illustration {
+    width: 140px;
+    height: 140px;
+    margin: 0 auto 24px;
+    background: var(--crave-bg-page);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--crave-brand);
+}
+
+.cart-empty-illustration svg {
+    width: 72px;
+    height: 72px;
+}
+
+.cart-empty-title {
+    font-family: var(--crave-font-heading);
+    font-size: 1.8rem;
+    font-weight: 800;
+    color: var(--crave-text);
+    margin: 0 0 12px 0;
+}
+
+.cart-empty-desc {
+    color: var(--crave-text-muted);
+    font-size: 1rem;
+    line-height: 1.5;
+    max-width: 440px;
+    margin: 0 auto 28px;
+}
+
+.btn-explore-menu {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    background-color: var(--crave-brand);
+    color: #fff;
+    font-family: var(--crave-font-heading);
+    font-weight: 800;
+    font-size: 1.05rem;
+    padding: 14px 32px;
+    border-radius: 12px;
+    text-decoration: none;
+    box-shadow: var(--crave-shadow-lg);
+    transition: all 0.2s ease;
+}
+
+.btn-explore-menu:hover {
+    background-color: var(--crave-brand-hover);
+    transform: translateY(-2px);
+    text-decoration: none;
+    color: #fff;
+}
+
+/* ==========================================================================
+   REQUIRED STATE 2: ERROR STATE (TRẠNG THÁI LỖI)
+   ========================================================================== */
+
+.cart-error-state {
+    background: var(--crave-danger-bg);
+    border: 1px solid #fecaca;
+    border-radius: var(--crave-radius-lg);
+    padding: 32px 24px;
+    text-align: center;
+    margin: 20px 0;
+}
+
+.cart-error-icon {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: #fee2e2;
+    color: var(--crave-danger);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 16px;
+}
+
+.cart-error-title {
+    font-family: var(--crave-font-heading);
+    font-size: 1.3rem;
+    font-weight: 800;
+    color: #991b1b;
+    margin: 0 0 8px 0;
+}
+
+.cart-error-desc {
+    color: #7f1d1d;
+    font-size: 0.95rem;
+    margin: 0 0 20px 0;
+}
+
+.btn-retry {
+    background: var(--crave-danger);
+    color: #fff;
+    border: none;
+    padding: 10px 24px;
+    border-radius: 8px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.btn-retry:hover {
+    background: #b91c1c;
+}
+
+/* Toast Notification for errors / success */
+.crave-toast-container {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.crave-toast {
+    background: #1f2937;
+    color: #fff;
+    padding: 14px 20px;
+    border-radius: 12px;
+    font-size: 0.92rem;
+    font-weight: 500;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    animation: toastSlideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    max-width: 380px;
+}
+
+.crave-toast.error {
+    background: #991b1b;
+    border-left: 4px solid #ef4444;
+}
+
+.crave-toast.success {
+    background: #14532d;
+    border-left: 4px solid #22c55e;
+}
+
+@keyframes toastSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ==========================================================================
+   REQUIRED STATE 3: LOADING STATE (SKELETON SHIMMER)
+   ========================================================================== */
+
+.skeleton-shimmer {
+    background: linear-gradient(
+        90deg,
+        #f3ebe6 0%,
+        #fbf6f3 50%,
+        #f3ebe6 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+    border-radius: 6px;
+}
+
+@keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+}
+
+.skeleton-card {
+    background: #fff;
+    border: 1px solid var(--crave-border);
+    border-radius: var(--crave-radius-lg);
+    padding: 20px;
+    display: flex;
+    gap: 20px;
+    align-items: center;
+}
+
+.skeleton-thumb {
+    width: 88px;
+    height: 88px;
+    min-width: 88px;
+    border-radius: var(--crave-radius-md);
+}
+
+.skeleton-text-group {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.skeleton-line {
+    height: 16px;
+}
+
+.skeleton-line.title {
+    width: 60%;
+    height: 20px;
+}
+
+.skeleton-line.sub {
+    width: 85%;
+    height: 14px;
+}
+
+.skeleton-line.price {
+    width: 25%;
+    height: 18px;
+}
+
+/* Spinner inside button */
+.btn-spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+    display: inline-block;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* ==========================================================================
+   PROMOTIONS DRAWER / MODAL / LISTING STYLES
+   ========================================================================== */
+
+.promo-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(31, 41, 55, 0.6);
+    backdrop-filter: blur(4px);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+}
+
+.promo-modal-backdrop.active {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.promo-modal-dialog {
+    background: #fff;
+    border-radius: var(--crave-radius-xl);
+    width: 100%;
+    max-width: 540px;
+    max-height: 85vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2);
+    transform: translateY(20px);
+    transition: transform 0.25s ease;
+    padding: 28px;
+}
+
+.promo-modal-backdrop.active .promo-modal-dialog {
+    transform: translateY(0);
+}
+
+.promo-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.promo-modal-title {
+    font-family: var(--crave-font-heading);
+    font-size: 1.5rem;
+    font-weight: 800;
+    margin: 0;
+}
+
+.promo-modal-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    color: var(--crave-text-muted);
+    cursor: pointer;
+    padding: 4px;
+}
+
+/* Promo Voucher Cards inside modal or page */
+.promo-list {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.promo-card {
+    background: var(--crave-bg-page);
+    border: 1px dashed #e3cbbe;
+    border-radius: var(--crave-radius-md);
+    padding: 16px 18px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    transition: border-color 0.2s, background 0.2s;
+    position: relative;
+}
+
+.promo-card:hover {
+    border-color: var(--crave-brand);
+    background: #fff5ee;
+}
+
+.promo-badge-tag {
+    display: inline-block;
+    background: var(--crave-brand);
+    color: #fff;
+    font-family: var(--crave-font-heading);
+    font-size: 0.85rem;
+    font-weight: 800;
+    padding: 3px 10px;
+    border-radius: 6px;
+    letter-spacing: 0.05em;
+    margin-bottom: 6px;
+}
+
+.promo-card-title {
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: var(--crave-text);
+    margin: 0 0 4px 0;
+}
+
+.promo-card-desc {
+    color: var(--crave-text-muted);
+    font-size: 0.82rem;
+    margin: 0;
+}
+
+.btn-apply-promo-card {
+    background: #fff;
+    color: var(--crave-brand);
+    border: 1.5px solid var(--crave-brand);
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-weight: 700;
+    font-size: 0.88rem;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s ease;
+}
+
+.btn-apply-promo-card:hover {
+    background: var(--crave-brand);
+    color: #fff;
+}

@@ -1,6 +1,7 @@
 <%@ page contentType="text/html;charset=UTF-8" pageEncoding="UTF-8" %>
 <%@ include file="../components/header.jspf" %>
-<main class="page auth-page">
+<link rel="stylesheet" href="<c:url value='/assets/css/account.css'/>">
+<main class="page auth-page account-ui">
     <section class="intro-panel">
         <p class="eyebrow">Thành viên mới</p>
         <h1>Tạo tài khoản trong một phút.</h1>
@@ -13,14 +14,14 @@
             <h2 id="register-title">Đăng ký</h2>
         </div>
 
-        <div id="form-error" class="form-error" role="alert" aria-live="polite">
+        <div id="form-error" class="form-error" role="alert" aria-live="polite" ${empty error ? 'hidden' : ''}>
             <c:out value="${error}"/>
         </div>
 
-        <form action="<c:url value='/api/auth/register'/>" method="post">
+        <form id="registerForm" action="<c:url value='/api/auth/register'/>" method="post" data-method="POST">
             <label for="fullName">Họ và tên</label>
             <input id="fullName" name="fullName" type="text" autocomplete="name"
-                   maxlength="100" placeholder="Nguyễn Văn An" required>
+                   minlength="2" maxlength="100" placeholder="Nguyễn Văn An" required>
 
             <div class="field-grid">
                 <div>
@@ -31,7 +32,7 @@
                 <div>
                     <label for="phone">Số điện thoại</label>
                     <input id="phone" name="phone" type="tel" autocomplete="tel"
-                           maxlength="15" inputmode="tel" placeholder="0901234567" required>
+                           minlength="9" maxlength="15" pattern="\+?[0-9]{8,15}" inputmode="tel" placeholder="0901234567" required>
                 </div>
             </div>
 
@@ -39,7 +40,8 @@
                 <div>
                     <label for="password">Mật khẩu</label>
                     <input id="password" name="password" type="password" autocomplete="new-password"
-                           minlength="8" maxlength="72" required>
+                           minlength="8" maxlength="72" aria-describedby="password-hint" required>
+                    <p id="password-hint" class="field-hint">Mật khẩu có từ 8 đến 72 ký tự.</p>
                 </div>
                 <div>
                     <label for="confirmPassword">Nhập lại mật khẩu</label>
@@ -52,7 +54,7 @@
         </form>
 
         <p class="card-footnote">Đã có tài khoản?
-            <a href="<c:url value='/auth/login'/>">Đăng nhập</a>
+            <a data-auth-switch href="<c:url value='/auth/login'/>">Đăng nhập</a>
         </p>
     </section>
 </main>

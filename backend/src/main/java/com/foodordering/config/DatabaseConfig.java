@@ -29,6 +29,16 @@ public final class DatabaseConfig {
         return current;
     }
 
+    public static EntityManager getEntityManager() {
+        try {
+            EntityManagerFactory emf = getEntityManagerFactory();
+            return emf != null ? emf.createEntityManager() : null;
+        } catch (Exception e) {
+            System.err.println("Chưa thể tạo EntityManager: " + e.getMessage());
+            return null;
+        }
+    }
+
     public static void verifyConnection() {
         try (EntityManager entityManager = getEntityManagerFactory().createEntityManager()) {
             entityManager.createNativeQuery("SELECT 1", Integer.class).getSingleResult();
@@ -43,11 +53,24 @@ public final class DatabaseConfig {
         entityManagerFactory = null;
     }
 
+    public static void closeQuietly(AutoCloseable closeable) {
+        if (closeable != null) {
+            try {
+                closeable.close();
+            } catch (Exception ignored) {
+            }
+        }
+    }
+
+    static {
+        loadDotEnv();
+    }
+
     static Map<String, Object> properties() {
         String jdbcUrl = env("DB_URL",
                 "jdbc:mysql://localhost:3306/crave?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Ho_Chi_Minh&characterEncoding=UTF-8");
-        String username = env("DB_USER", "crave_app");
-        String password = env("DB_PASSWORD", "");
+        String username = env("DB_USER", env("CRAVE_DB_USER", "crave_app"));
+        String password = env("DB_PASSWORD", env("CRAVE_DB_PASSWORD", "12345"));
 
         Map<String, Object> properties = new HashMap<>();
         properties.put("jakarta.persistence.jdbc.driver", "com.mysql.cj.jdbc.Driver");
@@ -68,6 +91,33 @@ public final class DatabaseConfig {
 
     private static String env(String name, String fallback) {
         String value = System.getenv(name);
+        if (value == null || value.isBlank()) {
+            value = System.getProperty(name);
+        }
         return value == null || value.isBlank() ? fallback : value.trim();
+    }
+
+    private static void loadDotEnv() {
+        for (String candidate : new String[]{".env", "../.env", "../../.env"}) {
+            java.nio.file.Path path = java.nio.file.Path.of(candidate);
+            if (java.nio.file.Files.exists(path)) {
+                try {
+                    for (String line : java.nio.file.Files.readAllLines(path)) {
+                        line = line.trim();
+                        if (line.isEmpty() || line.startsWith("#")) continue;
+                        int idx = line.indexOf('=');
+                        if (idx > 0) {
+                            String key = line.substring(0, idx).trim();
+                            String val = line.substring(idx + 1).trim();
+                            if (System.getProperty(key) == null) {
+                                System.setProperty(key, val);
+                            }
+                        }
+                    }
+                    break;
+                } catch (Exception ignored) {
+                }
+            }
+        }
     }
 }

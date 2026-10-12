@@ -59,4 +59,9 @@ public class OrderDetail {
     public void setNote(String note) { this.note = note; }
     public List<OrderDetailOption> getOptions() { return options; }
     public void setOptions(List<OrderDetailOption> options) { this.options = options; }
+
+    public void addOption(OrderDetailOption option) {
+        this.options.add(option);
+        option.setOrderDetail(this);
+    }
 }

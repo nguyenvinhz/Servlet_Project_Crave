@@ -17,7 +17,7 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "user_account")
 @Inheritance(strategy = InheritanceType.JOINED)
-@DiscriminatorColumn(name = "account_type", discriminatorType = DiscriminatorType.STRING, length = 8)
+@DiscriminatorColumn(name = "account_type", discriminatorType = DiscriminatorType.STRING, length = 20)
 public abstract class User {
 
     @Id
@@ -25,7 +25,7 @@ public abstract class User {
     private String id;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "account_type", insertable = false, updatable = false, nullable = false)
+    @Column(name = "account_type", length = 20, insertable = false, updatable = false, nullable = false)
     private AccountType accountType;
 
     @Column(name = "full_name", length = 100, nullable = false)

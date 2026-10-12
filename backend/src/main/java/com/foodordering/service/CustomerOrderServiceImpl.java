@@ -3,11 +3,16 @@ package com.foodordering.service;
 import com.foodordering.config.DatabaseConfig;
 import com.foodordering.dto.OrderRequest;
 import com.foodordering.dto.OrderResponse;
+import com.foodordering.dto.OrderSummaryResponse;
 import com.foodordering.entity.*;
+import com.foodordering.enums.ErrorCode;
 import com.foodordering.enums.OrderStatus;
 import com.foodordering.enums.PaymentStatus;
+import com.foodordering.exception.ApiException;
+import com.foodordering.exception.BadRequestException;
 import com.foodordering.repository.CustomerOrderRepository;
 import com.foodordering.repository.PaymentRepository;
+import com.foodordering.validator.PromotionValidator;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityTransaction;
 import jakarta.persistence.Query;
@@ -33,6 +38,18 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
 
     @Override
     public OrderResponse createOrder(String customerId, OrderRequest request) {
+        if (request.getReceiverName() == null || request.getReceiverName().trim().isEmpty()) {
+            throw new IllegalArgumentException("Tên người nhận không được để trống");
+        }
+        if (request.getReceiverPhone() == null || request.getReceiverPhone().trim().isEmpty()) {
+            throw new IllegalArgumentException("Số điện thoại không được để trống");
+        }
+        if (com.foodordering.enums.FulfillmentType.DELIVERY.equals(request.getFulfillmentType())) {
+            if (request.getDeliveryAddress() == null || request.getDeliveryAddress().trim().isEmpty()) {
+                throw new IllegalArgumentException("Địa chỉ giao hàng không được để trống khi chọn giao tận nơi");
+            }
+        }
+
         EntityManager em = DatabaseConfig.getEntityManagerFactory().createEntityManager();
         EntityTransaction tx = em.getTransaction();
         try {
@@ -43,12 +60,12 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
                 throw new RuntimeException("Khách hàng không tồn tại");
             }
 
-            // Lấy Cart ID của khách
-            Query cartQuery = em.createNativeQuery("SELECT cart_id FROM cart WHERE customer_id = ?");
+            // Lấy Cart ID của khách và lock bằng FOR UPDATE để tránh checkout trùng
+            Query cartQuery = em.createNativeQuery("SELECT cart_id FROM cart WHERE customer_id = ? FOR UPDATE");
             cartQuery.setParameter(1, customerId);
             List<?> carts = cartQuery.getResultList();
             if (carts.isEmpty()) {
-                throw new RuntimeException("Giỏ hàng trống");
+                throw new BadRequestException(ErrorCode.CART_EMPTY);
             }
             String cartId = carts.get(0).toString();
 
@@ -57,8 +74,8 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
             subtotalQuery.setParameter(1, cartId);
             BigDecimal subtotal = (BigDecimal) subtotalQuery.getSingleResult();
 
-            if (subtotal == null || subtotal.compareTo(BigDecimal.ZERO) == 0) {
-                throw new RuntimeException("Giỏ hàng không có món ăn hợp lệ");
+            if (subtotal == null || subtotal.compareTo(BigDecimal.ZERO) <= 0) {
+                throw new BadRequestException(ErrorCode.CART_EMPTY);
             }
 
             CustomerOrder order = new CustomerOrder();
@@ -69,20 +86,35 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
             order.setReceiverPhone(request.getReceiverPhone());
             order.setDeliveryAddress(request.getDeliveryAddress());
             order.setCustomerNote(request.getCustomerNote());
-            order.setPromotionId(request.getPromotionId());
+            
+            // Xác thực Promotion
+            if (request.getPromotionId() != null && !request.getPromotionId().trim().isEmpty()) {
+                Promotion promotion = em.find(Promotion.class, request.getPromotionId().trim());
+                PromotionValidator.validateApplicable(promotion, subtotal, order.getOrderedAt());
+                order.setPromotionId(promotion.getPromotionId());
+            }
+            
             order.setSubtotal(subtotal);
-            order.setDeliveryFee(new BigDecimal("15000")); // Hardcode fee cho demo
+            BigDecimal fee = com.foodordering.enums.FulfillmentType.DELIVERY.equals(request.getFulfillmentType()) 
+                    ? new BigDecimal("15000") : BigDecimal.ZERO;
+            order.setDeliveryFee(fee);
 
             em.persist(order);
 
             // Copy từ CartItem sang OrderDetail
-            Query itemsQuery = em.createNativeQuery("SELECT ci.cart_item_id, ci.food_id, f.name, ci.quantity, f.price, ci.note " +
+            Query itemsQuery = em.createNativeQuery("SELECT ci.cart_item_id, ci.food_id, f.name, ci.quantity, f.price, ci.note, f.status " +
                     "FROM cart_item ci JOIN food f ON f.food_id = ci.food_id " +
                     "WHERE ci.cart_id = ?");
             itemsQuery.setParameter(1, cartId);
             List<Object[]> items = itemsQuery.getResultList();
 
             for (Object[] item : items) {
+                String foodStatus = (String) item[6];
+                if (!"AVAILABLE".equals(foodStatus)) {
+                    throw new BadRequestException(ErrorCode.FOOD_NOT_AVAILABLE,
+                            "Món " + item[2] + " hiện không khả dụng");
+                }
+
                 String cartItemId = (String) item[0];
                 OrderDetail detail = new OrderDetail();
                 detail.setId(generateId(10));
@@ -94,7 +126,7 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
                 detail.setNote((String) item[5]);
 
                 // Copy tùy chọn (options)
-                Query optionsQuery = em.createNativeQuery("SELECT cio.option_id, fo.name, fo.extra_price " +
+                Query optionsQuery = em.createNativeQuery("SELECT cio.option_id, fo.name, fo.extra_price, fo.status, fo.food_id " +
                         "FROM cart_item_option cio JOIN food_option fo ON fo.option_id = cio.option_id " +
                         "WHERE cio.cart_item_id = ?");
                 optionsQuery.setParameter(1, cartItemId);
@@ -102,6 +134,9 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
 
                 BigDecimal optionTotal = BigDecimal.ZERO;
                 for (Object[] opt : options) {
+                    if (!"ACTIVE".equals(opt[3]) || !detail.getFoodId().equals(opt[4])) {
+                        throw new BadRequestException(ErrorCode.INVALID_OPTION);
+                    }
                     OrderDetailOption detailOpt = new OrderDetailOption();
                     detailOpt.setOrderDetail(detail);
                     detailOpt.setOptionId((String) opt[0]);
@@ -116,12 +151,20 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
                 em.persist(detail);
             }
 
+            // Flush để các trigger và database xử lý discount_amount, subtotal và total_amount
+            em.flush();
+            // Refresh order để lấy lại giá trị từ DB
+            em.refresh(order);
+
             Payment payment = new Payment();
             payment.setId(generateId(12));
             payment.setOrder(order);
             payment.setPaymentMethod(request.getPaymentMethod());
             payment.setStatus(PaymentStatus.PENDING);
-            payment.setAmount(subtotal.add(order.getDeliveryFee())); // Rough calculation
+            
+            BigDecimal finalAmount = order.getTotalAmount() != null ? order.getTotalAmount() : 
+                    order.getSubtotal().add(order.getDeliveryFee()).subtract(order.getDiscountAmount());
+            payment.setAmount(finalAmount); 
             em.persist(payment);
 
             OrderStatusHistory history = new OrderStatusHistory();
@@ -138,6 +181,9 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
 
             tx.commit();
             return getOrderById(order.getId());
+        } catch (ApiException e) {
+            if (tx.isActive()) tx.rollback();
+            throw e;
         } catch (Exception e) {
             if (tx.isActive()) tx.rollback();
             throw new RuntimeException("Lỗi tạo đơn hàng: " + e.getMessage(), e);
@@ -148,20 +194,60 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
 
     @Override
     public OrderResponse getOrderById(String orderId) {
-        CustomerOrder order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new RuntimeException("Đơn hàng không tồn tại"));
-        return mapToResponse(order);
+        EntityManager em = DatabaseConfig.getEntityManagerFactory().createEntityManager();
+        try {
+            CustomerOrder order = em.find(CustomerOrder.class, orderId);
+            if (order == null) throw new RuntimeException("Đơn hàng không tồn tại");
+            // Kích hoạt lazy loading trong scope của em
+            if (order.getOrderDetails() != null) order.getOrderDetails().size();
+            if (order.getPayment() != null) order.getPayment().getId();
+            if (order.getStatusHistories() != null) order.getStatusHistories().size();
+            return mapToResponse(order);
+        } finally {
+            em.close();
+        }
     }
 
     @Override
-    public List<OrderResponse> getOrdersByCustomer(String customerId) {
-        return orderRepository.findByCustomerId(customerId).stream()
-                .map(this::mapToResponse)
-                .collect(Collectors.toList());
+    public List<OrderSummaryResponse> getOrdersByCustomer(String customerId) {
+        EntityManager em = DatabaseConfig.getEntityManagerFactory().createEntityManager();
+        try {
+            String jpql = "SELECT o FROM CustomerOrder o WHERE o.customer.id = :customerId ORDER BY o.orderedAt DESC";
+            List<CustomerOrder> orders = em.createQuery(jpql, CustomerOrder.class)
+                    .setParameter("customerId", customerId)
+                    .getResultList();
+            for (CustomerOrder o : orders) {
+                if (o.getPayment() != null) o.getPayment().getId();
+            }
+            return orders.stream()
+                    .map(this::mapToSummaryResponse)
+                    .collect(Collectors.toList());
+        } finally {
+            em.close();
+        }
     }
 
     @Override
-    public void updateOrderStatus(String orderId, OrderStatus newStatus, String employeeId, String note) {
+    public List<OrderResponse> getAllOrdersForAdmin() {
+        EntityManager em = DatabaseConfig.getEntityManagerFactory().createEntityManager();
+        try {
+            String jpql = "SELECT o FROM CustomerOrder o ORDER BY o.orderedAt DESC";
+            List<CustomerOrder> orders = em.createQuery(jpql, CustomerOrder.class).getResultList();
+            for (CustomerOrder o : orders) {
+                if (o.getOrderDetails() != null) o.getOrderDetails().size();
+                if (o.getPayment() != null) o.getPayment().getId();
+                if (o.getStatusHistories() != null) o.getStatusHistories().size();
+            }
+            return orders.stream()
+                    .map(this::mapToResponse)
+                    .collect(Collectors.toList());
+        } finally {
+            em.close();
+        }
+    }
+
+    @Override
+    public void updateOrderStatus(String orderId, OrderStatus status, String employeeId, String note) {
         EntityManager em = DatabaseConfig.getEntityManagerFactory().createEntityManager();
         EntityTransaction tx = em.getTransaction();
         try {
@@ -170,29 +256,26 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
             if (order == null) throw new RuntimeException("Đơn hàng không tồn tại");
 
             OrderStatus currentStatus = order.getStatus();
-            
-            // Logic chặn chuyển trạng thái sai
-            if (currentStatus == OrderStatus.COMPLETED || currentStatus == OrderStatus.CANCELLED) {
-                throw new RuntimeException("Không thể cập nhật đơn hàng đã " + currentStatus);
+            boolean isValidTransition = false;
+            if (currentStatus == OrderStatus.PENDING_CONFIRMATION) {
+                isValidTransition = (status == OrderStatus.PREPARING || status == OrderStatus.CANCELLED);
+            } else if (currentStatus == OrderStatus.PREPARING) {
+                isValidTransition = (status == OrderStatus.DELIVERING || status == OrderStatus.CANCELLED);
+            } else if (currentStatus == OrderStatus.DELIVERING) {
+                isValidTransition = (status == OrderStatus.COMPLETED);
             }
-            if (currentStatus == OrderStatus.PENDING_CONFIRMATION && newStatus != OrderStatus.PREPARING && newStatus != OrderStatus.CANCELLED) {
-                throw new RuntimeException("Trạng thái tiếp theo phải là Đang chuẩn bị hoặc Hủy");
-            }
-            if (currentStatus == OrderStatus.PREPARING && newStatus != OrderStatus.DELIVERING && newStatus != OrderStatus.CANCELLED) {
-                throw new RuntimeException("Trạng thái tiếp theo phải là Đang giao hoặc Hủy");
-            }
-            if (currentStatus == OrderStatus.DELIVERING && newStatus != OrderStatus.COMPLETED && newStatus != OrderStatus.CANCELLED) {
-                throw new RuntimeException("Trạng thái tiếp theo phải là Hoàn tất hoặc Hủy");
+            if (!isValidTransition && currentStatus != status) {
+                throw new IllegalArgumentException("Không thể chuyển trạng thái từ " + currentStatus + " sang " + status);
             }
 
-            order.setStatus(newStatus);
+            order.setStatus(status);
             order.setAssignedEmployeeId(employeeId);
             em.merge(order);
 
             OrderStatusHistory history = new OrderStatusHistory();
             history.setId(generateId(10));
             history.setOrder(order);
-            history.setStatus(newStatus);
+            history.setStatus(status);
             history.setChangedByEmployeeId(employeeId);
             history.setNote(note);
             em.persist(history);
@@ -206,12 +289,76 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
         }
     }
 
+    private OrderSummaryResponse mapToSummaryResponse(CustomerOrder order) {
+        OrderSummaryResponse res = new OrderSummaryResponse();
+        res.setOrderId(order.getId());
+        res.setOrderedAt(order.getOrderedAt());
+        res.setFulfillmentType(order.getFulfillmentType());
+        res.setTotalAmount(order.getTotalAmount() != null ? order.getTotalAmount() : order.getSubtotal().add(order.getDeliveryFee()).subtract(order.getDiscountAmount()));
+        res.setStatus(order.getStatus());
+        if (order.getPayment() != null) {
+            res.setPaymentStatus(order.getPayment().getStatus().name());
+        }
+        return res;
+    }
+
     private OrderResponse mapToResponse(CustomerOrder order) {
         OrderResponse res = new OrderResponse();
         res.setOrderId(order.getId());
         res.setCustomerId(order.getCustomer().getId());
+        res.setOrderedAt(order.getOrderedAt());
+        res.setFulfillmentType(order.getFulfillmentType());
+        res.setReceiverName(order.getReceiverName());
+        res.setReceiverPhone(order.getReceiverPhone());
+        res.setDeliveryAddress(order.getDeliveryAddress());
+        res.setCustomerNote(order.getCustomerNote());
+        res.setSubtotal(order.getSubtotal());
+        res.setDiscountAmount(order.getDiscountAmount());
+        res.setDeliveryFee(order.getDeliveryFee());
+        res.setTotalAmount(order.getTotalAmount() != null ? order.getTotalAmount() : order.getSubtotal().add(order.getDeliveryFee()).subtract(order.getDiscountAmount()));
         res.setStatus(order.getStatus());
-        // ... map thêm các fields cần thiết
+
+        if (order.getOrderDetails() != null) {
+            List<OrderResponse.OrderItemResponse> items = order.getOrderDetails().stream().map(detail -> {
+                OrderResponse.OrderItemResponse itemRes = new OrderResponse.OrderItemResponse();
+                itemRes.setFoodId(detail.getFoodId());
+                itemRes.setFoodName(detail.getFoodNameSnapshot());
+                itemRes.setFoodNameSnapshot(detail.getFoodNameSnapshot());
+                itemRes.setQuantity(detail.getQuantity());
+                itemRes.setUnitPrice(detail.getUnitPrice());
+                itemRes.setLineTotal(detail.getUnitPrice().multiply(BigDecimal.valueOf(detail.getQuantity())));
+                itemRes.setNote(detail.getNote());
+                itemRes.setOptions(detail.getOptions().stream().map(option -> {
+                    OrderResponse.OptionSnapshot snapshot = new OrderResponse.OptionSnapshot();
+                    snapshot.setOptionName(option.getOptionNameSnapshot());
+                    snapshot.setExtraPrice(option.getExtraPriceSnapshot());
+                    return snapshot;
+                }).collect(Collectors.toList()));
+                return itemRes;
+            }).collect(Collectors.toList());
+            res.setItems(items);
+        }
+
+        if (order.getPayment() != null) {
+            OrderResponse.PaymentSummary paymentRes = new OrderResponse.PaymentSummary();
+            paymentRes.setPaymentId(order.getPayment().getId());
+            paymentRes.setMethod(order.getPayment().getPaymentMethod().name());
+            paymentRes.setStatus(order.getPayment().getStatus().name());
+            paymentRes.setAmount(order.getPayment().getAmount());
+            res.setPayment(paymentRes);
+        }
+        
+        if (order.getStatusHistories() != null) {
+            List<OrderResponse.StatusHistoryEntry> history = order.getStatusHistories().stream().map(h -> {
+                OrderResponse.StatusHistoryEntry entry = new OrderResponse.StatusHistoryEntry();
+                entry.setStatus(h.getStatus().name());
+                entry.setChangedAt(h.getChangedAt());
+                entry.setNote(h.getNote());
+                return entry;
+            }).collect(java.util.stream.Collectors.toList());
+            res.setHistory(history);
+        }
+
         return res;
     }
 }

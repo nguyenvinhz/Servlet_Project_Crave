@@ -1,6 +1,7 @@
 <%@ page contentType="text/html;charset=UTF-8" pageEncoding="UTF-8" %>
 <%@ include file="../components/header.jspf" %>
-<main class="page auth-page">
+<link rel="stylesheet" href="<c:url value='/assets/css/account.css'/>">
+<main class="page auth-page account-ui">
     <section class="intro-panel">
         <p class="eyebrow">Chào mừng trở lại</p>
         <h1>Món ngon đang chờ bạn.</h1>
@@ -13,11 +14,12 @@
             <h2 id="login-title">Đăng nhập</h2>
         </div>
 
-        <div id="form-error" class="form-error" role="alert" aria-live="polite">
+        <div id="form-error" class="form-error" role="alert" aria-live="polite" ${empty error ? 'hidden' : ''}>
             <c:out value="${error}"/>
         </div>
+        <div id="form-success" class="form-success" role="status" aria-live="polite" hidden></div>
 
-        <form action="<c:url value='/api/auth/login'/>" method="post">
+        <form id="loginForm" action="<c:url value='/api/auth/login'/>" method="post" data-method="POST">
             <label for="email">Email</label>
             <input id="email" name="email" type="email" autocomplete="email"
                    maxlength="100" placeholder="ban@example.com" required>
@@ -26,16 +28,11 @@
             <input id="password" name="password" type="password" autocomplete="current-password"
                    minlength="8" maxlength="72" placeholder="Nhập mật khẩu" required>
 
-            <label class="checkbox-row" for="rememberMe">
-                <input id="rememberMe" name="rememberMe" type="checkbox" value="true">
-                <span>Ghi nhớ đăng nhập</span>
-            </label>
-
             <button class="button primary" type="submit">Đăng nhập</button>
         </form>
 
         <p class="card-footnote">Chưa có tài khoản?
-            <a href="<c:url value='/auth/register'/>">Đăng ký ngay</a>
+            <a data-auth-switch href="<c:url value='/auth/register'/>">Đăng ký ngay</a>
         </p>
     </section>
 </main>

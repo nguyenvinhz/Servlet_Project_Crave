@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Promotions · Crave Preview</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="./assets/css/styles.css">
+    <link rel="stylesheet" href="./assets/css/cart.css">
+    <style>
+        .preview-toolbar {
+            background: #1e293b;
+            color: #fff;
+            padding: 10px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 0.88rem;
+            position: sticky;
+            top: 0;
+            z-index: 99999;
+        }
+        .site-header {
+            background: #ffffff;
+            border-bottom: 1px solid #f2e6df;
+            padding: 0 4vw;
+            min-height: 72px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .site-header .brand {
+            font-family: 'Nunito', sans-serif;
+            font-weight: 900;
+            font-size: 1.95rem;
+            color: #f4511e;
+            text-decoration: none;
+        }
+        .site-header nav {
+            display: flex;
+            align-items: center;
+            gap: 1.8rem;
+        }
+        .site-header nav a {
+            font-family: 'Inter', sans-serif;
+            font-weight: 600;
+            font-size: 0.95rem;
+            color: #4b5563;
+            text-decoration: none;
+        }
+        .promos-page-wrapper {
+            background-color: var(--crave-bg-page);
+            min-height: calc(100vh - 160px);
+            padding: 48px 24px 80px;
+        }
+        .promos-container {
+            max-width: 1040px;
+            margin: 0 auto;
+        }
+        .promos-hero-header {
+            text-align: center;
+            max-width: 640px;
+            margin: 0 auto 48px;
+        }
+        .promos-hero-title {
+            font-family: var(--crave-font-heading);
+            font-size: 2.75rem;
+            font-weight: 800;
+            color: var(--crave-text);
+            margin: 0 0 12px 0;
+        }
+        .promos-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 24px;
+        }
+        .promo-ticket-card {
+            background: #fff;
+            border: 1px dashed #e3cbbe;
+            border-radius: var(--crave-radius-xl);
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            position: relative;
+            box-shadow: var(--crave-shadow-sm);
+            transition: all 0.25s ease;
+        }
+        .promo-ticket-card:hover {
+            border-color: var(--crave-brand);
+            box-shadow: var(--crave-shadow-md);
+            transform: translateY(-2px);
+        }
+        .promo-ticket-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 16px;
+        }
+        .promo-ticket-code {
+            font-family: var(--crave-font-heading);
+            font-size: 1.25rem;
+            font-weight: 800;
+            color: var(--crave-brand);
+            background: var(--crave-brand-light);
+            padding: 4px 12px;
+            border-radius: 8px;
+            letter-spacing: 0.05em;
+        }
+        .promo-ticket-value {
+            font-family: var(--crave-font-heading);
+            font-size: 1.4rem;
+            font-weight: 800;
+            color: var(--crave-text);
+        }
+        .promo-ticket-name {
+            font-family: var(--crave-font-heading);
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--crave-text);
+            margin: 0 0 8px 0;
+        }
+        .promo-ticket-desc {
+            color: var(--crave-text-muted);
+            font-size: 0.9rem;
+            line-height: 1.45;
+            margin: 0 0 20px 0;
+        }
+        .promo-ticket-bottom {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            border-top: 1px dashed var(--crave-border);
+            padding-top: 16px;
+        }
+        .btn-copy-code {
+            flex: 1;
+            background: var(--crave-bg-page);
+            color: var(--crave-text);
+            border: 1px solid var(--crave-border);
+            border-radius: 10px;
+            padding: 10px 14px;
+            font-weight: 700;
+            font-size: 0.88rem;
+            cursor: pointer;
+        }
+        .btn-apply-direct {
+            flex: 1.3;
+            background: var(--crave-brand);
+            color: #fff;
+            border: none;
+            border-radius: 10px;
+            padding: 10px 14px;
+            font-weight: 800;
+            font-size: 0.88rem;
+            cursor: pointer;
+            text-align: center;
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body class="crave-body">
+
+<div class="preview-toolbar">
+    <div><strong>Crave Preview</strong> · Trang danh sách mã khuyến mãi</div>
+    <div><a href="./preview-cart.html" style="color: #f4511e; font-weight: 700; text-decoration: none;">← Quay lại Giỏ hàng</a></div>
+</div>
+
+<header class="site-header">
+    <a class="brand" href="javascript:void(0)">crave<span>.</span></a>
+    <nav>
+        <a href="javascript:void(0)">Home</a>
+        <a href="javascript:void(0)">Restaurants</a>
+        <a href="javascript:void(0)">Food</a>
+        <a href="javascript:void(0)">Drinks</a>
+        <a href="./preview-promotions.html" style="color: #f4511e;">Promotions</a>
+        <a href="javascript:void(0)">Orders</a>
+    </nav>
+    <div>
+        <a href="./preview-cart.html" style="font-weight: 600; color: #1f2937; text-decoration: none;">Giỏ hàng (1)</a>
+    </div>
+</header>
+
+<main class="promos-page-wrapper">
+    <div class="promos-container">
+        <header class="promos-hero-header">
+            <h1 class="promos-hero-title">Khuyến mãi & Ưu đãi đặc biệt</h1>
+            <p style="color: var(--crave-text-muted); font-size: 1.05rem;">
+                Áp dụng các mã voucher giảm giá độc quyền từ Crave để thưởng thức trọn vẹn bữa ăn ngon với chi phí tối ưu nhất!
+            </p>
+        </header>
+
+        <div class="promos-grid">
+            <!-- Ticket 1 -->
+            <div class="promo-ticket-card">
+                <div>
+                    <div class="promo-ticket-top">
+                        <span class="promo-ticket-code">WELCOME10</span>
+                        <span class="promo-ticket-value">Giảm 20%</span>
+                    </div>
+                    <h3 class="promo-ticket-name">Ưu đãi chào bạn mới</h3>
+                    <p class="promo-ticket-desc">Giảm ngay 20% tổng giá trị đơn hàng (tối đa $5.00 hoặc 50.000đ). Áp dụng cho mọi khách hàng mới.</p>
+                </div>
+                <div class="promo-ticket-bottom">
+                    <button type="button" class="btn-copy-code" onclick="alert('Đã sao chép mã WELCOME10')">Sao chép</button>
+                    <a href="./preview-cart.html" class="btn-apply-direct">Dùng ngay</a>
+                </div>
+            </div>
+
+            <!-- Ticket 2 -->
+            <div class="promo-ticket-card">
+                <div>
+                    <div class="promo-ticket-top">
+                        <span class="promo-ticket-code">SAVE20K</span>
+                        <span class="promo-ticket-value">Giảm $2.00</span>
+                    </div>
+                    <h3 class="promo-ticket-name">Giảm giá món chính</h3>
+                    <p class="promo-ticket-desc">Giảm cố định $2.00 (hoặc 20.000đ) cho các đơn hàng có giá trị từ $10.00 (hoặc 100.000đ) trở lên.</p>
+                </div>
+                <div class="promo-ticket-bottom">
+                    <button type="button" class="btn-copy-code" onclick="alert('Đã sao chép mã SAVE20K')">Sao chép</button>
+                    <a href="./preview-cart.html" class="btn-apply-direct">Dùng ngay</a>
+                </div>
+            </div>
+
+            <!-- Ticket 3 -->
+            <div class="promo-ticket-card">
+                <div>
+                    <div class="promo-ticket-top">
+                        <span class="promo-ticket-code">FREESHIP</span>
+                        <span class="promo-ticket-value">Freeship</span>
+                    </div>
+                    <h3 class="promo-ticket-name">Miễn phí giao hàng</h3>
+                    <p class="promo-ticket-desc">Freeship tận cửa cho đơn từ $15.00 (hoặc 150.000đ), tối đa hỗ trợ $2.50 phí vận chuyển.</p>
+                </div>
+                <div class="promo-ticket-bottom">
+                    <button type="button" class="btn-copy-code" onclick="alert('Đã sao chép mã FREESHIP')">Sao chép</button>
+                    <a href="./preview-cart.html" class="btn-apply-direct">Dùng ngay</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
+
+<footer class="site-footer" style="background: #111827; color: #9ca3af; padding: 28px 4vw; margin-top: 60px;">
+    <div style="max-width: 1240px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+        <div style="font-size: 0.95rem;">
+            <strong style="color: #fff; font-family: 'Nunito', sans-serif; font-size: 1.15rem; font-weight: 900;">crave.</strong>
+            <span style="color: #d1d5db; margin-left: 8px;">Fresh favorites, delivered.</span>
+        </div>
+        <div style="font-size: 0.85rem; color: #6b7280;">
+            &copy; 2026 Crave Food Ordering · All rights reserved.
+        </div>
+    </div>
+</footer>
+
+</body>
+</html>

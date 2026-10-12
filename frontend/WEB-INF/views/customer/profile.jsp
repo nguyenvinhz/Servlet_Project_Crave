@@ -1,12 +1,15 @@
 <%@ page contentType="text/html;charset=UTF-8" pageEncoding="UTF-8" %>
 <%@ include file="../components/header.jspf" %>
-<main class="page account-page">
+<link rel="stylesheet" href="<c:url value='/assets/css/account.css'/>">
+<main class="page account-page account-ui">
     <aside class="account-sidebar">
         <p class="eyebrow">Tài khoản</p>
         <h1>Thông tin của bạn</h1>
         <nav aria-label="Thiết lập tài khoản">
-            <a class="active" href="<c:url value='/customer/profile'/>">Hồ sơ</a>
-            <a href="<c:url value='/customer/addresses'/>">Địa chỉ giao hàng</a>
+            <a class="active" aria-current="page" href="<c:url value='/customer/profile'/>">Hồ sơ</a>
+            <c:if test="${sessionScope.currentUser.accountType == 'CUSTOMER'}">
+                <a href="<c:url value='/customer/addresses'/>">Địa chỉ giao hàng</a>
+            </c:if>
         </nav>
     </aside>
 
@@ -17,17 +20,22 @@
             <p>Cập nhật thông tin dùng cho xác nhận và giao đơn.</p>
         </div>
 
-        <div id="form-error" class="form-error" role="alert" aria-live="polite">
+        <div id="form-error" class="form-error" role="alert" aria-live="polite" ${empty error ? 'hidden' : ''}>
             <c:out value="${error}"/>
         </div>
-        <div id="form-success" class="form-success" role="status" aria-live="polite">
+        <div id="form-success" class="form-success" role="status" aria-live="polite" ${empty message ? 'hidden' : ''}>
             <c:out value="${message}"/>
         </div>
+        <p id="profile-loading" class="field-hint" role="status">Đang tải hồ sơ...</p>
+        <p id="profile-readonly" class="field-hint" hidden>Hồ sơ nhân viên chỉ có thể xem tại đây.</p>
+        <button id="profile-retry" class="address-action" type="button" hidden>Thử tải lại</button>
 
-        <form action="<c:url value='/api/profile'/>" method="post">
+        <form id="profileForm" action="<c:url value='/api/profile'/>" method="post" data-method="PUT">
+            <fieldset id="profile-fields" disabled>
+            <legend class="visually-hidden">Thông tin hồ sơ</legend>
             <label for="fullName">Họ và tên</label>
             <input id="fullName" name="fullName" type="text" autocomplete="name"
-                   maxlength="100" placeholder="Họ và tên" required>
+                   minlength="2" maxlength="100" placeholder="Họ và tên" required>
 
             <div class="field-grid">
                 <div>
@@ -38,11 +46,12 @@
                 <div>
                     <label for="phone">Số điện thoại</label>
                     <input id="phone" name="phone" type="tel" autocomplete="tel"
-                           maxlength="15" inputmode="tel" placeholder="0901234567" required>
+                           minlength="9" maxlength="15" pattern="\+?[0-9]{8,15}" inputmode="tel" placeholder="0901234567" required>
                 </div>
             </div>
 
             <button class="button primary" type="submit">Lưu thay đổi</button>
+            </fieldset>
         </form>
     </section>
 </main>

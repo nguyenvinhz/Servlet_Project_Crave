@@ -1,5 +1,14 @@
 <footer class="site-footer">
-    <p>Crave · Đặt món nhanh, nhận món ngon.</p>
+    <div class="site-footer-inner">
+        <div>
+            <strong class="footer-brand">crave<span>.</span></strong>
+            <span class="footer-tagline">Fresh favorites, delivered.</span>
+        </div>
+        <div class="footer-copy">
+            &copy; 2026 Crave Food Ordering · All rights reserved.
+        </div>
+    </div>
 </footer>
+<script src="<c:url value='/assets/js/account.js'/>"></script>
 </body>
 </html>

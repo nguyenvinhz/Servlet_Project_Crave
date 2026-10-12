@@ -23,7 +23,7 @@ import java.util.List;
 public class Customer extends User {
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false)
+    @Column(name = "status", length = 20, nullable = false)
     private CustomerStatus status = CustomerStatus.ACTIVE;
 
     @Column(name = "registered_at", nullable = false, insertable = false, updatable = false)
@@ -32,7 +32,11 @@ public class Customer extends User {
     @OneToMany(mappedBy = "customer", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Address> addresses = new ArrayList<>();
 
-    protected Customer() {
+    public Customer() {
+    }
+
+    public Customer(String id) {
+        super(id, null, null, null, null);
     }
 
     public Customer(String id, String fullName, String email, String phone, String passwordHash) {

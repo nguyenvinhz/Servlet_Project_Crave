@@ -39,4 +39,25 @@ public abstract class BaseApiServlet extends HttpServlet {
         writeJson(response, HttpServletResponse.SC_BAD_REQUEST,
                 ApiResponse.failure(new ApiError("INVALID_REQUEST", message, Map.of())));
     }
+
+    protected <T> T readJson(jakarta.servlet.http.HttpServletRequest request, Class<T> clazz) throws IOException {
+        return JsonProvider.objectMapper().readValue(request.getInputStream(), clazz);
+    }
+
+    protected void handleError(HttpServletResponse response, Exception e) throws IOException {
+        if (e instanceof com.foodordering.exception.ApiException apiEx) {
+            writeJson(response, apiEx.getHttpStatus(),
+                    ApiResponse.error(apiEx.getMessage(), apiEx.getErrorCode()));
+        } else if (e instanceof com.foodordering.exception.AppException appEx) {
+            writeJson(response, appEx.getStatusCode(),
+                    ApiResponse.failure(new ApiError(appEx.getErrorCode(), appEx.getMessage(), appEx.getDetails())));
+        } else if (e instanceof com.fasterxml.jackson.core.JsonProcessingException
+                || e instanceof IllegalArgumentException
+                || e.getCause() instanceof com.fasterxml.jackson.core.JsonProcessingException) {
+            badRequest(response, "Nội dung JSON không hợp lệ.");
+        } else {
+            writeJson(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
+                    ApiResponse.failure(new ApiError("INTERNAL_SERVER_ERROR", "Đã xảy ra lỗi hệ thống. Vui lòng thử lại sau.", Map.of())));
+        }
+    }
 }

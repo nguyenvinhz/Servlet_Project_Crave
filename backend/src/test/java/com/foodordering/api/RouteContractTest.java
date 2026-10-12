@@ -24,10 +24,19 @@ class RouteContractTest {
 
     @Test
     void allAccountApiRootsAreRegistered() {
-        assertEquals(Set.of("/api/auth/login", "/api/auth/register"), patterns(AuthApiServlet.class));
+        assertEquals(Set.of("/api/auth/login", "/api/auth/register", "/api/auth/logout", "/api/auth/session"),
+                patterns(AuthApiServlet.class));
         assertEquals(Set.of("/api/profile"), patterns(ProfileApiServlet.class));
         assertEquals(Set.of("/api/addresses", "/api/addresses/*"), patterns(AddressApiServlet.class));
         assertEquals(Set.of("/api/health"), patterns(HealthApiServlet.class));
+    }
+
+    @Test
+    void cartAndPromotionRoutesAreRegistered() {
+        assertEquals(Set.of("/cart", "/cart/"), patterns(com.foodordering.servlet.CartPageServlet.class));
+        assertEquals(Set.of("/promotions", "/promotions/"), patterns(com.foodordering.servlet.PromotionPageServlet.class));
+        assertEquals(Set.of("/api/cart", "/api/cart/*"), patterns(CartApiServlet.class));
+        assertEquals(Set.of("/api/promotions", "/api/promotions/*"), patterns(PromotionApiServlet.class));
     }
 
     private Set<String> patterns(Class<?> servletType) {
