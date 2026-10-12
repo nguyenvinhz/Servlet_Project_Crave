@@ -28,7 +28,7 @@ function updateTotalPrice() {
 
     const totalDisplay = document.getElementById('totalPriceDisplay');
     if (totalDisplay) {
-        totalDisplay.textContent = grandTotal.toLocaleString('vi-VN') + ' ₫';
+        totalDisplay.textContent = grandTotal.toLocaleString('vi-VN') + '\u00a0₫';
     }
 }
 
@@ -86,14 +86,8 @@ async function handleAddToCart() {
         if (response.ok && data.success) {
             btn.innerHTML = '<span>✅ Đã thêm món vào giỏ!</span>';
             btn.style.background = '#18794e';
-            const badge = document.querySelector('.cart-badge-count');
-            if (badge) {
-                let currentCount = parseInt(badge.textContent) || 0;
-                badge.textContent = data.data?.totalItems ?? (currentCount + quantity);
-                badge.style.display = 'inline-flex';
-            }
-            const dot = document.querySelector('.cart-badge-dot');
-            if (dot) dot.style.display = 'block';
+            if (data.data) window.CraveCart?.update(data.data);
+            else window.CraveCart?.refresh();
             setTimeout(() => {
                 btn.innerHTML = originalText;
                 btn.style.background = '';

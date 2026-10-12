@@ -37,8 +37,9 @@ Merge PR / push main ──> CI thành công ──> artifact crave-war
 - Job CD dùng environment `production` và các label
   `self-hosted`, `linux`, `x64`, `crave-production`; kiểm tra runner có tên
   `crave-ec2` trước khi checkout code từ commit mới trên `main`.
-- CD chỉ recreate service ứng dụng. Database, volume MySQL, `.env` và compose
-  trên server được giữ nguyên. Migration database cần kế hoạch riêng.
+- CD recreate service ứng dụng và áp migration PayOS bổ sung trước khi deploy.
+  Volume MySQL, `.env` và compose gốc trên server được giữ nguyên. Chỉ migration
+  `2026-10-12-payos.sql` được chạy; không áp bootstrap schema lên production.
 - Các lần deploy được tuần tự hóa và có khóa trên server. Lần đang deploy được
   chạy đến hết; GitHub có thể thay lần đang chờ bằng push mới nhất.
 
@@ -72,6 +73,15 @@ volumes:
 Đây là cấu hình đang dùng từ bước deploy trước. Nếu cần sửa volume, thêm vào
 service `app` của compose trên EC2. Compose trong repo phục vụ MySQL môi trường
 phát triển, nên không copy đè compose production.
+
+Environment GitHub `production` cần ba secrets `PAYOS_CLIENT_ID`, `PAYOS_API_KEY`
+và `PAYOS_CHECKSUM_KEY`. Variable `PAYOS_PUBLIC_BASE_URL` chỉ định URL công khai
+bao gồm `/crave`; nếu trống, runner lấy IPv4 EC2 qua IMDSv2 và cổng app publish.
+`scripts/prepare-payos-deploy.py` áp migration vào database trong `DB_URL`, tạo
+`.payos.env` và `.payos-compose.yaml` với quyền `0600` ngoài checkout. Deploy và
+rollback đều dùng override này; không log cấu hình Compose đã resolve hoặc khóa.
+Sau health check, workflow đăng ký webhook với PayOS. Đổi tên miền thì cập nhật
+variable và deploy lại để callback sử dụng URL mới.
 
 Cài các công cụ mà script cần:
 

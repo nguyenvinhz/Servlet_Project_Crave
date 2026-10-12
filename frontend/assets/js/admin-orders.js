@@ -11,8 +11,11 @@ document.addEventListener('DOMContentLoaded', () => {
         return orders.filter(order => (!status || order.status === status) && (!type || order.fulfillmentType === type) && (!query || [order.orderId,order.receiverName,order.receiverPhone].some(value=>String(value || '').toLocaleLowerCase('vi-VN').includes(query))));
     }
     function render() {
+        A.closeDropdown();
         const filtered=filterOrders(), max=Math.max(1,Math.ceil(filtered.length/pageSize));page=Math.min(page,max);
-        list.innerHTML = filtered.slice((page-1)*pageSize,page*pageSize).map(order=>`<tr><td><strong>${A.escape(order.orderId)}</strong><small>${order.fulfillmentType==='PICKUP'?'Nhận tại cửa hàng':'Giao tận nơi'}</small></td><td><strong>${A.escape(order.receiverName || 'Khách hàng')}</strong><small>${A.escape(order.receiverPhone)}</small></td><td>${A.date(order.orderedAt)}</td><td><strong class="price-text">${A.money(order.totalAmount)}</strong></td><td>${A.badge(order.status)}</td><td>${A.badge(order.payment?.status)}<small>${order.payment?.method==='COD'?'Tiền mặt':'Chuyển khoản'}</small></td><td><button class="button outline btn-sm" type="button" data-order-id="${A.escape(order.orderId)}">Chi tiết</button></td></tr>`).join('') || '<tr><td colspan="7" class="empty-state">Không có đơn hàng phù hợp với bộ lọc.</td></tr>';
+        list.innerHTML = filtered.slice((page-1)*pageSize,page*pageSize).map(order=>`<tr><td><strong>${A.escape(order.orderId)}</strong><small>${order.fulfillmentType==='PICKUP'?'Nhận tại cửa hàng':'Giao tận nơi'}</small></td><td><strong>${A.escape(order.receiverName || 'Khách hàng')}</strong><small>${A.escape(order.receiverPhone)}</small></td><td>${A.date(order.orderedAt)}</td><td><strong class="price-text">${A.money(order.totalAmount)}</strong></td><td>${A.badge(order.status)}</td><td>${A.badge(order.payment?.status)}<small>${order.payment?.method==='COD'?'Tiền mặt':'Chuyển khoản'}</small></td><td><div class="row-actions"><button class="button outline btn-sm" type="button" data-order-id="${A.escape(order.orderId)}">Chi tiết và xử lý đơn</button></div></td></tr>`).join('') || '<tr><td colspan="7" class="empty-state">Không có đơn hàng phù hợp với bộ lọc.</td></tr>';
+        list.querySelectorAll('[data-order-id]').forEach(button => button.addEventListener('click', () => openDetail(button.dataset.orderId)));
+        A.enhanceActions(list);
         document.getElementById('orderResultCount').textContent=`${filtered.length} đơn hàng · Trang ${page}/${max}`;
         document.getElementById('orderPrev').disabled=page<=1;document.getElementById('orderNext').disabled=page>=max;
     }
@@ -47,8 +50,8 @@ document.addEventListener('DOMContentLoaded', () => {
     function close(){modal.hidden=true;modal.style.display='none';selectedId=null;}
     document.getElementById('closeOrderDetail').addEventListener('click',close);document.getElementById('closeOrderDetailFooter').addEventListener('click',close);
     modal.addEventListener('click',event=>{if(event.target===modal)close();});
-    list.addEventListener('click',event=>{const button=event.target.closest('[data-order-id]');if(button)openDetail(button.dataset.orderId);});
-    for(const id of ['orderSearch','orderStatusFilter','orderTypeFilter'])document.getElementById(id).addEventListener('input',()=>{page=1;render();});
+    document.getElementById('orderSearch').addEventListener('input',A.debounce(()=>{page=1;render();}));
+    for(const id of ['orderStatusFilter','orderTypeFilter'])document.getElementById(id).addEventListener('change',()=>{page=1;render();});
     document.getElementById('orderPrev').addEventListener('click',()=>{page--;render();});document.getElementById('orderNext').addEventListener('click',()=>{page++;render();});
     document.getElementById('refreshBtn').addEventListener('click',loadOrders);loadOrders();
 });

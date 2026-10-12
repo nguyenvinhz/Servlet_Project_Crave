@@ -1,3 +1,4 @@
+<%@ page pageEncoding="UTF-8" %>
 <footer class="admin-footer"><span>crave. · Quản trị cửa hàng</span><span>Dữ liệu cập nhật từ hệ thống</span></footer>
 </div>
 <div class="toast-container" id="adminToastContainer" role="status" aria-live="polite"></div>

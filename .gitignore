@@ -6,6 +6,8 @@ backend/target/
 .env
 *.log
 node_modules/
+__pycache__/
+*.pyc
 .runtime/
 
 # Maven bundle

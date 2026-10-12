@@ -1,6 +1,13 @@
 document.addEventListener('DOMContentLoaded', () => {
     'use strict';
-    const A=window.CraveAdmin, isReport=document.body.dataset.page==='reports';let report=null;
+    const A=window.CraveAdmin, isReport=document.body.dataset.page==='reports';let report=null, loadRevision=0;
+    const dailyPager = isReport ? A.pagination(document.getElementById('dailyReport').closest('.admin-card'), {pageSize: 10,label: 'ngày',onChange: reportTables}) : null;
+    const itemsPager = isReport ? A.pagination(document.getElementById('itemsReport').closest('.admin-card'), {pageSize: 10,label: 'món ăn',onChange: reportTables}) : null;
+    function reportTables() {
+        if (!report) return;
+        document.getElementById('dailyReport').innerHTML=dailyPager.slice(report.daily).map(day=>`<tr><td>${A.date(day.date,false)}</td><td>${day.orderCount}</td><td><strong class="price-text">${A.money(day.revenue)}</strong></td></tr>`).join('') || '<tr><td colspan="3" class="empty-state">Chưa có dữ liệu trong kỳ.</td></tr>';
+        document.getElementById('itemsReport').innerHTML=itemsPager.slice(report.topItems).map(item=>`<tr><td><strong>${A.escape(item.name)}</strong></td><td>${item.quantity}</td><td class="price-text">${A.money(item.revenue)}</td></tr>`).join('') || '<tr><td colspan="3" class="empty-state">Chưa có món ăn bán được trong kỳ.</td></tr>';
+    }
     const set = (id,value) => {const element=document.getElementById(id);if(element)element.textContent=value;};
     const ymd = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
     function chart(data) {
@@ -16,8 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function render(data) {
         report=data;const s=data.summary;set('summaryRevenue',A.money(s.revenue));set('summaryOrders',s.totalOrders);set('summaryCustomers',s.totalCustomers);set('summaryPending',s.pendingOrders);set('summaryCompleted',s.completedOrders);set('summaryAverage',A.money(s.averageOrderValue));set('chartRange',A.date(data.range.from,false)+' – '+A.date(data.range.to,false));chart(data.daily);
         if(isReport){
-            document.getElementById('dailyReport').innerHTML=data.daily.map(day=>`<tr><td>${A.date(day.date,false)}</td><td>${day.orderCount}</td><td><strong>${A.money(day.revenue)}</strong></td></tr>`).join('');
-            document.getElementById('itemsReport').innerHTML=data.topItems.map(item=>`<tr><td><strong>${A.escape(item.name)}</strong></td><td>${item.quantity}</td><td>${A.money(item.revenue)}</td></tr>`).join('') || '<tr><td colspan="3" class="empty-state">Chưa có món ăn bán được trong kỳ.</td></tr>';
+            dailyPager.reset();itemsPager.reset();reportTables();
             document.getElementById('exportReport').disabled=false;
         }else{
             const statuses=['PENDING_CONFIRMATION','PREPARING','DELIVERING','COMPLETED','CANCELLED'];const colors=['#f2a93b','#e8552b','#3e7cb1','#2f9e5b','#c1432c'];
@@ -27,15 +33,16 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     async function load(){
+        const revision = ++loadRevision;
         const alert=document.getElementById('dashboardAlert');alert.hidden=true;
         const form=document.getElementById('reportForm'),button=form?.querySelector('button');if(button)button.disabled=true;
-        try{let query='';if(isReport){const from=document.getElementById('reportFrom').value,to=document.getElementById('reportTo').value;if(from>to)throw new Error('Ngày bắt đầu phải trước hoặc bằng ngày kết thúc.');query='?'+new URLSearchParams({from,to});}render(await A.request('/api/admin/overview'+query));}
-        catch(error){alert.textContent=error.message;alert.hidden=false;}
+        try{let query='';if(isReport){const from=document.getElementById('reportFrom').value,to=document.getElementById('reportTo').value;if(!from||!to)throw new Error('Vui lòng chọn đủ ngày bắt đầu và ngày kết thúc.');if(from>to)throw new Error('Ngày bắt đầu phải trước hoặc bằng ngày kết thúc.');query='?'+new URLSearchParams({from,to});}const data=await A.request('/api/admin/overview'+query);if(revision===loadRevision)render(data);}
+        catch(error){if(revision===loadRevision){alert.textContent=error.message;alert.hidden=false;}}
         finally{if(button)button.disabled=false;}
     }
     function range(days){const end=new Date(),start=new Date(end);start.setDate(end.getDate()-days+1);document.getElementById('reportFrom').value=ymd(start);document.getElementById('reportTo').value=ymd(end);}
     window.addEventListener('resize',()=>{if(report)chart(report.daily);});
-    if(isReport){range(7);document.getElementById('reportForm').addEventListener('submit',event=>{event.preventDefault();load();});document.getElementById('reportQuickRange').addEventListener('change',event=>{range(Number(event.target.value));load();});document.getElementById('exportReport').addEventListener('click',()=>{
+    if(isReport){range(7);document.getElementById('reportForm').addEventListener('submit',event=>{event.preventDefault();load();});for(const id of ['reportFrom','reportTo'])document.getElementById(id).addEventListener('change',load);document.getElementById('reportQuickRange').addEventListener('change',event=>{range(Number(event.target.value));load();});document.getElementById('exportReport').addEventListener('click',()=>{
         if(!report)return;const safe=value=>`"${String(value??'').replace(/^[=+\-@]/,"'$&").replace(/"/g,'""')}"`;
         const rows=[['Ngày','Số đơn hàng','Doanh thu đã thanh toán (VND)'],...report.daily.map(d=>[d.date,d.orderCount,d.revenue])];const blob=new Blob(['\ufeff'+rows.map(row=>row.map(safe).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8;'}),url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download=`crave-bao-cao-${report.range.from}-${report.range.to}.csv`;link.click();URL.revokeObjectURL(url);
     });}load();

@@ -77,6 +77,44 @@ Xem [cấu trúc mã nguồn và sơ đồ lớp](docs/architecture/README.md).
 
 ## Quản trị
 
+Giao diện dùng font Be Vietnam Pro được lưu tại `frontend/assets/fonts/` (giấy phép
+OFL). Danh sách quản trị dùng menu hành động ba chấm, tự lọc khi chọn điều kiện
+và phân trang; thực đơn, ưu đãi và đơn hàng khách hàng cũng có phân trang.
+Số lượng giỏ và trạng thái món đã thêm cập nhật ngay sau thao tác và đồng bộ giữa các tab.
+
+## Thanh toán chuyển khoản PayOS
+
+Điền `PAYOS_CLIENT_ID`, `PAYOS_API_KEY`, `PAYOS_CHECKSUM_KEY` vào `.env` đã được
+Git bỏ qua hoặc biến môi trường server. `PAYOS_PUBLIC_BASE_URL` là URL ứng dụng
+bao gồm `/crave`, ví dụ `http://localhost:8080/crave` khi phát triển. Có thể ghi
+đè callback bằng `PAYOS_RETURN_URL` và `PAYOS_CANCEL_URL`, dùng `{orderId}` cho mã đơn.
+Không đưa khóa thật vào source, JSP, JavaScript hoặc PR.
+
+Database hiện có cần migration bổ sung cột PayOS, không chạy lại schema bootstrap:
+
+```powershell
+mysql --user=root --password --database=crave --execute="SOURCE database/migrations/2026-10-12-payos.sql"
+```
+
+Checkout chọn chuyển khoản sẽ lưu đơn rồi mở trang QR PayOS. Nếu tạo link bị lỗi,
+khách có thể thanh toán lại từ chi tiết đơn mà không tạo đơn lần nữa. Khi quay lại,
+ứng dụng đối chiếu trạng thái qua API PayOS; tham số trên URL không xác nhận thanh toán.
+Webhook `POST /crave/api/payments/payos/webhook` kiểm tra HMAC-SHA256, số tiền và
+mã link; gửi lại cùng giao dịch không ghi nhận thanh toán hai lần.
+
+CD dùng ba secrets `PAYOS_CLIENT_ID`, `PAYOS_API_KEY`, `PAYOS_CHECKSUM_KEY` trong
+environment `production`. Variable `PAYOS_PUBLIC_BASE_URL` cho phép chỉ định tên
+miền; khi chưa có, runner xác định IPv4 công khai EC2 và cổng Tomcat đã publish.
+CD áp migration bổ sung, lưu cấu hình ngoài checkout với quyền `0600`, deploy WAR
+rồi đăng ký webhook công khai. Tham khảo [API PayOS](https://payos.vn/docs/api/)
+và [quy tắc chữ ký webhook](https://payos.vn/docs/tich-hop-webhook/kiem-tra-du-lieu-voi-signature/).
+
+Kiểm tra UTF-8 và font đóng gói: `node tests/frontend/source-integrity.cjs`.
+Kiểm tra giỏ realtime, ảnh danh mục và phân trang trên Chrome:
+`node tests/frontend/customer-cart-menu-browser-smoke.cjs`.
+
+## Mẫu và phân quyền quản trị
+
 Mẫu giao diện khách hàng tham khảo [Crave trên Framer](https://thrilled-calendar-459980.framer.app/),
 giao diện quản trị dựa trên mẫu `food-admin-dashboard` người dùng cung cấp.
 Trang quản trị dùng API và database của ứng dụng Servlet/JSP.

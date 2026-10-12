@@ -34,52 +34,58 @@ document.addEventListener('DOMContentLoaded', async () => {
                 return;
             }
             
-            listEl.innerHTML = '';
-            orders.forEach(o => {
-                const card = document.createElement('div');
-                card.className = 'order-card';
+            const pageSize = 8;
+            const renderOrders = page => {
+                listEl.innerHTML = '';
+                orders.slice((page - 1) * pageSize, page * pageSize).forEach(o => {
+                    const card = document.createElement('div');
+                    card.className = 'order-card';
                 
-                const infoDiv = document.createElement('div');
-                infoDiv.className = 'order-card-info';
+                    const infoDiv = document.createElement('div');
+                    infoDiv.className = 'order-card-info';
                 
-                const h3 = document.createElement('h3');
-                h3.textContent = 'Đơn hàng #' + o.orderId;
+                    const h3 = document.createElement('h3');
+                    h3.textContent = 'Đơn hàng #' + o.orderId;
                 
-                const pDate = document.createElement('p');
-                pDate.textContent = 'Ngày đặt: ' + new Date(o.orderedAt).toLocaleString('vi-VN');
+                    const pDate = document.createElement('p');
+                    pDate.textContent = 'Ngày đặt: ' + new Date(o.orderedAt).toLocaleString('vi-VN');
                 
-                const pFulfill = document.createElement('p');
-                pFulfill.textContent = 'Hình thức: ' + (o.fulfillmentType === 'DELIVERY' ? 'Giao tận nơi' : 'Lấy tại quán');
+                    const pFulfill = document.createElement('p');
+                    pFulfill.textContent = 'Hình thức: ' + (o.fulfillmentType === 'DELIVERY' ? 'Giao tận nơi' : 'Lấy tại quán');
                 
-                infoDiv.append(h3, pDate, pFulfill);
+                    infoDiv.append(h3, pDate, pFulfill);
                 
-                const rightDiv = document.createElement('div');
-                rightDiv.className = 'order-card-right';
+                    const rightDiv = document.createElement('div');
+                    rightDiv.className = 'order-card-right';
                 
-                const priceDiv = document.createElement('div');
-                priceDiv.className = 'price';
-                priceDiv.textContent = (Number(o.totalAmount) || 0).toLocaleString('vi-VN') + ' đ';
+                    const priceDiv = document.createElement('div');
+                    priceDiv.className = 'price';
+                    priceDiv.textContent = (Number(o.totalAmount) || 0).toLocaleString('vi-VN') + '\u00a0₫';
                 
-                const badge = document.createElement('span');
-                badge.className = 'order-status-badge ' + getBadgeClass(o.status);
-                badge.textContent = formatStatus(o.status);
+                    const badge = document.createElement('span');
+                    badge.className = 'order-status-badge ' + getBadgeClass(o.status);
+                    badge.textContent = formatStatus(o.status);
                 
-                const actionDiv = document.createElement('div');
-                actionDiv.style.marginTop = '0.5rem';
-                const aView = document.createElement('a');
-                aView.href = `${API_BASE}/orders/${encodeURIComponent(o.orderId)}`;
-                aView.style.color = 'var(--accent)';
-                aView.style.fontWeight = '600';
-                aView.style.fontSize = '0.85rem';
-                aView.style.textDecoration = 'none';
-                aView.textContent = 'Xem chi tiết →';
-                actionDiv.appendChild(aView);
+                    const actionDiv = document.createElement('div');
+                    actionDiv.style.marginTop = '0.5rem';
+                    const aView = document.createElement('a');
+                    aView.href = `${API_BASE}/orders/${encodeURIComponent(o.orderId)}`;
+                    aView.style.color = 'var(--accent)';
+                    aView.style.fontWeight = '600';
+                    aView.style.fontSize = '0.85rem';
+                    aView.style.textDecoration = 'none';
+                    aView.textContent = 'Xem chi tiết →';
+                    actionDiv.appendChild(aView);
                 
-                rightDiv.append(priceDiv, badge, actionDiv);
+                    rightDiv.append(priceDiv, badge, actionDiv);
                 
-                card.append(infoDiv, rightDiv);
-                listEl.appendChild(card);
-            });
+                    card.append(infoDiv, rightDiv);
+                    listEl.appendChild(card);
+                });
+            };
+            if (window.CravePagination) {
+                window.CravePagination.create({ container: document.getElementById('ordersPagination'), totalItems: orders.length, pageSize, label: 'đơn hàng', onChange: renderOrders });
+            } else renderOrders(1);
         } else {
             listEl.innerHTML = `
                 <div class="card" style="padding: 2rem; text-align: center; color: #f87171;">
