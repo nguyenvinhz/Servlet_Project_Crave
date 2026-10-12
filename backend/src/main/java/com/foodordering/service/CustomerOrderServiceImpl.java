@@ -9,11 +9,14 @@ import com.foodordering.enums.ErrorCode;
 import com.foodordering.enums.OrderStatus;
 import com.foodordering.enums.PaymentStatus;
 import com.foodordering.exception.ApiException;
+import com.foodordering.exception.AppException;
 import com.foodordering.exception.BadRequestException;
+import com.foodordering.exception.ResourceNotFoundException;
 import com.foodordering.repository.CustomerOrderRepository;
 import com.foodordering.repository.PaymentRepository;
 import com.foodordering.validator.PromotionValidator;
 import jakarta.persistence.EntityManager;
+import jakarta.persistence.EntityManagerFactory;
 import jakarta.persistence.EntityTransaction;
 import jakarta.persistence.Query;
 
@@ -26,10 +29,20 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
 
     private final CustomerOrderRepository orderRepository;
     private final PaymentRepository paymentRepository;
+    private final EntityManagerFactory emf;
 
     public CustomerOrderServiceImpl(CustomerOrderRepository orderRepository, PaymentRepository paymentRepository) {
+        this(orderRepository, paymentRepository, null);
+    }
+
+    public CustomerOrderServiceImpl(CustomerOrderRepository orderRepository, PaymentRepository paymentRepository, EntityManagerFactory emf) {
         this.orderRepository = orderRepository;
         this.paymentRepository = paymentRepository;
+        this.emf = emf;
+    }
+
+    private EntityManager getEntityManager() {
+        return emf != null ? emf.createEntityManager() : DatabaseConfig.getEntityManagerFactory().createEntityManager();
     }
 
     private String generateId(int length) {
@@ -50,14 +63,14 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
             }
         }
 
-        EntityManager em = DatabaseConfig.getEntityManagerFactory().createEntityManager();
+        EntityManager em = getEntityManager();
         EntityTransaction tx = em.getTransaction();
         try {
             tx.begin();
 
             Customer customer = em.find(Customer.class, customerId);
             if (customer == null) {
-                throw new RuntimeException("Khách hàng không tồn tại");
+                throw new ResourceNotFoundException("Khách hàng không tồn tại");
             }
 
             // Lấy Cart ID của khách và lock bằng FOR UPDATE để tránh checkout trùng
@@ -194,10 +207,10 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
 
     @Override
     public OrderResponse getOrderById(String orderId) {
-        EntityManager em = DatabaseConfig.getEntityManagerFactory().createEntityManager();
+        EntityManager em = getEntityManager();
         try {
             CustomerOrder order = em.find(CustomerOrder.class, orderId);
-            if (order == null) throw new RuntimeException("Đơn hàng không tồn tại");
+            if (order == null) throw new ResourceNotFoundException("Đơn hàng không tồn tại");
             // Kích hoạt lazy loading trong scope của em
             if (order.getOrderDetails() != null) order.getOrderDetails().size();
             if (order.getPayment() != null) order.getPayment().getId();
@@ -210,7 +223,7 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
 
     @Override
     public List<OrderSummaryResponse> getOrdersByCustomer(String customerId) {
-        EntityManager em = DatabaseConfig.getEntityManagerFactory().createEntityManager();
+        EntityManager em = getEntityManager();
         try {
             String jpql = "SELECT o FROM CustomerOrder o WHERE o.customer.id = :customerId ORDER BY o.orderedAt DESC";
             List<CustomerOrder> orders = em.createQuery(jpql, CustomerOrder.class)
@@ -229,7 +242,7 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
 
     @Override
     public List<OrderResponse> getAllOrdersForAdmin() {
-        EntityManager em = DatabaseConfig.getEntityManagerFactory().createEntityManager();
+        EntityManager em = getEntityManager();
         try {
             String jpql = "SELECT o FROM CustomerOrder o ORDER BY o.orderedAt DESC";
             List<CustomerOrder> orders = em.createQuery(jpql, CustomerOrder.class).getResultList();
@@ -248,14 +261,18 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
 
     @Override
     public void updateOrderStatus(String orderId, OrderStatus status, String employeeId, String note) {
-        EntityManager em = DatabaseConfig.getEntityManagerFactory().createEntityManager();
+        EntityManager em = getEntityManager();
         EntityTransaction tx = em.getTransaction();
         try {
             tx.begin();
             CustomerOrder order = em.find(CustomerOrder.class, orderId);
-            if (order == null) throw new RuntimeException("Đơn hàng không tồn tại");
+            if (order == null) throw new ResourceNotFoundException("Đơn hàng không tồn tại");
 
             OrderStatus currentStatus = order.getStatus();
+            if (currentStatus == OrderStatus.COMPLETED || currentStatus == OrderStatus.CANCELLED) {
+                throw new BadRequestException("Không thể cập nhật đơn hàng đã " + (currentStatus == OrderStatus.COMPLETED ? "hoàn tất" : "hủy"));
+            }
+
             boolean isValidTransition = false;
             if (currentStatus == OrderStatus.PENDING_CONFIRMATION) {
                 isValidTransition = (status == OrderStatus.PREPARING || status == OrderStatus.CANCELLED);
@@ -265,7 +282,7 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
                 isValidTransition = (status == OrderStatus.COMPLETED);
             }
             if (!isValidTransition && currentStatus != status) {
-                throw new IllegalArgumentException("Không thể chuyển trạng thái từ " + currentStatus + " sang " + status);
+                throw new BadRequestException("Không thể chuyển trạng thái từ " + currentStatus + " sang " + status);
             }
 
             order.setStatus(status);
@@ -281,6 +298,15 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
             em.persist(history);
 
             tx.commit();
+        } catch (ApiException e) {
+            if (tx.isActive()) tx.rollback();
+            throw e;
+        } catch (AppException e) {
+            if (tx.isActive()) tx.rollback();
+            throw e;
+        } catch (IllegalArgumentException e) {
+            if (tx.isActive()) tx.rollback();
+            throw new BadRequestException(e.getMessage());
         } catch (Exception e) {
             if (tx.isActive()) tx.rollback();
             throw new RuntimeException("Lỗi cập nhật trạng thái: " + e.getMessage(), e);

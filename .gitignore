@@ -5,3 +5,6 @@ backend/target/
 *.iml
 .env
 *.log
+
+# Maven bundle
+apache-maven-3.9.6/
