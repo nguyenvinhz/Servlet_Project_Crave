@@ -87,7 +87,6 @@ jobs:
 
       - name: Check frontend JavaScript syntax
         run: |
-          node tests/frontend/source-integrity.cjs
           find frontend/assets/js -type f -name '*.js' -print0 | xargs -0 -r -n 1 node --check
           node --check tests/frontend/account-browser-smoke.cjs
           node --check tests/frontend/admin-management-browser-smoke.cjs
@@ -95,9 +94,7 @@ jobs:
           node --check tests/runtime/http-smoke.cjs
 
       - name: Verify deployment and rollback script
-        run: |
-          bash scripts/tests/deploy-ec2-test.sh
-          python3 scripts/tests/prepare-payos-deploy-test.py
+        run: bash scripts/tests/deploy-ec2-test.sh
 
       - name: Run browser smoke tests
         run: |
@@ -106,7 +103,6 @@ jobs:
           node tests/frontend/account-browser-smoke.cjs
           node tests/frontend/admin-management-browser-smoke.cjs
           node tests/frontend/admin-orders-dashboard-browser-smoke.cjs
-          node tests/frontend/customer-cart-menu-browser-smoke.cjs
 
       - name: Run packaged WAR HTTP smoke tests
         env:

@@ -52,21 +52,10 @@ jobs:
           name: ${{ needs.ci.outputs.artifact-name }}
           path: ${{ runner.temp }}/crave-release-${{ github.run_id }}-${{ github.run_attempt }}
 
-      - name: Prepare PayOS environment and additive database migration
-        env:
-          PAYOS_CLIENT_ID: ${{ secrets.PAYOS_CLIENT_ID }}
-          PAYOS_API_KEY: ${{ secrets.PAYOS_API_KEY }}
-          PAYOS_CHECKSUM_KEY: ${{ secrets.PAYOS_CHECKSUM_KEY }}
-          PAYOS_PUBLIC_BASE_URL: ${{ vars.PAYOS_PUBLIC_BASE_URL }}
-        run: python3 scripts/prepare-payos-deploy.py
-
       - name: Deploy and check application health
         env:
           WAR_SOURCE: ${{ runner.temp }}/crave-release-${{ github.run_id }}-${{ github.run_attempt }}/crave.war
         run: bash scripts/deploy-ec2.sh "$WAR_SOURCE"
-
-      - name: Confirm public PayOS webhook
-        run: python3 scripts/prepare-payos-deploy.py --confirm-webhook
 
       - name: Record deployment
         env:

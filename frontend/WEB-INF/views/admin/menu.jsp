@@ -69,7 +69,7 @@
                 <input type="text" name="keyword" value="<c:out value='${keyword}'/>" placeholder="Tìm theo tên món ăn..." aria-label="Tìm kiếm món">
             </div>
             <div class="filter-group">
-                <select name="categoryId" aria-label="Lọc theo danh mục">
+                <select name="categoryId" onchange="this.form.submit()" aria-label="Lọc theo danh mục">
                     <option value="">Tất cả danh mục</option>
                     <c:forEach var="cat" items="${categories}">
                         <option value="<c:out value='${cat.id}'/>" ${currentCategoryId == cat.id ? 'selected' : ''}><c:out value="${cat.name}"/> (<c:out value="${cat.foodCount}"/>)</option>
@@ -77,12 +77,13 @@
                 </select>
             </div>
             <div class="filter-group">
-                <select name="status" aria-label="Lọc theo trạng thái">
+                <select name="status" onchange="this.form.submit()" aria-label="Lọc theo trạng thái">
                     <option value="">Tất cả trạng thái</option>
                     <option value="AVAILABLE" ${currentStatus == 'AVAILABLE' ? 'selected' : ''}>Đang bán</option>
                     <option value="UNAVAILABLE" ${currentStatus == 'UNAVAILABLE' ? 'selected' : ''}>Tạm hết món</option>
                 </select>
             </div>
+            <button type="submit" class="button outline">Lọc dữ liệu</button>
             <c:if test="${not empty keyword or not empty currentCategoryId or not empty currentStatus}">
                 <a href="<c:url value='/admin/menu'/>" class="button link-btn">Đặt lại</a>
             </c:if>
@@ -101,13 +102,14 @@
                         <th>Danh mục</th>
                         <th>Giá bán</th>
                         <th>Trạng thái</th>
-                        <th style="width: 100px; text-align: right;">Hành động</th>
+                        <th>Tùy chọn</th>
+                        <th style="width: 140px; text-align: right;">Hành động</th>
                     </tr>
                 </thead>
                 <tbody>
                     <c:if test="${empty foods}">
                         <tr>
-                            <td colspan="7" class="text-center py-4">
+                            <td colspan="8" class="text-center py-4">
                                 <div class="empty-state-table">
                                     <span>🔍</span>
                                     <p>Không tìm thấy món ăn nào phù hợp với bộ lọc.</p>
@@ -133,20 +135,25 @@
                             <td><span class="badge category-badge"><c:out value="${food.categoryName}"/></span></td>
                             <td><strong class="price-text"><fmt:formatNumber value="${food.price}" type="number" groupingUsed="true"/> ₫</strong></td>
                             <td>
-                                <span class="badge ${food.status == 'AVAILABLE' ? 'green' : 'red'}">
+                                <button type="button"
+                                        class="status-toggle-btn ${food.status == 'AVAILABLE' ? 'btn-status-available' : 'btn-status-unavailable'}"
+                                        data-food-id="<c:out value='${food.id}'/>"
+                                        data-status="<c:out value='${food.status}'/>"
+                                        onclick="handleToggleStatusClick(this)"
+                                        title="Nhấp để đổi trạng thái">
                                     ${food.status == 'AVAILABLE' ? '● Đang bán' : '○ Tạm hết'}
-                                </span>
+                                </button>
+                            </td>
+                            <td>
+                                <button type="button" class="btn-sm outline"
+                                        data-food-id="<c:out value='${food.id}'/>"
+                                        data-food-name="<c:out value='${food.name}'/>"
+                                        onclick="handleOpenOptionsClick(this)">
+                                    Tùy chọn
+                                </button>
                             </td>
                             <td style="text-align: right;">
                                 <div class="row-actions">
-                                    <button type="button" class="action-btn"
-                                            data-food-id="<c:out value='${food.id}'/>"
-                                            data-food-name="<c:out value='${food.name}'/>"
-                                            onclick="handleOpenOptionsClick(this)">Quản lý tùy chọn</button>
-                                    <button type="button" class="action-btn"
-                                            data-food-id="<c:out value='${food.id}'/>"
-                                            data-status="<c:out value='${food.status}'/>"
-                                            onclick="handleToggleStatusClick(this)">${food.status == 'AVAILABLE' ? 'Tạm ngừng bán' : 'Mở bán món'}</button>
                                     <button type="button" class="action-btn edit-btn"
                                             data-food-id="<c:out value='${food.id}'/>"
                                             onclick="handleEditFoodClick(this)"

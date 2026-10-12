@@ -35,15 +35,6 @@ public class Payment {
     @Column(name = "transaction_ref", length = 100)
     private String transactionRef;
 
-    @Column(name = "payos_order_code", unique = true)
-    private Long payosOrderCode;
-
-    @Column(name = "payos_payment_link_id", length = 100, unique = true)
-    private String payosPaymentLinkId;
-
-    @Column(name = "payos_checkout_url", length = 512)
-    private String payosCheckoutUrl;
-
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -72,12 +63,6 @@ public class Payment {
     public void setPaidAt(LocalDateTime paidAt) { this.paidAt = paidAt; }
     public String getTransactionRef() { return transactionRef; }
     public void setTransactionRef(String transactionRef) { this.transactionRef = transactionRef; }
-    public Long getPayosOrderCode() { return payosOrderCode; }
-    public void setPayosOrderCode(Long code) { this.payosOrderCode = code; }
-    public String getPayosPaymentLinkId() { return payosPaymentLinkId; }
-    public void setPayosPaymentLinkId(String id) { this.payosPaymentLinkId = id; }
-    public String getPayosCheckoutUrl() { return payosCheckoutUrl; }
-    public void setPayosCheckoutUrl(String url) { this.payosCheckoutUrl = url; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }

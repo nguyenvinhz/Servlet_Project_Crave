@@ -21,9 +21,6 @@ document.addEventListener('DOMContentLoaded', () => {
     let confirmation = null;
     let editingEmployee = null;
     let editingPromotion = null;
-    const pagerHost = element('div', null, 'management-pagination-host');
-    byId(promotionPage ? 'managementPromotionList' : 'managementRows').closest(promotionPage ? 'section' : '.management-table-wrap').after(pagerHost);
-    const pager = admin.pagination(pagerHost, {pageSize: promotionPage ? 6 : 10, label: promotionPage ? 'chương trình' : employeePage ? 'nhân viên' : 'khách hàng', onChange: render});
 
     function element(tag, text, className) {
         const node = document.createElement(tag);
@@ -133,18 +130,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function render() {
-        admin.closeDropdown();
         const visible = filteredItems();
         byId('managementCount').textContent = `${visible.length} / ${items.values.length} ${promotionPage ? 'chương trình' : employeePage ? 'nhân viên' : 'khách hàng'}`;
-        if (promotionPage) renderPromotions(pager.slice(visible));
+        if (promotionPage) renderPromotions(visible);
         else {
             const active = items.values.filter(item => item.status === (employeePage ? 'WORKING' : 'ACTIVE')).length;
             byId('managementTotal').textContent = items.values.length;
             byId('managementActive').textContent = active;
             byId('managementInactive').textContent = items.values.length - active;
-            renderAccounts(pager.slice(visible));
+            renderAccounts(visible);
         }
-        admin.enhanceActions(byId(promotionPage ? 'managementPromotionList' : 'managementRows'));
     }
 
     function renderAccounts(visible) {
@@ -408,10 +403,9 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('dialog').forEach(dialog => dialog.addEventListener('cancel', event => {
         if (dialog.querySelector('form')?.dataset.busy === 'true') event.preventDefault();
     }));
-    const filter = () => {pager.reset();render();};
-    search.addEventListener('input', admin.debounce(filter));
-    statusFilter.addEventListener('change', filter);
-    roleFilter?.addEventListener('change', filter);
+    search.addEventListener('input', render);
+    statusFilter.addEventListener('change', render);
+    roleFilter?.addEventListener('change', render);
     byId('managementRefresh').addEventListener('click', load);
     load();
 });

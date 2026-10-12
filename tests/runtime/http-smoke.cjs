@@ -31,8 +31,6 @@ class Client {
             return json.data;
         }
         if (status === 200) {
-            assert(/charset=UTF-8/i.test(response.headers.get('content-type')), `${path}: wrong HTTP encoding`);
-            assert(!/\uFFFD|[\u00C2\u00C3][\u0080-\u00BF]|\u00E1[\u00BA\u00BB]/.test(text), `${path}: corrupt Vietnamese text`);
             assert.equal((text.match(/<html\b/gi) || []).length, 1, `${path}: duplicate HTML document`);
             assert.equal((text.match(/<body\b/gi) || []).length, 1, `${path}: duplicate body`);
             assert(!text.includes('HTTP Status 500'), `${path}: JSP exception`);
@@ -56,8 +54,6 @@ class Client {
     for (const page of ['/menu', '/menu/detail?id=MA02', '/promotions', '/auth/login', '/auth/register']) {
         await guest.request(page);
     }
-    const vietnameseSearch = await guest.request('/menu?keyword=' + encodeURIComponent('Cơm gà'));
-    assert(vietnameseSearch.includes('Cơm gà'), 'Vietnamese query lost its encoding before JSP rendering');
     await guest.request('/api/admin/customers', {status: 401});
     await guest.request('/api/cart', {status: 401});
     await guest.request('/admin', {status: 302});

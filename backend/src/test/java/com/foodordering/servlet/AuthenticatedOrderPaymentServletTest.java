@@ -15,7 +15,6 @@ import com.foodordering.exception.PromotionValidationException;
 import com.foodordering.security.SessionAuth;
 import com.foodordering.service.CustomerOrderService;
 import com.foodordering.service.PaymentService;
-import com.foodordering.service.PayosPaymentService;
 import com.foodordering.utils.JsonProvider;
 import jakarta.servlet.ReadListener;
 import jakarta.servlet.ServletInputStream;
@@ -82,43 +81,6 @@ class AuthenticatedOrderPaymentServletTest {
             verify(exchange.request, never()).getSession(true);
         }
         verifyNoInteractions(orders, payments);
-    }
-
-    @Test
-    void payosCustomerEndpointsRequirePrincipalAndIgnoreSpoofedIdentity() throws Exception {
-        PayosPaymentService gateway = mock(PayosPaymentService.class);
-        PayosPaymentServlet servlet = new PayosPaymentServlet(gateway);
-        servlet.init();
-        for (String action : new String[]{"link", "sync"}) {
-            Route route = new Route(servlet, "POST", "/api/payments/payos", "/orders/DH01/" + action);
-            Exchange anonymous = request(route, null, "{}");
-            anonymous.send(servlet);
-            anonymous.assertError(401, "UNAUTHORIZED");
-            verify(anonymous.request, never()).getInputStream();
-            Exchange employee = request(route, employee(EmployeeRole.ADMIN), "{}");
-            employee.send(servlet);
-            employee.assertError(403, "FORBIDDEN");
-            Exchange owner = request(route, CUSTOMER, "{\"customerId\":\"KH99\",\"amount\":1}");
-            spoofIdentity(owner);
-            owner.send(servlet);
-            owner.assertStatus(200);
-            verify(owner.request, never()).getInputStream();
-        }
-        verify(gateway).createLink("KH01", "DH01");
-        verify(gateway).syncPayment("KH01", "DH01");
-    }
-
-    @Test
-    void unsignedPayosWebhookIsRejectedBeforeAcknowledgement() throws Exception {
-        PayosPaymentService gateway = mock(PayosPaymentService.class);
-        PayosPaymentServlet servlet = new PayosPaymentServlet(gateway);
-        servlet.init();
-        var exception = new com.foodordering.exception.PaymentGatewayException("PAYOS_INVALID_SIGNATURE", "Invalid signature", 400);
-        doThrow(exception).when(gateway).receiveWebhook(any(JsonNode.class));
-        Exchange webhook = request(new Route(servlet, "POST", "/api/payments/payos", "/webhook"), null, "{\"data\":{\"amount\":1}}");
-        webhook.send(servlet);
-        webhook.assertError(400, "PAYOS_INVALID_SIGNATURE");
-        verify(webhook.request, never()).getSession(false);
     }
 
     @Test

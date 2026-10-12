@@ -70,7 +70,6 @@
                 </div>
 
                 <form id="orderCustomizationForm" class="customization-form" data-food-id="<c:out value='${food.id}'/>" onsubmit="event.preventDefault(); handleAddToCart();">
-                    <p id="foodCartStatus" class="food-cart-status" role="status" hidden></p>
                     <c:if test="${not empty food.options}">
                         <section class="options-container" id="foodOptionsContainer">
                             <h3 class="options-title">Tùy chọn cho món ăn</h3>
