@@ -796,12 +796,10 @@ a:hover {
     box-shadow: var(--shadow);
 }
 
-.card-heading h2,
-#profile-title {
+.card-heading h2 {
     margin: 0.1em 0 0;
-    font-family: 'Nunito', 'Plus Jakarta Sans', ui-sans-serif, system-ui, -apple-system, sans-serif;
+    font-family: 'Plus Jakarta Sans', 'Nunito', ui-sans-serif, system-ui, -apple-system, sans-serif;
     font-size: clamp(2rem, 4vw, 3rem);
-    letter-spacing: normal;
 }
 
 .card-heading p:last-child {
