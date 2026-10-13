@@ -134,6 +134,8 @@ def register_webhook(environment=None, *, opener=None, sleep=time.sleep):
         request = urllib.request.Request(PROVIDER_ENDPOINT, data=body, method="POST", headers={
             "x-client-id": client_id, "x-api-key": api_key,
             "Content-Type": "application/json", "Accept": "application/json",
+            # payOS blocks urllib's default User-Agent with Cloudflare error 1010.
+            "User-Agent": "CraveWebhookRegistrar/1.0",
         })
         try:
             response = _send(opener, request)

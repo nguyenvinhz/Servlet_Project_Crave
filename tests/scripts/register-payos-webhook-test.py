@@ -88,6 +88,7 @@ class WebhookRegistrationTest(unittest.TestCase):
         self.assertEqual(dict((key.lower(), value) for key, value in request.header_items()), {
             "x-client-id": "fake-client-id", "x-api-key": "fake-api-key",
             "content-type": "application/json", "accept": "application/json",
+            "user-agent": "CraveWebhookRegistrar/1.0",
         })
         self.assertEqual(json.loads(request.data), {"webhookUrl": CALLBACK})
         self.assertEqual(timeout, 10)
