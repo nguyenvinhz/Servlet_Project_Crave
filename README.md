@@ -107,6 +107,16 @@ Xem [cấu trúc mã nguồn và sơ đồ lớp](docs/architecture/README.md).
    Mở `http://localhost:8080/crave/menu`; nhấn Ctrl+C để dừng.
    Profile `dev` chỉ dùng cho launcher, không thêm Tomcat vào WAR production.
 
+## Thanh toán QR qua payOS
+
+Chọn **Chuyển khoản ngân hàng** hoặc **Ví điện tử** khi đặt hàng để hiện QR
+trên trang chi tiết đơn. Server tạo link theo số tiền trong database và tự
+đồng bộ trạng thái với payOS. Ví cần hỗ trợ VietQR.
+
+Cấu hình local tại `http://localhost:8081/crave`, migration database và webhook
+public nằm trong [hướng dẫn payOS](docs/project/payos.md). Các khóa chỉ đặt trong
+`.env` cục bộ hoặc biến môi trường của Tomcat.
+
 ## Quản trị
 
 Mẫu giao diện khách hàng tham khảo [Crave trên Framer](https://thrilled-calendar-459980.framer.app/),

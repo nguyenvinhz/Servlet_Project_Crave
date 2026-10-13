@@ -45,7 +45,10 @@ public abstract class BaseApiServlet extends HttpServlet {
     }
 
     protected void handleError(HttpServletResponse response, Exception e) throws IOException {
-        if (e instanceof com.foodordering.exception.ApiException apiEx) {
+        if (e instanceof com.foodordering.gateway.PayosException payosEx) {
+            writeJson(response, payosEx.getStatusCode(),
+                    ApiResponse.error(payosEx.getMessage(), payosEx.getCode()));
+        } else if (e instanceof com.foodordering.exception.ApiException apiEx) {
             writeJson(response, apiEx.getHttpStatus(),
                     ApiResponse.error(apiEx.getMessage(), apiEx.getErrorCode()));
         } else if (e instanceof com.foodordering.exception.AppException appEx) {

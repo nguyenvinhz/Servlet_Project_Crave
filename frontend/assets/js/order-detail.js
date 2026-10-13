@@ -2,7 +2,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     loadOrderDetail();
 });
 
+let activePayosPayment = null;
+
+window.addEventListener('pageshow', event => {
+    if (event.persisted) loadOrderDetail();
+});
+
 async function loadOrderDetail() {
+    activePayosPayment?.dispose();
+    activePayosPayment = null;
     const container = document.getElementById('orderContent');
     const API_BASE = document.body.dataset.contextPath || '';
     
@@ -154,12 +162,18 @@ async function loadOrderDetail() {
             col2.innerHTML = `
                 <h3 style="margin-top: 0; margin-bottom: 1rem; font-size: 1.1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem;">💳 Thông tin thanh toán</h3>
                 <p style="margin: 0.4rem 0;"><strong>Phương thức:</strong> ${payMethod}</p>
-                <p style="margin: 0.4rem 0;"><strong>Trạng thái:</strong> <span style="font-weight: 700;">${payStatus}</span></p>
+                <p style="margin: 0.4rem 0;"><strong>Trạng thái:</strong> <span data-payment-status style="font-weight: 700;">${payStatus}</span></p>
                 ${o.payment?.paymentId ? `<p style="margin: 0.4rem 0; font-size: 0.85rem; color: var(--text-muted);">Mã thanh toán: #${escapeHtml(o.payment.paymentId)}</p>` : ''}
             `;
             
             grid.append(col1, col2);
             container.appendChild(grid);
+
+            if (['BANK_TRANSFER', 'E_WALLET'].includes(o.payment?.method)
+                    && !['SUCCESS', 'REFUNDED'].includes(o.payment?.status) && o.status !== 'CANCELLED') {
+                activePayosPayment = showPayosPayment(o, API_BASE, container,
+                    col2.querySelector('[data-payment-status]'));
+            }
             
             // 4. Danh sách món ăn
             const itemCard = document.createElement('div');
@@ -259,6 +273,203 @@ async function loadOrderDetail() {
             </div>
         `;
     }
+}
+
+function showPayosPayment(order, apiBase, container, paymentStatusElement) {
+    const template = document.getElementById('payosPaymentTemplate');
+    if (!template) return null;
+    const content = template.content.cloneNode(true);
+    const card = content.querySelector('#payosPayment');
+    const status = content.querySelector('#payosStatus');
+    const details = content.querySelector('#payosDetails');
+    const qr = content.querySelector('#payosQr');
+    const qrError = content.querySelector('#payosQrError');
+    const checkoutLink = content.querySelector('#payosCheckoutLink');
+    const retry = content.querySelector('#payosRetry');
+    const actions = content.querySelector('#payosActions');
+    const hint = content.querySelector('#payosHint');
+    const amount = content.querySelector('#payosAmount');
+    const accountNumber = content.querySelector('#payosAccountNumber');
+    const accountName = content.querySelector('#payosAccountName');
+    const description = content.querySelector('#payosDescription');
+    const endpoint = `${apiBase}/api/payos/orders/${encodeURIComponent(order.orderId)}`;
+    container.appendChild(content);
+
+    let disposed = false;
+    let busy = false;
+    let terminal = false;
+    let hasLink = false;
+    let hasError = false;
+    let retryMethod = 'POST';
+    let timer = null;
+    let controller = null;
+    let resumeWhenVisible = false;
+    let qrVersion = null;
+
+    function clearPoll() {
+        if (timer !== null) window.clearTimeout(timer);
+        timer = null;
+    }
+
+    function schedulePoll() {
+        clearPoll();
+        if (!disposed && !document.hidden && !terminal && hasLink && !hasError && !busy) {
+            timer = window.setTimeout(() => requestPayment('GET'), 5000);
+        }
+    }
+
+    function safeCheckoutUrl(value) {
+        try {
+            const url = new URL(value);
+            return url.protocol === 'https:' && url.hostname === 'pay.payos.vn'
+                && (!url.port || url.port === '443') && !url.username && !url.password ? url.href : null;
+        } catch (_) {
+            return null;
+        }
+    }
+
+    function render(data) {
+        if (!['PENDING', 'PROCESSING', 'PAID', 'REFUNDED', 'CANCELLED', 'EXPIRED'].includes(data.status)
+                || !['PENDING', 'SUCCESS', 'FAILED', 'REFUNDED'].includes(data.paymentStatus)
+                || String(data.orderId) !== String(order.orderId)) {
+            throw new Error('Thông tin thanh toán chưa hợp lệ. Vui lòng thử lại.');
+        }
+        const paid = data.paymentStatus === 'SUCCESS' || data.status === 'PAID';
+        const refunded = data.paymentStatus === 'REFUNDED' || data.status === 'REFUNDED';
+        terminal = paid || refunded || data.status === 'CANCELLED' || data.status === 'EXPIRED';
+        hasLink = true;
+        hasError = false;
+        qrError.hidden = true;
+        card.classList.toggle('payos-paid', paid && !refunded);
+        paymentStatusElement.textContent = formatPaymentStatus(refunded ? 'REFUNDED' : paid ? 'SUCCESS' : data.paymentStatus);
+        details.hidden = terminal;
+        hint.hidden = terminal;
+        checkoutLink.hidden = true;
+        checkoutLink.removeAttribute('href');
+        qr.hidden = true;
+        retry.hidden = terminal;
+        actions.hidden = terminal;
+
+        if (terminal) {
+            clearPoll();
+            qr.removeAttribute('src');
+            status.textContent = refunded ? 'Đơn hàng đã được hoàn tiền.' : paid
+                ? 'Đã nhận thanh toán. Cảm ơn bạn!'
+                : data.status === 'EXPIRED' ? 'Mã thanh toán đã hết hạn. Vui lòng liên hệ nhà hàng hoặc đặt đơn mới để thanh toán.'
+                    : 'Giao dịch đã bị hủy. Vui lòng liên hệ nhà hàng hoặc đặt đơn mới để thanh toán.';
+            return;
+        }
+
+        const serverAmount = Number(data.amount);
+        if (!Number.isFinite(serverAmount) || serverAmount <= 0 || data.currency !== 'VND') {
+            throw new Error('Chưa nhận được số tiền thanh toán hợp lệ. Vui lòng thử lại.');
+        }
+        amount.textContent = new Intl.NumberFormat('vi-VN').format(serverAmount) + ' đ';
+        accountNumber.textContent = data.accountNumber || 'Xem trên trang thanh toán';
+        accountName.textContent = data.accountName || 'Xem trên trang thanh toán';
+        description.textContent = data.description || 'Xem trên trang thanh toán';
+        status.textContent = 'Chờ thanh toán. Trạng thái sẽ tự cập nhật khi hệ thống nhận được tiền.';
+        retryMethod = 'GET';
+        retry.textContent = 'Kiểm tra thanh toán';
+        const url = safeCheckoutUrl(data.checkoutUrl);
+        if (url) {
+            checkoutLink.href = url;
+            checkoutLink.hidden = false;
+        }
+        if (data.qrCode) {
+            const version = String(data.orderCode || data.paymentId || 'current');
+            if (qrVersion !== version || !qr.hasAttribute('src')) {
+                qrVersion = version;
+                qr.src = `${endpoint}/qr?v=${encodeURIComponent(version)}`;
+            }
+            qr.hidden = false;
+        } else {
+            qrError.textContent = 'Chưa tải được mã QR. Bạn có thể mở trang thanh toán hoặc thử kiểm tra lại.';
+            qrError.hidden = false;
+        }
+    }
+
+    async function requestPayment(method) {
+        if (disposed || busy || document.hidden) return;
+        clearPoll();
+        busy = true;
+        controller = new AbortController();
+        const requestController = controller;
+        card.setAttribute('aria-busy', 'true');
+        retry.disabled = true;
+        if (method === 'POST') status.textContent = 'Đang tạo mã thanh toán...';
+        try {
+            const response = await fetch(endpoint, {
+                method, credentials: 'same-origin', signal: requestController.signal,
+                headers: { 'Accept': 'application/json' }
+            });
+            if (requestController.signal.aborted || disposed) return;
+            if (response.status === 401) throw new Error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại để thanh toán.');
+            const envelope = await response.json();
+            if (requestController.signal.aborted || disposed) return;
+            if (!response.ok || !envelope.success || !envelope.data) {
+                throw new Error(envelope.error?.message || 'Không thể tải thông tin thanh toán. Vui lòng thử lại.');
+            }
+            render(envelope.data);
+        } catch (error) {
+            if (requestController.signal.aborted || disposed) return;
+            hasError = true;
+            details.hidden = true;
+            checkoutLink.hidden = true;
+            checkoutLink.removeAttribute('href');
+            qr.hidden = true;
+            qr.removeAttribute('src');
+            status.textContent = error.message || 'Lỗi kết nối máy chủ. Vui lòng thử lại.';
+            retryMethod = hasLink && !terminal ? 'GET' : 'POST';
+            retry.hidden = false;
+            retry.textContent = 'Thử lại';
+            actions.hidden = false;
+        } finally {
+            busy = false;
+            controller = null;
+            if (!disposed) {
+                card.setAttribute('aria-busy', 'false');
+                retry.disabled = false;
+                if (resumeWhenVisible && !document.hidden && !terminal) {
+                    resumeWhenVisible = false;
+                    requestPayment(hasLink ? 'GET' : 'POST');
+                } else {
+                    schedulePoll();
+                }
+            }
+        }
+    }
+
+    function onVisibilityChange() {
+        if (document.hidden) {
+            clearPoll();
+            controller?.abort();
+        } else if (!terminal) {
+            if (busy) resumeWhenVisible = true;
+            else requestPayment(hasLink ? 'GET' : 'POST');
+        }
+    }
+
+    function dispose() {
+        disposed = true;
+        clearPoll();
+        controller?.abort();
+        document.removeEventListener('visibilitychange', onVisibilityChange);
+        window.removeEventListener('pagehide', dispose);
+    }
+
+    qr.addEventListener('error', () => {
+        if (disposed || terminal) return;
+        qr.hidden = true;
+        qrError.textContent = 'Không tải được mã QR. Bạn có thể mở trang thanh toán hoặc kiểm tra lại.';
+        qrError.hidden = false;
+        qr.removeAttribute('src');
+    });
+    retry.addEventListener('click', () => requestPayment(retryMethod));
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    window.addEventListener('pagehide', dispose);
+    requestPayment('POST');
+    return { dispose };
 }
 
 function showCancelModal(orderId, apiBase, onCancelled) {

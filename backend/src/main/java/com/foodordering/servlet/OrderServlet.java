@@ -18,6 +18,7 @@ import com.foodordering.dto.OrderResponse;
 import com.foodordering.dto.OrderSummaryResponse;
 import com.foodordering.service.CustomerOrderService;
 import com.foodordering.service.CustomerOrderServiceImpl;
+import com.foodordering.service.PayosPaymentService;
 import com.foodordering.repository.CustomerOrderRepositoryImpl;
 import com.foodordering.repository.PaymentRepositoryImpl;
 
@@ -25,6 +26,7 @@ import com.foodordering.repository.PaymentRepositoryImpl;
 public class OrderServlet extends BaseApiServlet {
 
     private CustomerOrderService orderService;
+    private PayosPaymentService payosPayments;
 
     public OrderServlet() {
     }
@@ -38,6 +40,7 @@ public class OrderServlet extends BaseApiServlet {
         if (orderService == null) {
             orderService = new CustomerOrderServiceImpl(new CustomerOrderRepositoryImpl(), new PaymentRepositoryImpl());
         }
+        if (payosPayments == null) payosPayments = new PayosPaymentService();
     }
 
     @Override
@@ -87,6 +90,7 @@ public class OrderServlet extends BaseApiServlet {
                 } catch (Exception ignored) {
                 }
                 orderService.cancelOrder(orderId, customerId, reason);
+                cancelPayosLink(orderId);
                 writeJson(resp, HttpServletResponse.SC_OK, ApiResponse.success("Đã hủy đơn hàng thành công"));
                 return;
             }
@@ -101,6 +105,16 @@ public class OrderServlet extends BaseApiServlet {
             writeJson(resp, HttpServletResponse.SC_CREATED, ApiResponse.success(response));
         } catch (Exception e) {
             handleError(resp, e);
+        }
+    }
+
+    private void cancelPayosLink(String orderId) {
+        if (payosPayments == null) return;
+        try {
+            payosPayments.cancelForOrder(orderId);
+        } catch (RuntimeException unavailable) {
+            // The local cancellation has committed. A subsequent status request retries the gateway cancellation.
+            log("Chưa đồng bộ được hủy link payOS; sẽ thử lại khi kiểm tra trạng thái.");
         }
     }
 }

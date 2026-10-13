@@ -278,7 +278,9 @@
             if (data.success && data.data?.orderId) {
                 state.completed = true;
                 clearVoucher();
-                alert('Đặt hàng thành công! Mã đơn: ' + data.data.orderId, true);
+                const onlinePayment = ['BANK_TRANSFER', 'E_WALLET'].includes(payload.paymentMethod);
+                alert('Đặt hàng thành công! Mã đơn: ' + data.data.orderId
+                    + (onlinePayment ? '. Đang chuyển đến mã QR thanh toán...' : ''), true);
                 setTimeout(() => window.location.assign(`${API_BASE}/orders/${encodeURIComponent(data.data.orderId)}`), 2000);
             } else {
                 const errorCode = data.error?.code || '';

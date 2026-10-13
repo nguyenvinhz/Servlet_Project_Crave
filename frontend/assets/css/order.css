@@ -594,3 +594,100 @@
     cursor: pointer;
 }
 
+/* QR thanh toán trên trang chi tiết đơn hàng */
+.payos-payment {
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.payos-payment h2 {
+    margin: 0 0 0.75rem;
+    font-size: 1.2rem;
+}
+
+.payos-hint {
+    color: var(--text-muted);
+    line-height: 1.6;
+    margin: 0 0 1rem;
+}
+
+.payos-status {
+    margin: 0 0 1rem;
+    font-weight: 600;
+    line-height: 1.6;
+}
+
+.payos-paid .payos-status {
+    color: #4ade80;
+    margin-bottom: 0;
+}
+
+.payos-details {
+    display: grid;
+    grid-template-columns: minmax(0, 240px) minmax(0, 1fr);
+    align-items: center;
+    gap: 1.5rem;
+    margin: 1.25rem 0;
+}
+
+.payos-qr {
+    display: block;
+    width: 100%;
+    height: auto;
+    max-width: 240px;
+    padding: 0.75rem;
+    background: white;
+    border-radius: 12px;
+}
+
+.payos-bank-details {
+    margin: 0;
+    display: grid;
+    gap: 1rem;
+    min-width: 0;
+}
+
+.payos-bank-details dt {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    margin-bottom: 0.25rem;
+}
+
+.payos-bank-details dd {
+    margin: 0;
+    font-weight: 700;
+    overflow-wrap: anywhere;
+}
+
+.payos-bank-details .payos-amount {
+    color: var(--accent);
+    font-size: 1.5rem;
+}
+
+.payos-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.payos-payment [hidden] {
+    display: none !important;
+}
+
+@media (max-width: 600px) {
+    .payos-details {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .payos-qr-wrap {
+        justify-self: center;
+        width: min(240px, 100%);
+    }
+
+    .payos-actions > * {
+        width: 100%;
+        text-align: center;
+    }
+}
+
