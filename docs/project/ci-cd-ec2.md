@@ -37,8 +37,10 @@ Merge PR / push main ──> CI thành công ──> artifact crave-war
 - Job CD dùng environment `production` và các label
   `self-hosted`, `linux`, `x64`, `crave-production`; kiểm tra runner có tên
   `crave-ec2` trước khi checkout code từ commit mới trên `main`.
-- CD chỉ recreate service ứng dụng. Database, volume MySQL, `.env` và compose
-  trên server được giữ nguyên. Migration database cần kế hoạch riêng.
+- CD chỉ recreate service ứng dụng. `.env` và compose gốc trên EC2 được giữ nguyên;
+  cấu hình payOS được bổ sung qua `.payos.compose.json` có quyền đọc hạn chế.
+  Trước khi thay WAR, CD chạy migration bổ sung bảng payOS trong service MySQL
+  hiện có; không chạy lại schema/seed hoặc recreate database.
 - Các lần deploy được tuần tự hóa và có khóa trên server. Lần đang deploy được
   chạy đến hết; GitHub có thể thay lần đang chờ bằng push mới nhất.
 
@@ -154,15 +156,31 @@ required reviewers hoặc wait timer. Approval của PR thuộc bước review t
 khi merge; không phải approval deploy. Branch protection có thể yêu cầu CI
 thành công trước khi merge.
 
-Với cấu hình hiện tại, không cần tạo secret hay variable: các giá trị mặc định
-đã khớp EC2. Nếu thay đổi server, thêm **Environment variables**:
+Environment `production` cần ba **Environment secrets**: `PAYOS_CLIENT_ID`,
+`PAYOS_API_KEY`, `PAYOS_CHECKSUM_KEY`. Workflow chỉ truyền chúng cho bước deploy
+và đăng ký webhook; không đưa khóa vào WAR hoặc file cấu hình trong Git.
+
+Đặt **Environment variable** `PAYOS_PUBLIC_BASE_URL` thành
+`http://15.134.39.86:8080/crave`. Giá trị mặc định trong workflow hiện cũng dùng
+đúng URL này. Nếu thay đổi server, cập nhật các variables:
 
 | Variable | Mặc định | Ý nghĩa |
 |---|---|---|
 | `EC2_DEPLOY_PATH` | `/home/ubuntu/crave` | Thư mục ứng dụng trên EC2, nằm ngoài checkout runner |
 | `EC2_COMPOSE_FILE` | `compose.yaml` | File compose, đường dẫn tương đối trong thư mục ứng dụng |
 | `EC2_APP_SERVICE` | `app` | Tên service Tomcat |
+| `EC2_DB_SERVICE` | `mysql` | Service MySQL đang chạy, có `MYSQL_ROOT_PASSWORD` trong container để áp migration |
 | `EC2_HEALTH_URL` | `http://127.0.0.1:8080/crave/api/health` | Endpoint health trên máy EC2 |
+| `PAYOS_PUBLIC_BASE_URL` | `http://15.134.39.86:8080/crave` | URL public dùng cho return/cancel và webhook, gồm `/crave` |
+
+Không copy `.env` local lên EC2. Compose override chỉ bổ sung bốn biến payOS
+cho service `app`; các biến kết nối MySQL, volume và port của compose production
+được giữ. Script lưu file secret và bản backup với quyền `0600`.
+
+Migration `database/migrations/2026-10-13-payos-payment.sql` được lấy từ commit
+đang deploy và chạy bằng MySQL client trong container. Mật khẩu quản trị được
+đọc bên trong container; không ghi vào command line hoặc log của runner.
+Nếu migration thất bại, script dừng trước khi thay WAR hoặc recreate app.
 
 ## Luồng cập nhật ứng dụng
 
@@ -172,22 +190,32 @@ commit mới trên `main` tạo sự kiện `push`, workflow **CI/CD - main to E
 chạy. Push trực tiếp vào `main` cũng dùng đúng luồng này. Xem tab **Actions**:
 
 1. `CI / Build and test` phải thành công và tạo artifact `crave-war`.
-2. `Deploy EC2` lấy artifact, lưu WAR hiện tại vào
-   `/home/ubuntu/crave/.deploy-backups/crave.war.previous`, thay WAR và recreate `app`.
+2. `Deploy EC2` kiểm tra secrets và cấu hình, áp migration payOS, rồi lưu WAR
+   cùng cấu hình payOS hiện tại vào `.deploy-backups/`, thay WAR và recreate `app`.
 3. Endpoint health phải trả HTTP 200 với `success: true`,
    `data.application: "UP"`, `data.database: "UP"` trong 180 giây.
-4. Khi thành công, summary ghi commit đã deploy. Mở website để kiểm tra chức năng.
+4. Workflow đăng ký `http://15.134.39.86:8080/crave/api/payos/webhook` với payOS
+   bằng API `confirm-webhook`, rồi summary ghi commit đã deploy.
+   [Tài liệu payOS](https://payos.vn/docs/api/) mô tả bước xác minh endpoint này.
+   Mở website để kiểm tra chức năng.
 
 Không cần nhấn **Run workflow** hoặc SSH vào EC2 để deploy mỗi lần cập nhật.
 Nếu CI thất bại, CD không chạy và website tiếp tục dùng WAR hiện tại.
 
 Nếu recreate hoặc health check thất bại, script tự khôi phục WAR cũ và recreate
-`app` lần nữa. Workflow vẫn báo lỗi để người triển khai kiểm tra. Mỗi deploy
+`app` lần nữa cùng cấu hình payOS cũ (hoặc không có override nếu trước đó chưa
+cấu hình). Bảng migration bổ sung được giữ khi rollback để không mất dữ liệu
+thanh toán. Workflow vẫn báo lỗi để người triển khai kiểm tra. Mỗi deploy
 recreate Tomcat nên có khoảng gián đoạn ngắn và session đang đăng nhập sẽ mất.
 Rollback khi force kill, hủy job hoặc EC2 crash có thể chưa hoàn tất; dùng backup
 trên server để khôi phục thủ công khi cần.
 Health endpoint xác nhận trạng thái database lúc khởi động, không thay thế
 giám sát database liên tục.
+
+Nếu đăng ký webhook thất bại sau khi app đã khỏe, job CD báo lỗi ở đúng bước
+webhook; bản WAR mới vẫn chạy. Trang đơn hàng vẫn đồng bộ thanh toán qua API
+payOS khi đang mở. Kiểm tra URL public, Security Group và keys, sau đó chạy lại
+job CD; migration có thể áp lại an toàn và không đổi các mã thanh toán đã lưu.
 
 ## Khi job không chạy được
 
@@ -200,6 +228,10 @@ giám sát database liên tục.
 | Báo thiếu app bind mount | Kiểm tra service `app` trong compose production và đường dẫn WAR ở bước 1 |
 | Permission denied khi backup/thay WAR | Kiểm tra quyền thư mục deploy và `backend/target`; WAR được thay bằng rename nên cần quyền ghi thư mục |
 | Health check thất bại | Trên EC2: `cd /home/ubuntu/crave`, `sudo docker compose ps`, `sudo docker compose logs --tail=100 app` |
+| Thiếu cấu hình payOS | Kiểm tra ba secrets và variable `PAYOS_PUBLIC_BASE_URL` của environment `production` |
+| Migration thất bại | Kiểm tra `EC2_DB_SERVICE`, container MySQL đang chạy và `MYSQL_ROOT_PASSWORD` trong container; app chưa bị thay WAR |
+| Đăng ký webhook thất bại | Kiểm tra endpoint public và Security Group cho cổng 8080; xem bước đăng ký webhook trong Actions |
 
 Không chạy `database/schema.sql` trên database production để sửa lỗi deploy:
-script này có `DROP DATABASE`. CD không tự áp dụng schema/seed.
+script này có `DROP DATABASE`. CD chỉ tự áp dụng migration payOS bổ sung đã chỉ
+định, không chạy schema/seed hay xóa bảng khi rollback.

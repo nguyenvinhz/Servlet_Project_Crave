@@ -113,9 +113,10 @@ Chọn **Chuyển khoản ngân hàng** hoặc **Ví điện tử** khi đặt h
 trên trang chi tiết đơn. Server tạo link theo số tiền trong database và tự
 đồng bộ trạng thái với payOS. Ví cần hỗ trợ VietQR.
 
-Cấu hình local tại `http://localhost:8081/crave`, migration database và webhook
-public nằm trong [hướng dẫn payOS](docs/project/payos.md). Các khóa chỉ đặt trong
-`.env` cục bộ hoặc biến môi trường của Tomcat.
+Cấu hình local tại `http://localhost:8081/crave`; bản AWS dùng
+`http://15.134.39.86:8080/crave`. CI/CD lấy khóa từ GitHub environment `production`,
+chạy migration và đăng ký webhook khi deploy. Xem [hướng dẫn payOS](docs/project/payos.md).
+Các khóa chỉ đặt trong `.env` cục bộ hoặc cấu hình server, không đưa lên Git.
 
 ## Quản trị
 

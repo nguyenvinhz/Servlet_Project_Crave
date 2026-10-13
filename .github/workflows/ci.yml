@@ -95,7 +95,9 @@ jobs:
           node --check tests/runtime/http-smoke.cjs
 
       - name: Verify deployment and rollback script
-        run: bash tests/scripts/deploy-ec2-test.sh
+        run: |
+          bash tests/scripts/deploy-ec2-test.sh
+          python3 tests/scripts/register-payos-webhook-test.py
 
       - name: Run browser smoke tests
         run: |

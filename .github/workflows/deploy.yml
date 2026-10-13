@@ -30,7 +30,9 @@ jobs:
       DEPLOY_PATH: ${{ vars.EC2_DEPLOY_PATH || '/home/ubuntu/crave' }}
       COMPOSE_FILE: ${{ vars.EC2_COMPOSE_FILE || 'compose.yaml' }}
       APP_SERVICE: ${{ vars.EC2_APP_SERVICE || 'app' }}
+      DB_SERVICE: ${{ vars.EC2_DB_SERVICE || 'mysql' }}
       HEALTH_URL: ${{ vars.EC2_HEALTH_URL || 'http://127.0.0.1:8080/crave/api/health' }}
+      PAYOS_PUBLIC_BASE_URL: ${{ vars.PAYOS_PUBLIC_BASE_URL || 'http://15.134.39.86:8080/crave' }}
 
     steps:
       - name: Kiểm tra runner production
@@ -55,10 +57,19 @@ jobs:
       - name: Deploy and check application health
         env:
           WAR_SOURCE: ${{ runner.temp }}/crave-release-${{ github.run_id }}-${{ github.run_attempt }}/crave.war
+          PAYOS_CLIENT_ID: ${{ secrets.PAYOS_CLIENT_ID }}
+          PAYOS_API_KEY: ${{ secrets.PAYOS_API_KEY }}
+          PAYOS_CHECKSUM_KEY: ${{ secrets.PAYOS_CHECKSUM_KEY }}
         run: bash scripts/deploy-ec2.sh "$WAR_SOURCE"
+
+      - name: Register payOS webhook for the public application
+        env:
+          PAYOS_CLIENT_ID: ${{ secrets.PAYOS_CLIENT_ID }}
+          PAYOS_API_KEY: ${{ secrets.PAYOS_API_KEY }}
+        run: python3 scripts/register-payos-webhook.py
 
       - name: Record deployment
         env:
           DEPLOY_COMMIT: ${{ github.sha }}
         run: |
-          printf 'Deployed commit `%s` to EC2. Health check passed.\n' "$DEPLOY_COMMIT" >> "$GITHUB_STEP_SUMMARY"
+          printf 'Deployed commit `%s` to EC2. Health check passed; payOS webhook configured.\n' "$DEPLOY_COMMIT" >> "$GITHUB_STEP_SUMMARY"

@@ -40,17 +40,26 @@ thanh toán, nhưng cần mở lại trang để đồng bộ nếu chưa cấu 
 
 ## Khi có URL public
 
-Đổi `PAYOS_PUBLIC_BASE_URL` sang URL ứng dụng public và khởi động lại WAR.
-Đăng ký endpoint sau trong kênh thanh toán trên payOS:
+Ứng dụng AWS hiện dùng `http://15.134.39.86:8080/crave`. CI/CD lấy ba khóa từ
+GitHub environment `production` và `PAYOS_PUBLIC_BASE_URL` từ environment variable
+cùng tên. Script deploy truyền chúng vào container Tomcat qua Compose override
+có quyền `0600`, chạy migration bổ sung trước khi thay WAR và khôi phục cấu hình
+cũ nếu app không khởi động được.
+
+Sau khi health check đạt, workflow tự đăng ký endpoint sau với payOS:
 
 ```text
-POST <PAYOS_PUBLIC_BASE_URL>/api/payos/webhook
+POST http://15.134.39.86:8080/crave/api/payos/webhook
 ```
 
 Webhook yêu cầu chữ ký HMAC-SHA256 đúng checksum key. Servlet xác thực dữ liệu
 rồi hỏi lại trạng thái link từ payOS trước khi ghi nhận đủ tiền.
 Các tham số `payment=return`, `payment=cancel` trên URL trình duyệt chỉ phục vụ
 điều hướng, không tự thay đổi trạng thái thanh toán hay hủy đơn.
+
+Khi đổi IP hoặc tên miền, cập nhật GitHub variable `PAYOS_PUBLIC_BASE_URL` rồi
+deploy lại qua `main`. Không cần đổi URL trong Java hoặc chép `.env` local lên AWS.
+Xem [hướng dẫn CI/CD EC2](ci-cd-ec2.md) về secrets, migration và rollback.
 
 ## API của ứng dụng
 
