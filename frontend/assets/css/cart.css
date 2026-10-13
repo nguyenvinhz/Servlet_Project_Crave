@@ -329,6 +329,10 @@ body.crave-body {
     font-weight: 600;
 }
 
+.summary-row span:last-child {
+    white-space: nowrap;
+}
+
 .summary-row.discount-row span:last-child {
     font-family: var(--crave-font-heading);
 }
@@ -359,6 +363,7 @@ body.crave-body {
     font-size: 1.6rem;
     font-weight: 800;
     color: var(--crave-text);
+    white-space: nowrap;
 }
 
 /* ==========================================================================
