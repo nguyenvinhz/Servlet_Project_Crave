@@ -477,3 +477,120 @@
     .order-page .step { flex-direction: row; gap: 16px; }
     .order-page .step-label { max-width: none; text-align: left; }
 }
+
+/* Checkout Saved Address Picker */
+.address-label-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin: 12px 0 4px;
+}
+.address-label-row label {
+    margin: 0 !important;
+}
+.address-manage-link {
+    font-size: 0.82rem;
+    color: var(--accent);
+    text-decoration: none;
+    font-weight: 600;
+}
+.address-manage-link:hover {
+    text-decoration: underline;
+}
+.saved-address-wrap {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 12px;
+}
+.saved-address-wrap .sub-label {
+    display: block;
+    margin: 0 0 6px !important;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    font-weight: 600;
+}
+.saved-address-select {
+    width: 100%;
+    font-size: 0.9rem;
+    cursor: pointer;
+}
+.field-hint {
+    margin: 6px 0 0;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    line-height: 1.4;
+}
+
+/* --- Order Cancellation Styles --- */
+.btn-cancel-order {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.4rem 0.85rem;
+    border-radius: 8px;
+    border: 1px solid rgba(239, 68, 68, 0.4);
+    background: rgba(239, 68, 68, 0.08);
+    color: #f87171;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.btn-cancel-order:hover {
+    background: rgba(239, 68, 68, 0.2);
+    border-color: #ef4444;
+    color: #fca5a5;
+}
+
+.btn-cancel-order:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.order-page .modal-dialog {
+    background: var(--bg-card);
+    color: var(--text);
+    border: 1px solid var(--border);
+}
+
+.order-page .modal-header {
+    border-bottom: 1px solid var(--border);
+}
+
+.order-page .modal-header h3 {
+    color: var(--text);
+}
+
+.order-page .modal-close {
+    color: var(--text-muted);
+}
+
+.order-page .modal-footer {
+    border-top: 1px solid var(--border);
+}
+
+.cancel-reason-option {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.6rem 0.75rem;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--bg-card-alt);
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: border-color 0.15s, background-color 0.15s;
+}
+
+.cancel-reason-option:hover {
+    border-color: var(--accent);
+}
+
+.cancel-reason-option input[type="radio"] {
+    width: auto;
+    accent-color: var(--accent);
+    cursor: pointer;
+}
+

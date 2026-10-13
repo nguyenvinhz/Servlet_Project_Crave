@@ -12,6 +12,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
 
+import com.foodordering.dto.CancelOrderRequest;
 import com.foodordering.dto.OrderRequest;
 import com.foodordering.dto.OrderResponse;
 import com.foodordering.dto.OrderSummaryResponse;
@@ -69,6 +70,26 @@ public class OrderServlet extends BaseApiServlet {
         try {
             ProfileResponse customer = SessionAuth.requireCustomer(req);
             String customerId = customer.id();
+
+            String pathInfo = req.getPathInfo();
+            if (pathInfo != null && pathInfo.matches("^/[^/]+/cancel$")) {
+                String[] parts = pathInfo.split("/");
+                String orderId = parts[1];
+                String reason = null;
+                try {
+                    String body = req.getReader().lines().collect(java.util.stream.Collectors.joining());
+                    if (body != null && !body.trim().isEmpty()) {
+                        CancelOrderRequest cancelReq = com.foodordering.utils.JsonProvider.objectMapper().readValue(body, CancelOrderRequest.class);
+                        if (cancelReq != null) {
+                            reason = cancelReq.getReason();
+                        }
+                    }
+                } catch (Exception ignored) {
+                }
+                orderService.cancelOrder(orderId, customerId, reason);
+                writeJson(resp, HttpServletResponse.SC_OK, ApiResponse.success("Đã hủy đơn hàng thành công"));
+                return;
+            }
 
             OrderRequest request = readJson(req, OrderRequest.class);
             if (request == null) {

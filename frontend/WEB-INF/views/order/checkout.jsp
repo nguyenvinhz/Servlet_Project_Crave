@@ -18,9 +18,22 @@
             <button type="button" id="retryCheckoutBtn" class="button outline" hidden>Thử tải lại</button>
             <form id="checkoutForm">
                 <div class="form-group"><label for="fulfillmentType">Hình thức nhận món</label><select name="fulfillmentType" id="fulfillmentType"><option value="DELIVERY">Giao hàng tận nơi</option><option value="PICKUP">Lấy tại quán</option></select></div>
-                <div class="form-group"><label for="receiverName">Người nhận</label><input type="text" name="receiverName" id="receiverName" autocomplete="name" maxlength="100" placeholder="Họ và tên người nhận" required></div>
-                <div class="form-group"><label for="receiverPhone">Số điện thoại</label><input type="tel" name="receiverPhone" id="receiverPhone" autocomplete="tel" inputmode="tel" maxlength="15" placeholder="0901234567" required></div>
-                <div class="form-group" id="addressGroup"><label for="deliveryAddress">Địa chỉ nhận hàng</label><input type="text" name="deliveryAddress" id="deliveryAddress" autocomplete="street-address" maxlength="255" placeholder="Số nhà, đường, phường/xã, tỉnh/thành" required></div>
+                <div class="form-group"><label for="receiverName">Người nhận</label><input type="text" name="receiverName" id="receiverName" autocomplete="name" maxlength="100" value="<c:out value='${sessionScope.currentUser.fullName}'/>" placeholder="Họ và tên người nhận" required></div>
+                <div class="form-group"><label for="receiverPhone">Số điện thoại</label><input type="tel" name="receiverPhone" id="receiverPhone" autocomplete="tel" inputmode="tel" maxlength="15" value="<c:out value='${sessionScope.currentUser.phone}'/>" placeholder="0901234567" required></div>
+                <div class="form-group" id="addressGroup">
+                    <div class="address-label-row">
+                        <label for="deliveryAddress">Địa chỉ nhận hàng</label>
+                        <a href="<c:url value='/customer/addresses'/>" target="_blank" class="address-manage-link" title="Mở sổ địa chỉ để thêm hoặc chỉnh sửa">Quản lý sổ địa chỉ ↗</a>
+                    </div>
+                    <div id="savedAddressWrap" class="saved-address-wrap" style="display: none; margin-bottom: 0.65rem;">
+                        <label for="savedAddressSelect" class="sub-label">Chọn từ sổ địa chỉ đã lưu</label>
+                        <select id="savedAddressSelect" class="saved-address-select" aria-label="Chọn từ sổ địa chỉ đã lưu">
+                            <!-- Nạp động từ /api/addresses -->
+                        </select>
+                    </div>
+                    <input type="text" name="deliveryAddress" id="deliveryAddress" autocomplete="street-address" maxlength="255" placeholder="Số nhà, đường, phường/xã, tỉnh/thành" required>
+                    <p class="field-hint" id="addressHint">Hệ thống tự động điền địa chỉ mặc định. Bạn có thể chọn địa chỉ khác hoặc sửa trực tiếp.</p>
+                </div>
                 <div class="form-group"><label for="paymentMethod">Phương thức thanh toán</label><select name="paymentMethod" id="paymentMethod"><option value="CASH">Tiền mặt</option><option value="BANK_TRANSFER">Chuyển khoản ngân hàng</option><option value="E_WALLET">Ví điện tử</option></select></div>
                 <div class="form-group"><label for="customerNote">Ghi chú <span class="optional-label">(không bắt buộc)</span></label><textarea name="customerNote" id="customerNote" rows="3" maxlength="500" placeholder="Ví dụ: gọi trước khi giao"></textarea></div>
                 <button type="submit" id="placeOrderBtn" class="btn-primary" disabled>Đặt hàng</button>

@@ -1,8 +1,10 @@
 package com.foodordering.dto;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.foodordering.enums.FulfillmentType;
 import com.foodordering.enums.PaymentMethod;
 
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class OrderRequest {
     private FulfillmentType fulfillmentType;
     private String receiverName;

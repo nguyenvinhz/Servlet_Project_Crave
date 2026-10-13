@@ -13,6 +13,7 @@ import com.foodordering.enums.PaymentStatus;
 import com.foodordering.exception.ApiException;
 import com.foodordering.exception.AppException;
 import com.foodordering.exception.BadRequestException;
+import com.foodordering.exception.ForbiddenException;
 import com.foodordering.exception.ResourceNotFoundException;
 import com.foodordering.repository.CustomerOrderRepository;
 import com.foodordering.repository.PaymentRepository;
@@ -322,6 +323,83 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
         } catch (Exception e) {
             if (tx.isActive()) tx.rollback();
             throw new RuntimeException("Lỗi cập nhật trạng thái: " + e.getMessage(), e);
+        } finally {
+            em.close();
+        }
+    }
+
+    @Override
+    public void cancelOrder(String orderId, String customerId, String reason) {
+        if (orderId == null || orderId.trim().isEmpty()) {
+            throw new BadRequestException("Mã đơn hàng không hợp lệ");
+        }
+        if (customerId == null || customerId.trim().isEmpty()) {
+            throw new BadRequestException("Mã khách hàng không hợp lệ");
+        }
+        if (reason != null && reason.trim().length() > 255) {
+            throw new BadRequestException("Lý do hủy không được vượt quá 255 ký tự");
+        }
+
+        EntityManager em = getEntityManager();
+        EntityTransaction tx = em.getTransaction();
+        try {
+            tx.begin();
+            CustomerOrder order = em.find(CustomerOrder.class, orderId);
+            if (order == null) {
+                throw new ResourceNotFoundException("Đơn hàng không tồn tại");
+            }
+            em.refresh(order, LockModeType.PESSIMISTIC_WRITE);
+
+            if (!customerId.equals(order.getCustomer().getId())) {
+                throw new ForbiddenException("Bạn không có quyền thao tác trên đơn hàng này");
+            }
+
+            OrderStatus currentStatus = order.getStatus();
+            if (currentStatus == OrderStatus.CANCELLED) {
+                throw new BadRequestException("Đơn hàng này đã được hủy trước đó");
+            }
+            if (currentStatus == OrderStatus.COMPLETED) {
+                throw new BadRequestException("Không thể hủy đơn hàng đã hoàn tất");
+            }
+            if (currentStatus == OrderStatus.DELIVERING) {
+                throw new BadRequestException("Không thể hủy đơn hàng đang được giao");
+            }
+            if (currentStatus != OrderStatus.PENDING_CONFIRMATION && currentStatus != OrderStatus.PREPARING) {
+                throw new BadRequestException("Không thể hủy đơn hàng ở trạng thái: " + currentStatus);
+            }
+
+            order.setStatus(OrderStatus.CANCELLED);
+            if (order.getPayment() != null && order.getPayment().getStatus() == PaymentStatus.PENDING) {
+                order.getPayment().setStatus(PaymentStatus.FAILED);
+            }
+            em.merge(order);
+
+            String note = "Khách hàng hủy";
+            if (reason != null && !reason.trim().isEmpty()) {
+                note += ": " + reason.trim();
+            }
+            if (note.length() > 255) {
+                note = note.substring(0, 255);
+            }
+
+            OrderStatusHistory history = new OrderStatusHistory();
+            history.setId(generateId(10));
+            history.setOrder(order);
+            history.setStatus(OrderStatus.CANCELLED);
+            history.setChangedByEmployeeId(null);
+            history.setNote(note);
+            em.persist(history);
+
+            tx.commit();
+        } catch (ApiException e) {
+            if (tx.isActive()) tx.rollback();
+            throw e;
+        } catch (AppException e) {
+            if (tx.isActive()) tx.rollback();
+            throw e;
+        } catch (Exception e) {
+            if (tx.isActive()) tx.rollback();
+            throw new RuntimeException("Lỗi hủy đơn hàng: " + e.getMessage(), e);
         } finally {
             em.close();
         }

@@ -8,6 +8,7 @@ import com.foodordering.enums.FulfillmentType;
 import com.foodordering.enums.OrderStatus;
 import com.foodordering.enums.PaymentMethod;
 import com.foodordering.exception.BadRequestException;
+import com.foodordering.exception.ForbiddenException;
 import com.foodordering.exception.ResourceNotFoundException;
 import com.foodordering.repository.CustomerOrderRepository;
 import com.foodordering.repository.PaymentRepository;
@@ -280,5 +281,135 @@ class CustomerOrderServiceTest {
         verify(em, never()).persist(any());
         verify(em, never()).merge(any());
         verify(tx).commit();
+    }
+
+    @Test
+    @DisplayName("Hủy đơn thất bại khi đơn không tồn tại")
+    void cancelOrderThrowsNotFoundWhenOrderDoesNotExist() {
+        when(em.find(CustomerOrder.class, "DH_NONE")).thenReturn(null);
+
+        assertThrows(ResourceNotFoundException.class,
+                () -> orderService.cancelOrder("DH_NONE", "KH01", "Đổi ý"));
+        verify(tx, never()).commit();
+        verify(em).close();
+    }
+
+    @Test
+    @DisplayName("Hủy đơn thất bại khi đơn không thuộc về khách hàng")
+    void cancelOrderThrowsForbiddenWhenNotOwner() {
+        Customer owner = new Customer();
+        owner.setId("KH01");
+
+        CustomerOrder order = new CustomerOrder();
+        order.setId("DH01");
+        order.setCustomer(owner);
+        order.setStatus(OrderStatus.PENDING_CONFIRMATION);
+
+        when(em.find(CustomerOrder.class, "DH01")).thenReturn(order);
+
+        assertThrows(ForbiddenException.class,
+                () -> orderService.cancelOrder("DH01", "KH99", "Đổi ý"));
+        verify(tx).rollback();
+        verify(em).close();
+    }
+
+    @Test
+    @DisplayName("Hủy đơn thất bại khi đơn đã hủy trước đó")
+    void cancelOrderThrowsBadRequestWhenAlreadyCancelled() {
+        Customer owner = new Customer();
+        owner.setId("KH01");
+
+        CustomerOrder order = new CustomerOrder();
+        order.setId("DH01");
+        order.setCustomer(owner);
+        order.setStatus(OrderStatus.CANCELLED);
+
+        when(em.find(CustomerOrder.class, "DH01")).thenReturn(order);
+
+        BadRequestException ex = assertThrows(BadRequestException.class,
+                () -> orderService.cancelOrder("DH01", "KH01", "Đổi ý"));
+        assertTrue(ex.getMessage().contains("đã được hủy"));
+        verify(tx).rollback();
+    }
+
+    @Test
+    @DisplayName("Hủy đơn thất bại khi đơn đã hoàn tất")
+    void cancelOrderThrowsBadRequestWhenCompleted() {
+        Customer owner = new Customer();
+        owner.setId("KH01");
+
+        CustomerOrder order = new CustomerOrder();
+        order.setId("DH01");
+        order.setCustomer(owner);
+        order.setStatus(OrderStatus.COMPLETED);
+
+        when(em.find(CustomerOrder.class, "DH01")).thenReturn(order);
+
+        BadRequestException ex = assertThrows(BadRequestException.class,
+                () -> orderService.cancelOrder("DH01", "KH01", "Đổi ý"));
+        assertTrue(ex.getMessage().contains("hoàn tất"));
+        verify(tx).rollback();
+    }
+
+    @Test
+    @DisplayName("Hủy đơn thất bại khi đơn đang giao hàng")
+    void cancelOrderThrowsBadRequestWhenDelivering() {
+        Customer owner = new Customer();
+        owner.setId("KH01");
+
+        CustomerOrder order = new CustomerOrder();
+        order.setId("DH01");
+        order.setCustomer(owner);
+        order.setStatus(OrderStatus.DELIVERING);
+
+        when(em.find(CustomerOrder.class, "DH01")).thenReturn(order);
+
+        BadRequestException ex = assertThrows(BadRequestException.class,
+                () -> orderService.cancelOrder("DH01", "KH01", "Đổi ý"));
+        assertTrue(ex.getMessage().contains("đang được giao"));
+        verify(tx).rollback();
+    }
+
+    @Test
+    @DisplayName("Hủy đơn thành công khi trạng thái là PENDING_CONFIRMATION")
+    void cancelOrderSucceedsWhenPendingConfirmation() {
+        Customer owner = new Customer();
+        owner.setId("KH01");
+
+        CustomerOrder order = new CustomerOrder();
+        order.setId("DH01");
+        order.setCustomer(owner);
+        order.setStatus(OrderStatus.PENDING_CONFIRMATION);
+
+        when(em.find(CustomerOrder.class, "DH01")).thenReturn(order);
+
+        orderService.cancelOrder("DH01", "KH01", "Bận việc đột xuất");
+
+        assertEquals(OrderStatus.CANCELLED, order.getStatus());
+        verify(em).merge(order);
+        verify(em).persist(any());
+        verify(tx).commit();
+        verify(em).close();
+    }
+
+    @Test
+    @DisplayName("Hủy đơn thành công khi trạng thái là PREPARING")
+    void cancelOrderSucceedsWhenPreparing() {
+        Customer owner = new Customer();
+        owner.setId("KH01");
+
+        CustomerOrder order = new CustomerOrder();
+        order.setId("DH01");
+        order.setCustomer(owner);
+        order.setStatus(OrderStatus.PREPARING);
+
+        when(em.find(CustomerOrder.class, "DH01")).thenReturn(order);
+
+        orderService.cancelOrder("DH01", "KH01", null);
+
+        assertEquals(OrderStatus.CANCELLED, order.getStatus());
+        verify(em).merge(order);
+        verify(tx).commit();
+        verify(em).close();
     }
 }
