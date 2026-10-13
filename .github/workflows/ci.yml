@@ -93,6 +93,7 @@ jobs:
           node --check tests/frontend/admin-orders-dashboard-browser-smoke.cjs
           node --check tests/frontend/payos-payment-browser-smoke.cjs
           node --check tests/runtime/http-smoke.cjs
+          node --check tests/runtime/smtp-fixture.cjs
 
       - name: Verify deployment and rollback script
         run: |
@@ -112,6 +113,14 @@ jobs:
         env:
           CRAVE_SMOKE_BASE_URL: http://127.0.0.1:8081/crave
           CRAVE_SMOKE_ADMIN_EMAIL: ci-runtime@crave.example
+          CRAVE_SMOKE_INBOX_URL: http://127.0.0.1:2526
+          EMAIL_SMTP_HOST: 127.0.0.1
+          EMAIL_SMTP_PORT: '2525'
+          EMAIL_SMTP_USERNAME: ''
+          EMAIL_SMTP_PASSWORD: ''
+          EMAIL_FROM: ci-mail@crave.example
+          EMAIL_SMTP_STARTTLS: 'false'
+          EMAIL_OTP_SECRET: ci-only-disposable-otp-secret-at-least-32-characters
         run: |
           set -euo pipefail
           mvn --batch-mode --no-transfer-progress --file backend/pom.xml -Pdev \
@@ -135,6 +144,7 @@ jobs:
           fi
 
           server_pid=''
+          smtp_pid=''
           runtime_log='backend/target/runtime-smoke-tomcat.log'
           health_file='backend/target/runtime-health.json'
           cleanup() {
@@ -142,8 +152,23 @@ jobs:
               kill "$server_pid" || true
               wait "$server_pid" || true
             fi
+            if [[ -n "$smtp_pid" ]] && kill -0 "$smtp_pid" 2>/dev/null; then
+              kill "$smtp_pid" || true
+              wait "$smtp_pid" || true
+            fi
           }
           trap cleanup EXIT
+          node tests/runtime/smtp-fixture.cjs > backend/target/runtime-smoke-smtp.log 2>&1 &
+          smtp_pid=$!
+          inbox_ready=0
+          for attempt in $(seq 1 20); do
+            if curl --fail --silent --max-time 1 "$CRAVE_SMOKE_INBOX_URL/health" > /dev/null; then
+              inbox_ready=1
+              break
+            fi
+            sleep 1
+          done
+          [[ "$inbox_ready" == 1 ]] || { echo 'The local SMTP fixture did not become ready.' >&2; exit 1; }
           java -Dfile.encoding=UTF-8 \
             -cp "backend/target/test-classes:$(cat backend/target/dev-classpath.txt)" \
             com.foodordering.dev.DevServer backend/target/crave.war 8081 > "$runtime_log" 2>&1 &

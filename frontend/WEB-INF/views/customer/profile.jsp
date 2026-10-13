@@ -9,6 +9,7 @@
         <h1>Thông tin của bạn</h1>
         <nav aria-label="Thiết lập tài khoản">
             <a class="active" aria-current="page" href="<c:url value='/customer/profile'/>">Hồ sơ</a>
+            <a href="<c:url value='/auth/change-password'/>">Đổi mật khẩu</a>
             <c:if test="${sessionScope.currentUser.accountType == 'CUSTOMER'}">
                 <a href="<c:url value='/customer/addresses'/>">Địa chỉ giao hàng</a>
             </c:if>

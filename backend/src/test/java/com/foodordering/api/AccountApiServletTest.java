@@ -12,6 +12,7 @@ import com.foodordering.enums.EmployeeRole;
 import com.foodordering.exception.AccountException;
 import com.foodordering.security.SessionAuth;
 import com.foodordering.service.AccountService;
+import com.foodordering.service.EmailVerificationService;
 import com.foodordering.utils.JsonProvider;
 import jakarta.servlet.ReadListener;
 import jakarta.servlet.ServletInputStream;
@@ -61,20 +62,22 @@ class AccountApiServletTest {
     private static final AddressResponse ADDRESS = new AddressResponse("DC01", "12 Nguyễn Trãi", "Cổng trước", true,
             LocalDateTime.of(2026, 10, 8, 12, 0), LocalDateTime.of(2026, 10, 8, 12, 0));
     private AccountService accounts;
+    private EmailVerificationService verification;
 
     @BeforeEach
     void setUp() {
         accounts = mock(AccountService.class);
+        verification = mock(EmailVerificationService.class);
     }
 
     @Test
     void registerCreatesCustomerWithoutStartingSessionOrExposingPassword() throws Exception {
-        when(accounts.register(any(RegisterRequest.class))).thenReturn(CUSTOMER);
+        when(verification.register(any(RegisterRequest.class), eq("012345"))).thenReturn(CUSTOMER);
         Exchange exchange = request("POST", "/api/auth/register", null,
                 "{\"fullName\":\"Nguyễn Quang Vinh\",\"email\":\"vinh@example.com\",\"phone\":\"0901234567\","
-                        + "\"password\":\"strongPassword123\",\"confirmPassword\":\"strongPassword123\"}", null);
+                        + "\"password\":\"strongPassword123\",\"confirmPassword\":\"strongPassword123\",\"verificationCode\":\"012345\"}", null);
 
-        exchange.send(new AuthApiServlet(accounts));
+        exchange.send(new AuthApiServlet(accounts, verification));
 
         exchange.assertStatus(201);
         assertEquals("KH01", exchange.json().path("data").path("id").asText());
@@ -90,7 +93,7 @@ class AccountApiServletTest {
         Exchange exchange = request("POST", "/api/auth/login", null,
                 "{\"email\":\"vinh@example.com\",\"password\":\"strongPassword123\",\"rememberMe\":false}", CUSTOMER);
 
-        exchange.send(new AuthApiServlet(accounts));
+        exchange.send(new AuthApiServlet(accounts, verification));
 
         exchange.assertStatus(200);
         verify(exchange.request).changeSessionId();
@@ -110,7 +113,7 @@ class AccountApiServletTest {
         when(exchange.request.getSession()).thenReturn(newSession);
         when(exchange.request.getSession(true)).thenReturn(newSession);
 
-        exchange.send(new AuthApiServlet(accounts));
+        exchange.send(new AuthApiServlet(accounts, verification));
 
         exchange.assertStatus(200);
         verify(newSession).setAttribute("currentUser", EMPLOYEE);
@@ -123,7 +126,7 @@ class AccountApiServletTest {
         when(accounts.login(any(LoginRequest.class))).thenReturn(CUSTOMER);
         Exchange customerLogin = request("POST", "/api/auth/login", null,
                 "{\"email\":\"vinh@example.com\",\"password\":\"password123\"}", EMPLOYEE);
-        customerLogin.send(new AuthApiServlet(accounts));
+        customerLogin.send(new AuthApiServlet(accounts, verification));
         customerLogin.assertStatus(200);
         verify(customerLogin.session).setAttribute("customerId", "KH01");
         verify(customerLogin.session).removeAttribute("employeeId");
@@ -132,7 +135,7 @@ class AccountApiServletTest {
         when(accounts.login(any(LoginRequest.class))).thenReturn(EMPLOYEE);
         Exchange employeeLogin = request("POST", "/api/auth/login", null,
                 "{\"email\":\"admin@example.com\",\"password\":\"password123\"}", CUSTOMER);
-        employeeLogin.send(new AuthApiServlet(accounts));
+        employeeLogin.send(new AuthApiServlet(accounts, verification));
         employeeLogin.assertStatus(200);
         verify(employeeLogin.session).setAttribute("employeeId", "NV01");
         verify(employeeLogin.session).setAttribute("role", "ADMIN");
@@ -143,24 +146,24 @@ class AccountApiServletTest {
     void sessionReturnsAuthenticatedPrincipalAndRejectsAnonymousRequests() throws Exception {
         when(accounts.getProfile("KH01")).thenReturn(CUSTOMER);
         Exchange signedIn = request("GET", "/api/auth/session", null, "", CUSTOMER);
-        signedIn.send(new AuthApiServlet(accounts));
+        signedIn.send(new AuthApiServlet(accounts, verification));
         signedIn.assertStatus(200);
         assertEquals("KH01", signedIn.json().path("data").path("id").asText());
 
         Exchange anonymous = request("GET", "/api/auth/session", null, "", null);
-        anonymous.send(new AuthApiServlet(accounts));
+        anonymous.send(new AuthApiServlet(accounts, verification));
         anonymous.assertError(401, "UNAUTHORIZED");
     }
 
     @Test
     void logoutInvalidatesExistingSessionAndIsIdempotentForAnonymousUsers() throws Exception {
         Exchange signedIn = request("POST", "/api/auth/logout", null, "", CUSTOMER);
-        signedIn.send(new AuthApiServlet(accounts));
+        signedIn.send(new AuthApiServlet(accounts, verification));
         signedIn.assertStatus(200);
         verify(signedIn.session).invalidate();
 
         Exchange anonymous = request("POST", "/api/auth/logout", null, "", null);
-        anonymous.send(new AuthApiServlet(accounts));
+        anonymous.send(new AuthApiServlet(accounts, verification));
         anonymous.assertStatus(200);
         assertTrue(anonymous.json().path("success").asBoolean());
         verify(anonymous.request, never()).getSession(true);
@@ -175,7 +178,7 @@ class AccountApiServletTest {
             return CUSTOMER;
         });
 
-        exchange.send(new AuthApiServlet(accounts));
+        exchange.send(new AuthApiServlet(accounts, verification));
 
         exchange.assertError(401, "UNAUTHORIZED");
         assertEquals(EMPLOYEE, exchange.session.getAttribute("currentUser"));
@@ -190,7 +193,7 @@ class AccountApiServletTest {
             throw new AccountException("ACCOUNT_INACTIVE", "Tài khoản bị khóa.", 401);
         });
 
-        exchange.send(new AuthApiServlet(accounts));
+        exchange.send(new AuthApiServlet(accounts, verification));
 
         exchange.assertError(401, "ACCOUNT_INACTIVE");
         assertEquals(CUSTOMER, exchange.session.getAttribute("currentUser"));
@@ -245,7 +248,7 @@ class AccountApiServletTest {
                 return CUSTOMER;
             });
 
-            exchange.send(path.equals("/api/profile") ? new ProfileApiServlet(accounts) : new AuthApiServlet(accounts));
+            exchange.send(path.equals("/api/profile") ? new ProfileApiServlet(accounts) : new AuthApiServlet(accounts, verification));
 
             exchange.assertError(401, "UNAUTHORIZED");
             verify(exchange.session).invalidate();
@@ -270,7 +273,7 @@ class AccountApiServletTest {
                 return CUSTOMER;
             });
 
-            exchange.send(new AuthApiServlet(accounts));
+            exchange.send(new AuthApiServlet(accounts, verification));
 
             exchange.assertError(401, "UNAUTHORIZED");
             verify(original).invalidate();
@@ -286,7 +289,7 @@ class AccountApiServletTest {
         doAnswer(call -> { throw new IllegalStateException("Session invalidated"); })
                 .when(exchange.session).invalidate();
 
-        exchange.send(new AuthApiServlet(accounts));
+        exchange.send(new AuthApiServlet(accounts, verification));
 
         exchange.assertStatus(200);
     }
@@ -295,7 +298,7 @@ class AccountApiServletTest {
     void malformedUnknownAndEmptyJsonAreBadRequestsWithoutCallingService() throws Exception {
         for (String payload : new String[]{"{", "", "null", "[]", "{\"unexpected\":true}", "{} {}"}) {
             Exchange exchange = request("POST", "/api/auth/login", null, payload, null);
-            exchange.send(new AuthApiServlet(accounts));
+            exchange.send(new AuthApiServlet(accounts, verification));
             exchange.assertStatus(400);
             assertFalse(exchange.json().path("success").asBoolean(), payload);
         }
@@ -311,7 +314,7 @@ class AccountApiServletTest {
                 "{\"email\":\"vinh@example.com\",\"password\":\"password123\",\"rememberMe\":1}",
                 "{\"email\":\"vinh@example.com\",\"password\":\"password123\",\"rememberMe\":\"true\"}"}) {
             Exchange exchange = request("POST", "/api/auth/login", null, payload, null);
-            exchange.send(new AuthApiServlet(accounts));
+            exchange.send(new AuthApiServlet(accounts, verification));
             exchange.assertStatus(400);
         }
         verifyNoInteractions(accounts);
@@ -324,7 +327,7 @@ class AccountApiServletTest {
                 "{\"fullName\":\"Vinh\",\"email\":\"vinh@example.com\",\"phone\":901234567,\"password\":\"password123\",\"confirmPassword\":\"password123\"}",
                 "{\"fullName\":\"Vinh\",\"email\":\"vinh@example.com\",\"phone\":\"0901234567\",\"password\":12345678,\"confirmPassword\":12345678}"}) {
             Exchange exchange = request("POST", "/api/auth/register", null, payload, null);
-            exchange.send(new AuthApiServlet(accounts));
+            exchange.send(new AuthApiServlet(accounts, verification));
             exchange.assertStatus(400);
         }
         verifyNoInteractions(accounts);
@@ -362,7 +365,7 @@ class AccountApiServletTest {
     void duplicateJsonFieldsAreRejectedWithoutCallingService() throws Exception {
         Exchange login = request("POST", "/api/auth/login", null,
                 "{\"email\":\"first@example.com\",\"email\":\"second@example.com\",\"password\":\"password123\"}", null);
-        login.send(new AuthApiServlet(accounts));
+        login.send(new AuthApiServlet(accounts, verification));
         login.assertStatus(400);
         Exchange address = request("POST", "/api/addresses", null,
                 "{\"addressLine\":\"demo\",\"isDefault\":false,\"isDefault\":true}", CUSTOMER);
@@ -376,7 +379,7 @@ class AccountApiServletTest {
         Exchange registration = request("POST", "/api/auth/register", null,
                 "{\"fullName\":\"Vinh\",\"email\":\"vinh@example.com\",\"phone\":\"0901234567\","
                         + "\"password\":\"password123\",\"confirmPassword\":\"password123\",\"accountType\":\"EMPLOYEE\",\"role\":\"ADMIN\"}", null);
-        registration.send(new AuthApiServlet(accounts));
+        registration.send(new AuthApiServlet(accounts, verification));
         registration.assertStatus(400);
         Exchange address = request("POST", "/api/addresses", null,
                 "{\"addressLine\":\"demo\",\"isDefault\":true,\"customerId\":\"KH02\"}", CUSTOMER);
@@ -390,7 +393,7 @@ class AccountApiServletTest {
         when(accounts.login(any(LoginRequest.class))).thenReturn(CUSTOMER);
         Exchange exchange = request("POST", "/api/auth/login", null,
                 "{\"email\":\"vinh@example.com\",\"password\":\"strongPassword123\",\"rememberMe\":true}", CUSTOMER);
-        exchange.send(new AuthApiServlet(accounts));
+        exchange.send(new AuthApiServlet(accounts, verification));
         exchange.assertStatus(200);
         verify(exchange.session).setMaxInactiveInterval(7 * 24 * 60 * 60);
     }
@@ -401,26 +404,135 @@ class AccountApiServletTest {
                 new AccountException("INVALID_CREDENTIALS", "Email hoặc mật khẩu không đúng.", 401));
         Exchange exchange = request("POST", "/api/auth/login", null,
                 "{\"email\":\"vinh@example.com\",\"password\":\"wrongPassword123\"}", null);
-        exchange.send(new AuthApiServlet(accounts));
+        exchange.send(new AuthApiServlet(accounts, verification));
         exchange.assertError(401, "INVALID_CREDENTIALS");
         verify(exchange.request, never()).getSession(true);
     }
 
     @Test
     void duplicateRegistrationReturnsConflictWithFieldErrors() throws Exception {
-        when(accounts.register(any(RegisterRequest.class))).thenThrow(new AccountException(
+        when(verification.register(any(RegisterRequest.class), eq("012345"))).thenThrow(new AccountException(
                 "ACCOUNT_CONFLICT", "Email đã được sử dụng.", 409, Map.of("email", "Email đã được sử dụng.")));
-        Exchange exchange = request("POST", "/api/auth/register", null, "{}", null);
-        exchange.send(new AuthApiServlet(accounts));
+        Exchange exchange = request("POST", "/api/auth/register", null, "{\"verificationCode\":\"012345\"}", null);
+        exchange.send(new AuthApiServlet(accounts, verification));
         exchange.assertError(409, "ACCOUNT_CONFLICT");
         assertEquals("Email đã được sử dụng.", exchange.json().path("error").path("fieldErrors").path("email").asText());
+    }
+
+    @Test
+    void registrationCannotBypassEmailVerification() throws Exception {
+        for (String code : new String[]{"null", "\"12345\"", "\"1234567\"", "123456", "\"１２３４５６\""}) {
+            Exchange exchange = request("POST", "/api/auth/register", null,
+                    "{\"verificationCode\":" + code + "}", null);
+            exchange.send(new AuthApiServlet(accounts, verification));
+            exchange.assertStatus(400);
+        }
+        verifyNoInteractions(accounts, verification);
+    }
+
+    @Test
+    void registrationCodeAcknowledgementDoesNotRevealCode() throws Exception {
+        Exchange exchange = request("POST", "/api/auth/register/code", null,
+                "{\"email\":\"vinh@example.com\"}", null);
+        exchange.send(new EmailVerificationApiServlet(verification));
+        exchange.assertStatus(200);
+        verify(verification).requestRegistrationCode("vinh@example.com");
+        assertEquals(600, exchange.json().path("data").path("expiresInSeconds").asInt());
+        assertFalse(exchange.json().path("data").has("verificationCode"));
+        verify(exchange.request, never()).getSession(true);
+    }
+
+    @Test
+    void forgotPasswordRequestIsPublicAndHasGenericResponse() throws Exception {
+        Exchange exchange = request("POST", "/api/auth/password/reset/code", null,
+                "{\"email\":\"unknown@example.com\"}", null);
+        exchange.send(new EmailVerificationApiServlet(verification));
+        exchange.assertStatus(200);
+        verify(verification).requestPasswordResetCode("unknown@example.com");
+        assertFalse(exchange.json().path("data").has("accountType"));
+        verify(exchange.request, never()).getSession(true);
+    }
+
+    @Test
+    void passwordResetPreservesLeadingZeroCodeAndDoesNotLogin() throws Exception {
+        Exchange exchange = request("POST", "/api/auth/password/reset", null,
+                "{\"email\":\"admin@example.com\",\"verificationCode\":\"012345\","
+                        + "\"password\":\"newPassword123\",\"confirmPassword\":\"newPassword123\"}", null);
+        exchange.send(new EmailVerificationApiServlet(verification));
+        exchange.assertStatus(200);
+        verify(verification).resetPassword("admin@example.com", "012345", "newPassword123", "newPassword123");
+        verify(exchange.request, never()).getSession(true);
+        assertFalse(exchange.body.toString().contains("newPassword123"));
+        assertFalse(exchange.body.toString().contains("012345"));
+    }
+
+    @Test
+    void passwordChangeUsesSessionIdentityForCustomerAndEveryEmployeeRole() throws Exception {
+        List<ProfileResponse> users = new java.util.ArrayList<>(List.of(CUSTOMER));
+        for (EmployeeRole role : EmployeeRole.values()) {
+            users.add(new ProfileResponse("NV" + role.ordinal(), AccountType.EMPLOYEE,
+                    "Employee", "employee@example.com", "0907654321", role));
+        }
+        for (ProfileResponse user : users) {
+            Exchange code = request("POST", "/api/auth/password/change/code", null,
+                    "{\"currentPassword\":\"oldPassword123\"}", user);
+            code.send(new EmailVerificationApiServlet(verification));
+            code.assertStatus(200);
+            verify(verification).requestPasswordChangeCode(user.id(), "oldPassword123");
+            Exchange change = request("POST", "/api/auth/password/change", null,
+                    "{\"verificationCode\":\"012345\",\"password\":\"newPassword123\","
+                            + "\"confirmPassword\":\"newPassword123\"}", user);
+            change.send(new EmailVerificationApiServlet(verification));
+            change.assertStatus(200);
+            verify(verification).changePassword(user.id(), "012345", "newPassword123", "newPassword123");
+            verify(change.session).invalidate();
+        }
+    }
+
+    @Test
+    void passwordChangeRejectsAnonymousAndInjectedTargetEmail() throws Exception {
+        Exchange anonymous = request("POST", "/api/auth/password/change/code", null,
+                "{\"currentPassword\":\"oldPassword123\"}", null);
+        anonymous.send(new EmailVerificationApiServlet(verification));
+        anonymous.assertStatus(401);
+        Exchange injected = request("POST", "/api/auth/password/change/code", null,
+                "{\"currentPassword\":\"oldPassword123\",\"email\":\"victim@example.com\"}", CUSTOMER);
+        injected.send(new EmailVerificationApiServlet(verification));
+        injected.assertStatus(400);
+        verifyNoInteractions(verification);
+    }
+
+    @Test
+    void resetAndChangeRejectNumericCodesAndUnexpectedMethods() throws Exception {
+        for (String path : new String[]{"/api/auth/password/reset", "/api/auth/password/change"}) {
+            Exchange numeric = request("POST", path, null, "{\"verificationCode\":123456}", CUSTOMER);
+            numeric.send(new EmailVerificationApiServlet(verification));
+            numeric.assertStatus(400);
+            Exchange get = request("GET", path, null, "", null);
+            get.send(new EmailVerificationApiServlet(verification));
+            get.assertStatus(405);
+        }
+        verifyNoInteractions(verification);
+    }
+
+    @Test
+    void oldCustomerAndEmployeeSessionsAreRevokedAfterPasswordVersionChanges() throws Exception {
+        for (ProfileResponse user : List.of(CUSTOMER, EMPLOYEE)) {
+            ProfileResponse changed = new ProfileResponse(user.id(), user.accountType(), user.fullName(),
+                    user.email(), user.phone(), user.role(), 1L);
+            when(accounts.getProfile(user.id())).thenReturn(changed);
+            Exchange exchange = request("GET", "/api/auth/session", null, "", user);
+            exchange.send(new AuthApiServlet(accounts, verification));
+            exchange.assertStatus(401);
+            verify(exchange.session).invalidate();
+        }
     }
 
     @Test
     void inactiveSessionIsInvalidatedBySessionEndpoint() throws Exception {
         when(accounts.getProfile("KH01")).thenThrow(new AccountException("ACCOUNT_INACTIVE", "Tài khoản bị khóa.", 401));
         Exchange exchange = request("GET", "/api/auth/session", null, "", CUSTOMER);
-        exchange.send(new AuthApiServlet(accounts));
+        exchange.send(new AuthApiServlet(accounts, verification));
         exchange.assertError(401, "ACCOUNT_INACTIVE");
         verify(exchange.session).invalidate();
     }
@@ -429,7 +541,7 @@ class AccountApiServletTest {
     void formEncodedRequestIsRejectedWith415() throws Exception {
         Exchange exchange = request("POST", "/api/auth/login", null, "email=test", null);
         when(exchange.request.getContentType()).thenReturn("application/x-www-form-urlencoded");
-        exchange.send(new AuthApiServlet(accounts));
+        exchange.send(new AuthApiServlet(accounts, verification));
         exchange.assertError(415, "UNSUPPORTED_MEDIA_TYPE");
         verifyNoInteractions(accounts);
     }
@@ -439,33 +551,33 @@ class AccountApiServletTest {
         Exchange exchange = request("POST", "/api/auth/login", null,
                 "{\"email\":\"vinh@example.com\",\"password\":\"password123\"}", null);
         when(exchange.request.getContentType()).thenReturn(null);
-        exchange.send(new AuthApiServlet(accounts));
+        exchange.send(new AuthApiServlet(accounts, verification));
         exchange.assertError(415, "UNSUPPORTED_MEDIA_TYPE");
         verifyNoInteractions(accounts);
     }
 
     @Test
     void jsonContentTypeMayIncludeCharsetAndMixedCase() throws Exception {
-        when(accounts.register(any(RegisterRequest.class))).thenReturn(CUSTOMER);
+        when(verification.register(any(RegisterRequest.class), eq("012345"))).thenReturn(CUSTOMER);
         Exchange exchange = request("POST", "/api/auth/register", null,
                 "{\"fullName\":\"Vinh\",\"email\":\"vinh@example.com\",\"phone\":\"0901234567\","
-                        + "\"password\":\"password123\",\"confirmPassword\":\"password123\"}", null);
+                        + "\"password\":\"password123\",\"confirmPassword\":\"password123\",\"verificationCode\":\"012345\"}", null);
         when(exchange.request.getContentType()).thenReturn("Application/JSON; charset=UTF-8");
-        exchange.send(new AuthApiServlet(accounts));
+        exchange.send(new AuthApiServlet(accounts, verification));
         exchange.assertStatus(201);
-        verify(accounts).register(any(RegisterRequest.class));
+        verify(verification).register(any(RegisterRequest.class), eq("012345"));
     }
 
     @Test
     void getLoginRegisterAndLogoutAndPostSessionAreMethodNotAllowed() throws Exception {
         for (String path : new String[]{"/api/auth/login", "/api/auth/register", "/api/auth/logout"}) {
             Exchange exchange = request("GET", path, null, "", null);
-            exchange.send(new AuthApiServlet(accounts));
+            exchange.send(new AuthApiServlet(accounts, verification));
             exchange.assertError(405, "METHOD_NOT_ALLOWED");
             verify(exchange.response).setHeader("Allow", "POST");
         }
         Exchange sessionPost = request("POST", "/api/auth/session", null, "", CUSTOMER);
-        sessionPost.send(new AuthApiServlet(accounts));
+        sessionPost.send(new AuthApiServlet(accounts, verification));
         sessionPost.assertStatus(405);
         verify(sessionPost.response).setHeader("Allow", "GET");
         verifyNoInteractions(accounts);
@@ -474,7 +586,7 @@ class AccountApiServletTest {
     @Test
     void unsupportedAuthHttpMethodReturnsJson405() throws Exception {
         Exchange exchange = request("DELETE", "/api/auth/login", null, "", null);
-        exchange.send(new AuthApiServlet(accounts));
+        exchange.send(new AuthApiServlet(accounts, verification));
         exchange.assertError(405, "METHOD_NOT_ALLOWED");
         verify(exchange.response).setHeader("Allow", "POST");
         verifyNoInteractions(accounts);

@@ -160,6 +160,14 @@ Environment `production` cần ba **Environment secrets**: `PAYOS_CLIENT_ID`,
 `PAYOS_API_KEY`, `PAYOS_CHECKSUM_KEY`. Workflow chỉ truyền chúng cho bước deploy
 và đăng ký webhook; không đưa khóa vào WAR hoặc file cấu hình trong Git.
 
+Email xác thực cần thêm hai **Environment secrets**: `EMAIL_SMTP_PASSWORD`
+(Google app password) và `EMAIL_OTP_SECRET` (ít nhất 32 ký tự ngẫu nhiên).
+Chỉ bước deploy nhận hai secret này. Các variables `EMAIL_SMTP_HOST`,
+`EMAIL_SMTP_PORT`, `EMAIL_SMTP_USERNAME`, `EMAIL_FROM` mặc định lần lượt là
+`smtp.gmail.com`, `587`, `craveshopvn@gmail.com`, `craveshopvn@gmail.com`.
+Production luôn yêu cầu STARTTLS; không đặt app password trong repository,
+WAR, command line hoặc log. Xem [email xác thực](email-verification.md).
+
 Đặt **Environment variable** `PAYOS_PUBLIC_BASE_URL` thành
 `http://15.134.39.86:8080/crave`. Giá trị mặc định trong workflow hiện cũng dùng
 đúng URL này. Nếu thay đổi server, cập nhật các variables:
@@ -173,13 +181,16 @@ và đăng ký webhook; không đưa khóa vào WAR hoặc file cấu hình tron
 | `EC2_HEALTH_URL` | `http://127.0.0.1:8080/crave/api/health` | Endpoint health trên máy EC2 |
 | `PAYOS_PUBLIC_BASE_URL` | `http://15.134.39.86:8080/crave` | URL public dùng cho return/cancel và webhook, gồm `/crave` |
 
-Không copy `.env` local lên EC2. Compose override chỉ bổ sung bốn biến payOS
+Không copy `.env` local lên EC2. Compose override bổ sung bốn biến payOS và bảy biến email
 cho service `app`; các biến kết nối MySQL, volume và port của compose production
 được giữ. Script lưu file secret và bản backup với quyền `0600`.
 
 Migration `database/migrations/2026-10-13-payos-payment.sql` được lấy từ commit
 đang deploy và chạy bằng MySQL client trong container. Mật khẩu quản trị được
 đọc bên trong container; không ghi vào command line hoặc log của runner.
+Migration `database/migrations/2026-10-13-email-verification.sql` chạy cùng lúc,
+thêm bảng mã xác thực và phiên bản mật khẩu trước khi cài WAR. Cả hai migration
+đều có thể chạy lại và không thay đổi mật khẩu hoặc tài khoản hiện có.
 Nếu migration thất bại, script dừng trước khi thay WAR hoặc recreate app.
 
 ## Luồng cập nhật ứng dụng
@@ -190,8 +201,8 @@ commit mới trên `main` tạo sự kiện `push`, workflow **CI/CD - main to E
 chạy. Push trực tiếp vào `main` cũng dùng đúng luồng này. Xem tab **Actions**:
 
 1. `CI / Build and test` phải thành công và tạo artifact `crave-war`.
-2. `Deploy EC2` kiểm tra secrets và cấu hình, áp migration payOS, rồi lưu WAR
-   cùng cấu hình payOS hiện tại vào `.deploy-backups/`, thay WAR và recreate `app`.
+2. `Deploy EC2` kiểm tra secrets và cấu hình, áp migration thanh toán/email, rồi lưu WAR
+   cùng cấu hình hiện tại vào `.deploy-backups/`, thay WAR và recreate `app`.
 3. Endpoint health phải trả HTTP 200 với `success: true`,
    `data.application: "UP"`, `data.database: "UP"` trong 180 giây.
 4. Workflow đăng ký `http://15.134.39.86:8080/crave/api/payos/webhook` với payOS

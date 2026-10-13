@@ -7,8 +7,38 @@ const origin = new URL(base).origin;
 const apiOnly = process.argv.includes('--api-only');
 const token = Date.now().toString(36) + randomBytes(2).toString('hex');
 const password = randomBytes(14).toString('base64url');
+let customerPassword = password;
+const inboxBase = (process.env.CRAVE_SMOKE_INBOX_URL || 'http://127.0.0.1:2526').replace(/\/$/, '');
+assert(['127.0.0.1', 'localhost', '[::1]'].includes(new URL(inboxBase).hostname), 'SMTP test inbox must use loopback.');
 const phone = () => '09' + String(Math.floor(Math.random() * 100000000)).padStart(8, '0');
 let checks = 0;
+
+async function verificationCode(email, purpose) {
+    for (let attempt = 0; attempt < 30; attempt++) {
+        const response = await fetch(inboxBase + '/messages?email=' + encodeURIComponent(email) + '&purpose=' + purpose);
+        if (response.ok) {
+            const message = await response.json();
+            assert.equal(message.email.toLowerCase(), email.toLowerCase());
+            assert.equal(message.purpose, purpose);
+            assert.match(message.code, /^[0-9]{6}$/);
+            return message.code;
+        }
+        assert.equal(response.status, 404, 'Unexpected test inbox response.');
+        await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    throw new Error('The local SMTP fixture did not receive a verification message.');
+}
+
+async function requestCode(client, path, body) {
+    const result = await client.request(path, {method: 'POST', body});
+    assert(!/verificationCode|otpCode|codeHash|passwordHash/.test(JSON.stringify(result)), 'Code or hash leaked through API response.');
+    return result;
+}
+
+async function resetPassword(client, email, nextPassword, code) {
+    return client.request('/api/auth/password/reset', {method: 'POST',
+        body: {email, verificationCode: code, password: nextPassword, confirmPassword: nextPassword}});
+}
 
 class Client {
     cookie = '';
@@ -57,10 +87,45 @@ class Client {
     await guest.request('/api/admin/customers', {status: 401});
     await guest.request('/api/cart', {status: 401});
     await guest.request('/admin', {status: 302});
+    const registration = {fullName: 'Khách kiểm thử Nguyễn', email: `smoke-${token}@example.com`, phone: phone(), password, confirmPassword: password};
+    await guest.request('/api/auth/register', {method: 'POST', status: 400, body: registration});
+    await requestCode(guest, '/api/auth/register/code', {email: registration.email});
+    const registerCode = await verificationCode(registration.email, 'REGISTER');
+    const wrongRegisterCode = registerCode === '000000' ? '111111' : '000000';
+    await guest.request('/api/auth/register', {method: 'POST', status: 400,
+        body: {...registration, verificationCode: wrongRegisterCode}});
     const account = await guest.request('/api/auth/register', {method: 'POST', status: 201,
-        body: {fullName: 'Khách kiểm thử Nguyễn', email: `smoke-${token}@example.com`, phone: phone(), password, confirmPassword: password}});
-    await customer.login(account.email, password);
+        body: {...registration, verificationCode: registerCode}});
+    await customer.login(account.email, customerPassword);
     assert.equal((await customer.request('/api/profile')).fullName, 'Khách kiểm thử Nguyễn');
+    // Codes bind to the account/purpose, and successful reset revokes existing sessions.
+    await guest.request('/api/auth/password/reset', {method: 'POST', status: 400,
+        body: {email: account.email, verificationCode: registerCode, password, confirmPassword: password}});
+    await requestCode(guest, '/api/auth/password/reset/code', {email: account.email});
+    const resetCode = await verificationCode(account.email, 'PASSWORD_RESET');
+    await guest.request('/api/auth/password/reset', {method: 'POST', status: 400,
+        body: {email: `other-${token}@example.com`, verificationCode: resetCode, password, confirmPassword: password}});
+    const resetPasswordValue = randomBytes(14).toString('base64url');
+    await resetPassword(guest, account.email, resetPasswordValue, resetCode);
+    await customer.request('/api/profile', {status: 401});
+    await guest.request('/api/auth/password/reset', {method: 'POST', status: 400,
+        body: {email: account.email, verificationCode: resetCode, password, confirmPassword: password}});
+    await guest.request('/api/auth/login', {method: 'POST', status: 401, body: {email: account.email, password}});
+    customerPassword = resetPasswordValue;
+    await customer.login(account.email, customerPassword);
+    await requestCode(customer, '/api/auth/password/change/code', {currentPassword: customerPassword});
+    const changeCode = await verificationCode(account.email, 'PASSWORD_CHANGE');
+    const changedPassword = randomBytes(14).toString('base64url');
+    await customer.request('/api/auth/password/change', {method: 'POST',
+        body: {verificationCode: changeCode, password: changedPassword, confirmPassword: changedPassword}});
+    await customer.request('/api/profile', {status: 401});
+    customerPassword = changedPassword;
+    await customer.login(account.email, customerPassword);
+    await customer.request('/api/auth/password/change', {method: 'POST', status: 400,
+        body: {verificationCode: changeCode, password, confirmPassword: password}});
+    const unknownEmail = `unknown-${token}@example.com`;
+    await requestCode(guest, '/api/auth/password/reset/code', {email: unknownEmail});
+    assert.equal((await fetch(inboxBase + '/messages?email=' + encodeURIComponent(unknownEmail) + '&purpose=PASSWORD_RESET')).status, 404);
     await customer.request('/api/admin/orders', {status: 403});
     for (const page of ['/customer/profile', '/customer/addresses', '/cart', '/checkout', '/orders']) await customer.request(page);
     const address = await customer.request('/api/addresses', {method: 'POST', status: 201,
@@ -72,6 +137,12 @@ class Client {
 
     const manager = await admin.login(process.env.CRAVE_SMOKE_ADMIN_EMAIL, process.env.CRAVE_SMOKE_ADMIN_PASSWORD);
     assert.equal(manager.role, 'ADMIN');
+    await requestCode(guest, '/api/auth/password/reset/code', {email: manager.email});
+    const adminCode = await verificationCode(manager.email, 'PASSWORD_RESET');
+    const nextAdminPassword = randomBytes(14).toString('base64url');
+    await resetPassword(guest, manager.email, nextAdminPassword, adminCode);
+    await admin.request('/api/admin/customers', {status: 401});
+    assert.equal((await admin.login(manager.email, nextAdminPassword)).role, 'ADMIN');
     await admin.request('/api/cart', {status: 403});
     const category = await admin.request('/api/admin/categories', {method: 'POST', status: 201,
         body: {name: `Kiểm thử ${token}`, description: 'Dữ liệu riêng của kiểm thử HTTP'}});
@@ -134,7 +205,7 @@ class Client {
     await admin.request(`/api/admin/customers/${account.id}/status`, {method: 'PATCH', body: {status: 'LOCKED'}});
     await customer.request('/api/profile', {status: 401});
     await admin.request(`/api/admin/customers/${account.id}/status`, {method: 'PATCH', body: {status: 'ACTIVE'}});
-    await customer.login(account.email, password);
+    await customer.login(account.email, customerPassword);
     for (const [role, allowed, forbidden] of [
         ['MENU_MANAGER', '/api/admin/foods', '/api/admin/orders'],
         ['ORDER_STAFF', '/api/admin/orders', '/api/admin/employees'],
@@ -146,6 +217,12 @@ class Client {
                 password, role, hireDate: today, address: 'TP. Hồ Chí Minh'}});
         const staff = new Client();
         await staff.login(employee.email, password);
+        await requestCode(guest, '/api/auth/password/reset/code', {email: employee.email});
+        const staffCode = await verificationCode(employee.email, 'PASSWORD_RESET');
+        const nextStaffPassword = randomBytes(14).toString('base64url');
+        await resetPassword(guest, employee.email, nextStaffPassword, staffCode);
+        await staff.request(allowed, {status: 401});
+        assert.equal((await staff.login(employee.email, nextStaffPassword)).role, role);
         await staff.request(allowed);
         await staff.request(forbidden, {status: 403});
         await admin.request(`/api/admin/employees/${employee.id}/status`, {method: 'PATCH', body: {status: 'ON_LEAVE'}});

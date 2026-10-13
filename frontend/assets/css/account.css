@@ -136,6 +136,64 @@
     margin-top: 0.75rem;
 }
 
+.account-ui .auth-help {
+    margin: 0.65rem 0 0;
+    text-align: right;
+}
+
+.account-ui .auth-help a {
+    color: var(--accent-dark);
+    font-weight: 600;
+}
+
+.account-ui .otp-fields {
+    margin: 1.5rem 0 0;
+    padding: 1rem 1.25rem 1.25rem;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: var(--cream, #fff5ee);
+}
+
+.account-ui #password-change-fields {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    min-width: 0;
+}
+
+.account-ui .otp-fields legend {
+    padding: 0 0.4rem;
+    color: var(--accent-dark);
+    font-weight: 700;
+}
+
+.account-ui input.otp-input {
+    width: min(100%, 16rem);
+    font: 600 1.4rem/1.5 ui-monospace, Consolas, monospace;
+    letter-spacing: 0.25em;
+}
+
+.account-ui .otp-actions {
+    display: flex;
+    gap: 0.65rem;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.account-ui .otp-actions .button {
+    margin-top: 0.5rem;
+}
+
+.account-ui input[readonly] {
+    background: var(--cream, #fff5ee);
+}
+
+.account-ui button:focus-visible,
+.account-ui a:focus-visible {
+    outline: 2px solid var(--accent-dark);
+    outline-offset: 3px;
+}
+
 .account-ui .account-sidebar nav a {
     display: flex;
     align-items: center;

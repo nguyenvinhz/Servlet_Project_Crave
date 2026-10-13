@@ -2,6 +2,7 @@ package com.foodordering.repository;
 
 import com.foodordering.entity.Address;
 import com.foodordering.entity.Customer;
+import com.foodordering.entity.EmailVerificationChallenge;
 import com.foodordering.entity.User;
 
 import java.util.List;
@@ -20,6 +21,22 @@ public interface AccountRepository {
         Optional<User> findUser(String id);
 
         Optional<User> findByEmail(String email);
+
+        default Optional<User> findUser(String id, boolean lock) {
+            return findUser(id);
+        }
+
+        default Optional<User> findByEmail(String email, boolean lock) {
+            return findByEmail(email);
+        }
+
+        default Optional<EmailVerificationChallenge> findVerificationChallenge(String id, boolean lock) {
+            throw new UnsupportedOperationException("Email verification persistence is unavailable.");
+        }
+
+        default void persistVerificationChallenge(EmailVerificationChallenge challenge) {
+            throw new UnsupportedOperationException("Email verification persistence is unavailable.");
+        }
 
         Optional<Customer> findCustomer(String id, boolean lock);
 

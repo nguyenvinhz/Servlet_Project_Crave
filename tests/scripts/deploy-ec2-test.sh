@@ -4,7 +4,8 @@ set -Eeuo pipefail
 
 script_directory=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 deploy_script=$(realpath -- "$script_directory/../../scripts/deploy-ec2.sh")
-test_migration=$(realpath -- "$script_directory/../../database/migrations/2026-10-13-payos-payment.sql")
+test_payos_migration=$(realpath -- "$script_directory/../../database/migrations/2026-10-13-payos-payment.sql")
+test_email_migration=$(realpath -- "$script_directory/../../database/migrations/2026-10-13-email-verification.sql")
 for dependency in bash python3 cmp mktemp install sha256sum unzip; do
   command -v "$dependency" >/dev/null || { printf 'Missing test dependency: %s\n' "$dependency" >&2; exit 1; }
 done
@@ -12,6 +13,8 @@ real_install=$(command -v install)
 temp_directory=$(realpath -- "${TMPDIR:-/tmp}")
 test_root=$(mktemp -d "$temp_directory/crave-deploy-test.XXXXXX")
 [[ $test_root == "$temp_directory/"crave-deploy-test.* ]] || exit 1
+test_migration=$test_root/release-migrations.sql
+cat -- "$test_payos_migration" "$test_email_migration" > "$test_migration"
 cleanup() {
   local status=$?
   if [[ $status -ne 0 && -n ${case_directory:-} ]]; then
@@ -122,6 +125,7 @@ case "$1" in
     cat > "$TEST_CASE_DIRECTORY/migration.sql"
     cmp -s -- "$TEST_MIGRATION" "$TEST_CASE_DIRECTORY/migration.sql" || exit 100
     grep -Fq 'CREATE TABLE IF NOT EXISTS payos_payment_link' "$TEST_CASE_DIRECTORY/migration.sql" || exit 101
+    grep -Fq 'CREATE TABLE IF NOT EXISTS email_verification_challenges' "$TEST_CASE_DIRECTORY/migration.sql" || exit 101
     cmp -s -- "$TEST_CASE_DIRECTORY/reference/old.war" "$TEST_DEPLOY_DIRECTORY/backend/target/crave.war" || exit 102
     [[ ! -e $TEST_CASE_DIRECTORY/recreate.count ]] || exit 103
     printf 'migration\n' >> "$TEST_CASE_DIRECTORY/operations.log"
@@ -247,6 +251,9 @@ PY
   export DEPLOY_PATH="$deploy_directory" COMPOSE_FILE=compose.yaml APP_SERVICE=app DB_SERVICE=mysql
   export PAYOS_CLIENT_ID=fixture-client-id PAYOS_API_KEY=fixture-api-key PAYOS_CHECKSUM_KEY=fixture-checksum-key
   export PAYOS_PUBLIC_BASE_URL=https://crave-fixture.example/crave
+  export EMAIL_SMTP_HOST=smtp.gmail.com EMAIL_SMTP_PORT=587 EMAIL_SMTP_STARTTLS=true
+  export EMAIL_SMTP_USERNAME=fixture-mail@example.com EMAIL_FROM=fixture-mail@example.com
+  export EMAIL_SMTP_PASSWORD=fixture-mail-password EMAIL_OTP_SECRET=fixture-otp-secret-at-least-32-characters
   export TEST_EXPECTED_PUBLIC_BASE_URL=''
   export PAYOS_EXPAND=incorrect-compose-interpolation PAYOS_BAD=incorrect-compose-fallback
   export HEALTH_URL=http://127.0.0.1:8080/crave/api/health HEALTH_TIMEOUT_SECONDS=1 HEALTH_INTERVAL_SECONDS=1
@@ -274,7 +281,7 @@ assert_protected_files() {
 
 assert_no_secret_log() {
   local secret
-  for secret in "$PAYOS_CLIENT_ID" "$PAYOS_API_KEY" "$PAYOS_CHECKSUM_KEY" 'existing-database-fixture-password' 'container-only-db-fixture' 'previous-fixture-client' 'previous-fixture-api' 'previous-fixture-checksum'; do
+  for secret in "$PAYOS_CLIENT_ID" "$PAYOS_API_KEY" "$PAYOS_CHECKSUM_KEY" "$EMAIL_SMTP_PASSWORD" "$EMAIL_OTP_SECRET" 'existing-database-fixture-password' 'container-only-db-fixture' 'previous-fixture-client' 'previous-fixture-api' 'previous-fixture-checksum' 'previous-fixture-mail-password' 'previous-fixture-otp-secret-at-least-32-characters'; do
     [[ -z $secret ]] || ! grep -Fq -- "$secret" "$case_directory/deploy.log" || fail 'Deployment output exposed fixture credentials.'
   done
 }
@@ -314,12 +321,12 @@ with open(sys.argv[2], encoding="utf-8") as source:
     resolved = json.load(source)
 with open(sys.argv[3], encoding="utf-8") as source:
     original = json.load(source)
-keys = {"PAYOS_CLIENT_ID", "PAYOS_API_KEY", "PAYOS_CHECKSUM_KEY", "PAYOS_PUBLIC_BASE_URL"}
+keys = {"PAYOS_CLIENT_ID", "PAYOS_API_KEY", "PAYOS_CHECKSUM_KEY", "PAYOS_PUBLIC_BASE_URL", "EMAIL_SMTP_HOST", "EMAIL_SMTP_PORT", "EMAIL_SMTP_USERNAME", "EMAIL_SMTP_PASSWORD", "EMAIL_FROM", "EMAIL_SMTP_STARTTLS", "EMAIL_OTP_SECRET"}
 assert set(overlay) == {"services"}
 assert set(overlay["services"]) == {"app"}, "Override must target only the app service"
 assert set(overlay["services"]["app"]) == {"environment"}, "Override must not change mounts/images"
 environment = overlay["services"]["app"]["environment"]
-assert set(environment) == keys, "Override must contain only four payment settings"
+assert set(environment) == keys, "Override must contain only payment and email settings"
 actual = resolved["services"]["app"]["environment"]
 for key in keys:
     expected = (os.environ.get("TEST_EXPECTED_PUBLIC_BASE_URL") or os.environ[key]) if key == "PAYOS_PUBLIC_BASE_URL" else os.environ[key]
@@ -340,6 +347,9 @@ with open(sys.argv[1], "w", encoding="utf-8") as target:
     json.dump({"services": {"app": {"environment": {
         "PAYOS_CLIENT_ID": "previous-fixture-client", "PAYOS_API_KEY": "previous-fixture-api",
         "PAYOS_CHECKSUM_KEY": "previous-fixture-checksum", "PAYOS_PUBLIC_BASE_URL": "https://previous-fixture.example/crave",
+        "EMAIL_SMTP_HOST": "smtp.gmail.com", "EMAIL_SMTP_PORT": "587", "EMAIL_SMTP_STARTTLS": "true",
+        "EMAIL_SMTP_USERNAME": "previous@example.com", "EMAIL_FROM": "previous@example.com",
+        "EMAIL_SMTP_PASSWORD": "previous-fixture-mail-password", "EMAIL_OTP_SECRET": "previous-fixture-otp-secret-at-least-32-characters",
     }}}}, target)
 PY
   chmod 600 "$deploy_directory/.payos.compose.json"
@@ -496,7 +506,7 @@ assert_recreates 0
 [[ ! -e $deploy_directory/.deploy-backups/crave.war.previous/crave.war ]] || fail 'Backup was copied into a directory.'
 pass_case
 
-for missing in PAYOS_CLIENT_ID PAYOS_API_KEY PAYOS_CHECKSUM_KEY PAYOS_PUBLIC_BASE_URL; do
+for missing in PAYOS_CLIENT_ID PAYOS_API_KEY PAYOS_CHECKSUM_KEY PAYOS_PUBLIC_BASE_URL EMAIL_SMTP_USERNAME EMAIL_SMTP_PASSWORD EMAIL_FROM EMAIL_OTP_SECRET; do
   new_case "missing-$missing"
   export "$missing="
   run_deploy 1
@@ -504,6 +514,21 @@ for missing in PAYOS_CLIENT_ID PAYOS_API_KEY PAYOS_CHECKSUM_KEY PAYOS_PUBLIC_BAS
   assert_recreates 0
   [[ ! -e $case_directory/migration.sql && ! -e $case_directory/recreate.count ]] || fail 'Missing payment configuration reached a mutating Docker command.'
   [[ ! -e $deploy_directory/.payos.compose.json ]] || fail 'Missing configuration wrote a payment override.'
+  pass_case
+done
+
+for invalid in plaintext weak-secret invalid-port invalid-email; do
+  new_case "invalid-email-$invalid"
+  case "$invalid" in
+    plaintext) export EMAIL_SMTP_STARTTLS=false ;;
+    weak-secret) export EMAIL_OTP_SECRET=short ;;
+    invalid-port) export EMAIL_SMTP_PORT=465 ;;
+    invalid-email) export EMAIL_FROM='not-an-email' ;;
+  esac
+  run_deploy 1
+  assert_old_war
+  assert_recreates 0
+  [[ ! -e $case_directory/migration.sql ]] || fail 'Invalid email configuration reached migration.'
   pass_case
 done
 
@@ -533,6 +558,8 @@ new_case payment-dollar-escaping
 export PAYOS_CLIENT_ID='fixture-client-$PAYOS_EXPAND'
 export PAYOS_API_KEY='fixture-api-$$-literal-${PAYOS_BAD:-fallback}'
 export PAYOS_CHECKSUM_KEY='fixture-checksum-"quoted"\slash&$PAYOS_EXPAND'
+export EMAIL_SMTP_PASSWORD='fixture-mail-"quoted"\slash&$PAYOS_EXPAND'
+export EMAIL_OTP_SECRET='fixture-otp-secret-at-least-32-characters-$PAYOS_EXPAND'
 run_deploy 0
 assert_payos_overlay
 assert_migration_before_recreation
@@ -544,6 +571,8 @@ with open(sys.argv[2], encoding="utf-8") as source:
     runtime = [json.loads(line) for line in source]
 assert serialized["services"]["app"]["environment"]["PAYOS_API_KEY"] == os.environ["PAYOS_API_KEY"].replace("$", "$$")
 assert runtime[0]["PAYOS_API_KEY"] == os.environ["PAYOS_API_KEY"], "Serialization escaping changed the runtime credential"
+assert runtime[0]["EMAIL_SMTP_PASSWORD"] == os.environ["EMAIL_SMTP_PASSWORD"], "Serialization changed the SMTP password"
+assert runtime[0]["EMAIL_OTP_SECRET"] == os.environ["EMAIL_OTP_SECRET"], "Serialization changed the OTP secret"
 PY
 pass_case
 
@@ -584,6 +613,8 @@ assert len(attempts) == 2
 assert attempts[0]["PAYOS_API_KEY"] == os.environ["PAYOS_API_KEY"]
 assert attempts[1]["PAYOS_API_KEY"] == "previous-fixture-api", "Rollback recreated with new credentials"
 assert attempts[1]["PAYOS_PUBLIC_BASE_URL"] == "https://previous-fixture.example/crave"
+assert attempts[1]["EMAIL_SMTP_PASSWORD"] == "previous-fixture-mail-password", "Rollback retained the new SMTP password"
+assert attempts[1]["EMAIL_OTP_SECRET"] == "previous-fixture-otp-secret-at-least-32-characters", "Rollback retained the new OTP secret"
 PY
 assert_migration_before_recreation
 pass_case

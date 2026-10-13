@@ -3,6 +3,7 @@ package com.foodordering.repository;
 import com.foodordering.config.DatabaseConfig;
 import com.foodordering.entity.Address;
 import com.foodordering.entity.Customer;
+import com.foodordering.entity.EmailVerificationChallenge;
 import com.foodordering.entity.User;
 import com.foodordering.exception.AccountException;
 import jakarta.persistence.EntityManager;
@@ -87,9 +88,39 @@ public class JpaAccountRepository implements AccountRepository {
         }
 
         @Override
+        public Optional<User> findUser(String id, boolean lock) {
+            return Optional.ofNullable(lock
+                    ? em.find(User.class, id, LockModeType.PESSIMISTIC_WRITE)
+                    : em.find(User.class, id));
+        }
+
+        @Override
         public Optional<User> findByEmail(String email) {
             return em.createQuery("SELECT u FROM User u WHERE LOWER(u.email) = :email", User.class)
                     .setParameter("email", email).getResultStream().findFirst();
+        }
+
+        @Override
+        public Optional<User> findByEmail(String email, boolean lock) {
+            Optional<User> found = findByEmail(email);
+            if (lock && found.isPresent()) {
+                // Lock only this primary-key row, rather than a LOWER(email) scan of every account.
+                em.refresh(found.get(), LockModeType.PESSIMISTIC_WRITE);
+                if (!found.get().getEmail().equalsIgnoreCase(email)) return Optional.empty();
+            }
+            return found;
+        }
+
+        @Override
+        public Optional<EmailVerificationChallenge> findVerificationChallenge(String id, boolean lock) {
+            return Optional.ofNullable(lock
+                    ? em.find(EmailVerificationChallenge.class, id, LockModeType.PESSIMISTIC_WRITE)
+                    : em.find(EmailVerificationChallenge.class, id));
+        }
+
+        @Override
+        public void persistVerificationChallenge(EmailVerificationChallenge challenge) {
+            em.persist(challenge);
         }
 
         @Override

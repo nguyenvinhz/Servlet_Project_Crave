@@ -131,6 +131,8 @@ class FormApiContractTest {
         String[][] pages = {
                 {"/auth/login", "Đăng nhập", "/WEB-INF/views/auth/login.jsp"},
                 {"/auth/register", "Đăng ký", "/WEB-INF/views/auth/register.jsp"},
+                {"/auth/forgot-password", "Quên mật khẩu", "/WEB-INF/views/auth/forgot-password.jsp"},
+                {"/auth/change-password", "Đổi mật khẩu", "/WEB-INF/views/auth/change-password.jsp"},
                 {"/customer/profile", "Hồ sơ", "/WEB-INF/views/customer/profile.jsp"},
                 {"/customer/addresses", "Địa chỉ giao hàng", "/WEB-INF/views/customer/addresses.jsp"}
         };
