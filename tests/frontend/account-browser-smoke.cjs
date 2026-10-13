@@ -117,15 +117,15 @@ const cases = [
  `},
  {name:'register-redirect',page:'auth/register',setup:`const fixtureFetch=async()=>reply(201,profile);`,run:`setFields({fullName:'Nguyen Van A',email:'a@example.com',phone:'0901234567',password:'password1',confirmPassword:'password1'});submit('registerForm');`, redirect:'/crave/auth/login?registered=1'},
  ...[
-  ['login-external-redirect','https://evil.example/phishing','/crave/customer/profile'],
-  ['login-network-redirect','//evil.example/phishing','/crave/customer/profile'],
-  ['login-other-context','/other/customer/profile','/crave/customer/profile'],
-  ['login-backslash','/crave/\\evil.example','/crave/customer/profile'],
-  ['login-api-loop','/crave/api/profile','/crave/customer/profile'],
-  ['login-matrix-api','/crave/api;test/profile','/crave/customer/profile'],
-  ['login-encoded-slash','/crave/%2f%2fevil.example','/crave/customer/profile'],
-  ['login-encoded-backslash','/crave/%5cevil.example','/crave/customer/profile'],
-  ['login-auth-loop','/crave/auth/login','/crave/customer/profile'],
+  ['login-external-redirect','https://evil.example/phishing','/crave/menu'],
+  ['login-network-redirect','//evil.example/phishing','/crave/menu'],
+  ['login-other-context','/other/customer/profile','/crave/menu'],
+  ['login-backslash','/crave/\\evil.example','/crave/menu'],
+  ['login-api-loop','/crave/api/profile','/crave/menu'],
+  ['login-matrix-api','/crave/api;test/profile','/crave/menu'],
+  ['login-encoded-slash','/crave/%2f%2fevil.example','/crave/menu'],
+  ['login-encoded-backslash','/crave/%5cevil.example','/crave/menu'],
+  ['login-auth-loop','/crave/auth/login','/crave/menu'],
   ['login-valid-return','/crave/menu?category=1','/crave/menu?category=1']
  ].map(([name,returnTo,redirect])=>({name,page:'auth/login',query:'returnTo='+encodeURIComponent(returnTo),setup:`const fixtureFetch=async()=>reply(200,profile);`,run:`setFields({email:'a@example.com',password:'password1'});submit('loginForm');`,redirect})),
  ...[
@@ -138,7 +138,7 @@ const cases = [
   setup:`const fixtureFetch=async()=>reply(200,{...profile,accountType:'EMPLOYEE',role:'ORDER_STAFF'});`,
   run:`setFields({email:'staff@example.com',password:'password1'});submit('loginForm');`,redirect:'/crave/admin/orders'},
  {name:'login-customer-rejects-admin-return',page:'auth/login',query:'returnTo=%2Fcrave%2Fadmin%2Fmenu',
-  setup:`const fixtureFetch=async()=>reply(200,profile);`,run:`setFields({email:'a@example.com',password:'password1'});submit('loginForm');`,redirect:'/crave/customer/profile'},
+  setup:`const fixtureFetch=async()=>reply(200,profile);`,run:`setFields({email:'a@example.com',password:'password1'});submit('loginForm');`,redirect:'/crave/menu'},
  {name:'session-expiry-redirect',page:'customer/profile',setup:`const fixtureFetch=async()=>reply(401,null,{message:'Unauthorized'});`,run:``,redirect:'/crave/auth/login?reason=session-expired&returnTo=%2Fcrave%2Fcustomer%2Fprofile'},
  {name:'logout-redirect',page:'customer/profile',setup:`const fixtureFetch=async r=>reply(200,r.method==='GET'?profile:{message:'Signed out'});`,run:`document.getElementById('logoutForm').dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));`,redirect:'/crave/auth/login?loggedOut=1'}
 ];
