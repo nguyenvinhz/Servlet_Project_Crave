@@ -6,6 +6,7 @@ import com.foodordering.dto.ProfileResponse;
 import com.foodordering.dto.RegisterRequest;
 import com.foodordering.security.SessionAuth;
 import com.foodordering.service.AccountService;
+import com.foodordering.service.EmailVerificationService;
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -18,13 +19,19 @@ import java.util.Map;
 })
 public class AuthApiServlet extends AccountApiServlet {
     private final AccountService accountService;
+    private final EmailVerificationService verificationService;
 
     public AuthApiServlet() {
         this(new AccountService());
     }
 
     public AuthApiServlet(AccountService accountService) {
+        this(accountService, new EmailVerificationService());
+    }
+
+    public AuthApiServlet(AccountService accountService, EmailVerificationService verificationService) {
         this.accountService = accountService;
+        this.verificationService = verificationService;
     }
 
     @Override
@@ -49,8 +56,13 @@ public class AuthApiServlet extends AccountApiServlet {
                             Boolean.TRUE.equals(login.rememberMe()) ? 7 * 24 * 60 * 60 : 30 * 60);
                     writeJson(response, HttpServletResponse.SC_OK, ApiResponse.success(user));
                 }
-                case "/api/auth/register" -> writeJson(response, HttpServletResponse.SC_CREATED,
-                        ApiResponse.success(accountService.register(readAccountJson(request, RegisterRequest.class))));
+                case "/api/auth/register" -> {
+                    VerifiedRegistration registration = readAccountJson(request, VerifiedRegistration.class);
+                    EmailVerificationApiServlet.requireCode(registration.verificationCode());
+                    writeJson(response, HttpServletResponse.SC_CREATED,
+                            ApiResponse.success(verificationService.register(registration.registration(),
+                                    registration.verificationCode())));
+                }
                 case "/api/auth/logout" -> {
                     SessionAuth.logout(request);
                     writeJson(response, HttpServletResponse.SC_OK, ApiResponse.success(Map.of("message", "Đã đăng xuất.")));
@@ -59,6 +71,13 @@ public class AuthApiServlet extends AccountApiServlet {
             }
         } catch (Exception exception) {
             handleError(response, exception);
+        }
+    }
+
+    public record VerifiedRegistration(String fullName, String email, String phone,
+                                       String password, String confirmPassword, String verificationCode) {
+        RegisterRequest registration() {
+            return new RegisterRequest(fullName, email, phone, password, confirmPassword);
         }
     }
 

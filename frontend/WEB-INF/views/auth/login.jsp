@@ -30,6 +30,8 @@
             <input id="password" name="password" type="password" autocomplete="current-password"
                    minlength="8" maxlength="72" placeholder="Nhập mật khẩu" required>
 
+            <p class="auth-help"><a data-auth-switch href="<c:url value='/auth/forgot-password'/>">Quên mật khẩu?</a></p>
+
             <button class="button primary" type="submit">Đăng nhập</button>
         </form>
 

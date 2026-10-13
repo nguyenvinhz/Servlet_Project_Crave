@@ -46,6 +46,11 @@ public class AccountService {
     }
 
     public ProfileResponse register(RegisterRequest request) {
+        Registration registration = prepareRegistration(request);
+        return repository.write(session -> register(session, registration));
+    }
+
+    Registration prepareRegistration(RegisterRequest request) {
         requireRequest(request);
         Map<String, String> errors = new LinkedHashMap<>();
         Contact contact = validateContact(request.fullName(), request.email(), request.phone(), errors);
@@ -55,15 +60,18 @@ public class AccountService {
             errors.put("confirmPassword", "Mật khẩu xác nhận không khớp.");
         }
         rejectInvalid(errors);
-        String hash = passwordHasher.hash(request.password());
-        return repository.write(session -> {
-            rejectConflicts(session, contact, null);
-            Customer customer = new Customer(newId("KH", session::userIdExists), contact.fullName(),
-                    contact.email(), contact.phone(), hash);
-            session.persistCustomer(customer);
-            session.flush();
-            return profile(customer);
-        });
+        return new Registration(contact.fullName(), contact.email(), contact.phone(),
+                passwordHasher.hash(request.password()));
+    }
+
+    ProfileResponse register(Session session, Registration registration) {
+        Contact contact = new Contact(registration.fullName(), registration.email(), registration.phone());
+        rejectConflicts(session, contact, null);
+        Customer customer = new Customer(newId("KH", session::userIdExists), contact.fullName(),
+                contact.email(), contact.phone(), registration.passwordHash());
+        session.persistCustomer(customer);
+        session.flush();
+        return profile(customer);
     }
 
     public ProfileResponse login(LoginRequest request) {
@@ -217,14 +225,14 @@ public class AccountService {
         return session.findAddress(customerId, addressId).orElseThrow(AccountService::addressNotFound);
     }
 
-    private static void requireActive(User user) {
+    static void requireActive(User user) {
         if ((user instanceof Customer customer && customer.getStatus() != CustomerStatus.ACTIVE)
                 || (user instanceof Employee employee && employee.getStatus() != EmployeeStatus.WORKING)) {
             throw new AccountException("ACCOUNT_INACTIVE", "Tài khoản hiện không hoạt động.", 401);
         }
     }
 
-    private static void requireSessionId(String userId) {
+    static void requireSessionId(String userId) {
         if (userId == null || userId.isBlank() || userId.length() > 10) {
             throw unauthorized();
         }
@@ -247,14 +255,14 @@ public class AccountService {
         return new Contact(name, normalizedEmail, normalizedPhone);
     }
 
-    private static void validateEmail(String email, Map<String, String> errors) {
+    static void validateEmail(String email, Map<String, String> errors) {
         if (email.length() > 100 || email.chars().anyMatch(Character::isISOControl)
                 || !isValidText(email) || !email.matches("[^\\s@]+@[^\\s@]+\\.[^\\s@]+")) {
             errors.put("email", "Email không đúng định dạng hoặc vượt quá 100 ký tự.");
         }
     }
 
-    private static void validatePassword(String password, String field, Map<String, String> errors) {
+    static void validatePassword(String password, String field, Map<String, String> errors) {
         if (password == null || password.isBlank() || password.length() < 8 || password.length() > 72) {
             errors.put(field, "Mật khẩu phải có từ 8 đến 72 ký tự.");
         } else if (!PasswordHasher.isValidPasswordText(password)) {
@@ -295,13 +303,13 @@ public class AccountService {
         }
     }
 
-    private static void rejectInvalid(Map<String, String> errors) {
+    static void rejectInvalid(Map<String, String> errors) {
         if (!errors.isEmpty()) {
             throw new AccountException("VALIDATION_ERROR", "Dữ liệu không hợp lệ.", 400, errors);
         }
     }
 
-    private static String normalizeEmail(String email) {
+    static String normalizeEmail(String email) {
         return trim(email).toLowerCase(Locale.ROOT);
     }
 
@@ -341,7 +349,7 @@ public class AccountService {
     private static ProfileResponse profile(User user) {
         return new ProfileResponse(user.getId(), user instanceof Employee ? AccountType.EMPLOYEE : AccountType.CUSTOMER,
                 user.getFullName(), user.getEmail(), user.getPhone(),
-                user instanceof Employee employee ? employee.getRole() : null);
+                user instanceof Employee employee ? employee.getRole() : null, user.getPasswordVersion());
     }
 
     private static AddressResponse address(Address address) {
@@ -362,5 +370,10 @@ public class AccountService {
     }
 
     private record Contact(String fullName, String email, String phone) {
+    }
+
+    record Registration(String fullName, String email, String phone, String passwordHash) {
+        @Override
+        public String toString() { return "Registration[credentials redacted]"; }
     }
 }

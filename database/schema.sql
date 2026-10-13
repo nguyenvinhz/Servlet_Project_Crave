@@ -17,6 +17,7 @@ CREATE TABLE user_account (
     email           VARCHAR(100)    NOT NULL,
     phone           VARCHAR(15)     NOT NULL,
     password_hash   VARCHAR(255)    NOT NULL,
+    password_version BIGINT        NOT NULL DEFAULT 0,
     created_at      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP
                                     ON UPDATE CURRENT_TIMESTAMP,
@@ -24,6 +25,29 @@ CREATE TABLE user_account (
     CONSTRAINT uq_user_account_email UNIQUE (email),
     CONSTRAINT uq_user_account_phone UNIQUE (phone),
     CONSTRAINT ck_user_account_type CHECK (account_type IN ('CUSTOMER', 'EMPLOYEE'))
+) ENGINE=InnoDB;
+
+-- Persistent single-use challenges contain salted HMAC digests, never plaintext email codes.
+CREATE TABLE email_verification_challenges (
+    challenge_id VARCHAR(64) NOT NULL,
+    email VARCHAR(100) NOT NULL,
+    purpose VARCHAR(24) NOT NULL,
+    user_id VARCHAR(10) NULL,
+    account_binding VARCHAR(64) NULL,
+    code_salt VARCHAR(32) NOT NULL,
+    code_digest VARCHAR(64) NOT NULL,
+    issued_at_ms BIGINT NOT NULL,
+    expires_at_ms BIGINT NOT NULL,
+    attempts INT NOT NULL DEFAULT 0,
+    consumed BOOLEAN NOT NULL DEFAULT FALSE,
+    window_started_at_ms BIGINT NOT NULL,
+    window_send_count INT NOT NULL,
+    send_history VARCHAR(100) NOT NULL DEFAULT '',
+    CONSTRAINT pk_email_verification_challenges PRIMARY KEY (challenge_id),
+    CONSTRAINT uq_email_verification_scope UNIQUE (email, purpose),
+    CONSTRAINT ck_email_verification_purpose CHECK (purpose IN ('REGISTER', 'PASSWORD_RESET', 'PASSWORD_CHANGE')),
+    CONSTRAINT ck_email_verification_attempts CHECK (attempts BETWEEN 0 AND 5),
+    CONSTRAINT ck_email_verification_send_count CHECK (window_send_count BETWEEN 1 AND 5)
 ) ENGINE=InnoDB;
 
 CREATE TABLE customer (

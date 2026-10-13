@@ -52,7 +52,7 @@ class AuthenticationFilterTest {
 
     @Test
     void publicPagesCatalogAndHealthDoNotRequireSessionOrDatabase() throws Exception {
-        for (String path : new String[]{"/", "/auth/login", "/auth/register", "/menu", "/menu/detail",
+        for (String path : new String[]{"/", "/auth/login", "/auth/register", "/auth/forgot-password", "/menu", "/menu/detail",
                 "/api/foods", "/api/categories", "/api/health", "/assets/css/styles.css",
                 "/promotions", "/api/promotions", "/api/promotions/active"}) {
             Exchange exchange = request("GET", path, null);
@@ -464,6 +464,38 @@ class AuthenticationFilterTest {
 
     private static ProfileResponse employee(EmployeeRole role) {
         return new ProfileResponse("NV01", AccountType.EMPLOYEE, "Admin", "admin@example.com", "0907654321", role);
+    }
+
+    @Test
+    void passwordChangeRoutesRequireSessionAndAllowEveryActiveAccountType() throws Exception {
+        for (String path : new String[]{"/auth/change-password", "/api/auth/password/change/code", "/api/auth/password/change"}) {
+            String method = path.startsWith("/api/") ? "POST" : "GET";
+            Exchange anonymous = request(method, path, null);
+            anonymous.send();
+            verifyNoInteractions(anonymous.chain);
+            for (ProfileResponse user : java.util.List.of(CUSTOMER,
+                    new ProfileResponse("NV01", AccountType.EMPLOYEE, "Admin", "admin@example.com",
+                            "0907654321", EmployeeRole.ADMIN))) {
+                when(accounts.getProfile(user.id())).thenReturn(user);
+                Exchange signedIn = request(method, path, user);
+                signedIn.send();
+                verify(signedIn.chain).doFilter(signedIn.request, signedIn.response);
+            }
+        }
+    }
+
+    @Test
+    void resetAndRegistrationCodeRequestsRemainPublicButRequireSameOrigin() throws Exception {
+        for (String path : new String[]{"/api/auth/register/code", "/api/auth/password/reset/code", "/api/auth/password/reset"}) {
+            Exchange sameOrigin = request("POST", path, null);
+            sameOrigin.send();
+            verify(sameOrigin.chain).doFilter(sameOrigin.request, sameOrigin.response);
+            Exchange crossOrigin = request("POST", path, null);
+            when(crossOrigin.request.getHeader("Origin")).thenReturn("https://evil.example");
+            crossOrigin.send();
+            crossOrigin.assertError(403, "FORBIDDEN");
+            verifyNoInteractions(crossOrigin.chain);
+        }
     }
 
     private Exchange request(String method, String path, ProfileResponse principal) throws Exception {

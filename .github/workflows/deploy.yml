@@ -33,6 +33,11 @@ jobs:
       DB_SERVICE: ${{ vars.EC2_DB_SERVICE || 'mysql' }}
       HEALTH_URL: ${{ vars.EC2_HEALTH_URL || 'http://127.0.0.1:8080/crave/api/health' }}
       PAYOS_PUBLIC_BASE_URL: ${{ vars.PAYOS_PUBLIC_BASE_URL || 'http://15.134.39.86:8080/crave' }}
+      EMAIL_SMTP_HOST: ${{ vars.EMAIL_SMTP_HOST || 'smtp.gmail.com' }}
+      EMAIL_SMTP_PORT: ${{ vars.EMAIL_SMTP_PORT || '587' }}
+      EMAIL_SMTP_USERNAME: ${{ vars.EMAIL_SMTP_USERNAME || 'craveshopvn@gmail.com' }}
+      EMAIL_FROM: ${{ vars.EMAIL_FROM || 'craveshopvn@gmail.com' }}
+      EMAIL_SMTP_STARTTLS: 'true'
 
     steps:
       - name: Kiểm tra runner production
@@ -60,6 +65,8 @@ jobs:
           PAYOS_CLIENT_ID: ${{ secrets.PAYOS_CLIENT_ID }}
           PAYOS_API_KEY: ${{ secrets.PAYOS_API_KEY }}
           PAYOS_CHECKSUM_KEY: ${{ secrets.PAYOS_CHECKSUM_KEY }}
+          EMAIL_SMTP_PASSWORD: ${{ secrets.EMAIL_SMTP_PASSWORD }}
+          EMAIL_OTP_SECRET: ${{ secrets.EMAIL_OTP_SECRET }}
         run: bash scripts/deploy-ec2.sh "$WAR_SOURCE"
 
       - name: Register payOS webhook for the public application

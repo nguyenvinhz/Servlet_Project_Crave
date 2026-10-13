@@ -84,7 +84,8 @@ public final class SessionAuth {
         try {
             synchronized (before.session()) {
                 requireCurrent(request, before);
-                if (!before.user().id().equals(user.id()) || before.user().accountType() != user.accountType()) {
+                if (!before.user().id().equals(user.id()) || before.user().accountType() != user.accountType()
+                        || before.user().credentialVersion() != user.credentialVersion()) {
                     throw unauthorized();
                 }
                 storeFields(before.session(), user);
@@ -141,6 +142,7 @@ public final class SessionAuth {
         return Objects.equals(before.revision(), before.session().getAttribute(AUTH_REVISION))
                 && (before.user() == null ? user == null : user != null
                 && before.user().id().equals(user.id()) && before.user().accountType() == user.accountType()
+                && before.user().credentialVersion() == user.credentialVersion()
                 && Objects.equals(before.user().role(), user.role()));
     }
 

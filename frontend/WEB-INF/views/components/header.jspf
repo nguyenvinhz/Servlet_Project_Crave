@@ -11,7 +11,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Nunito:wght@600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="<c:url value='/assets/css/styles.css?v=20261013-palette2'/>">
     <c:if test="${not empty pageStyle}">
-        <link rel="stylesheet" href="<c:url value='/assets/css/${pageStyle}.css?v=20261013-palette2'/>">
+        <link rel="stylesheet" href="<c:url value='/assets/css/${pageStyle}.css?v=20261013-auth1'/>">
     </c:if>
     <script>window.CONTEXT_PATH = '${pageContext.request.contextPath}';</script>
     <style>
@@ -86,6 +86,7 @@
                                 <a class="user-dropdown-link customer-dropdown-item" href="<c:url value='/admin'/>">Trang quản trị</a>
                             </c:if>
                             <a class="user-dropdown-link customer-dropdown-item" href="<c:url value='/customer/profile'/>">Tài khoản của tôi</a>
+                            <a class="user-dropdown-link customer-dropdown-item" href="<c:url value='/auth/change-password'/>">Đổi mật khẩu</a>
                             <form id="logoutForm" class="logout-form" action="<c:url value='/api/auth/logout'/>" method="post" style="margin: 0; padding: 0;">
                                 <button class="user-dropdown-logout customer-dropdown-item customer-logout-btn" id="customerLogoutBtn" type="submit">Đăng xuất</button>
                             </form>

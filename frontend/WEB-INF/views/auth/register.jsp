@@ -6,8 +6,8 @@
 <main id="main-content" class="page auth-page account-ui">
     <section class="intro-panel">
         <p class="eyebrow">Thành viên mới</p>
-        <h1>Tạo tài khoản trong một phút.</h1>
-        <p>Lưu thông tin nhận món, theo dõi đơn hàng và dùng ưu đãi dễ dàng hơn.</p>
+        <h1>Bắt đầu những bữa ngon.</h1>
+        <p>Điền thông tin và xác nhận email để lưu địa chỉ, theo dõi đơn hàng và nhận ưu đãi.</p>
     </section>
 
     <section class="card auth-card" aria-labelledby="register-title">
@@ -20,7 +20,10 @@
             <c:out value="${error}"/>
         </div>
 
-        <form id="registerForm" action="<c:url value='/api/auth/register'/>" method="post" data-method="POST">
+        <div id="form-success" class="form-success" role="status" aria-live="polite" hidden></div>
+
+        <form id="registerForm" action="<c:url value='/api/auth/register'/>" method="post" data-method="POST"
+              data-code-url="<c:url value='/api/auth/register/code'/>">
             <label for="fullName">Họ và tên</label>
             <input id="fullName" name="fullName" type="text" autocomplete="name"
                    minlength="2" maxlength="100" placeholder="Nguyễn Văn An" required>
@@ -52,7 +55,21 @@
                 </div>
             </div>
 
-            <button class="button primary" type="submit">Tạo tài khoản</button>
+            <fieldset id="otp-fields" class="otp-fields" data-otp-fields hidden disabled>
+                <legend>Xác nhận email</legend>
+                <p id="otp-summary" class="field-hint"></p>
+                <label for="verificationCode">Mã xác nhận</label>
+                <input id="verificationCode" name="verificationCode" class="otp-input" type="text"
+                       inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}"
+                       minlength="6" maxlength="6" aria-describedby="otp-hint" placeholder="000000" required>
+                <p id="otp-hint" class="field-hint">Nhập 6 chữ số trong email. Mã có hiệu lực trong 10 phút.</p>
+                <div class="otp-actions">
+                    <button id="otp-resend" class="button outline" type="button">Gửi lại mã</button>
+                    <button id="otp-edit" class="button outline" type="button">Đổi email</button>
+                </div>
+            </fieldset>
+
+            <button id="otp-submit" class="button primary" type="submit">Gửi mã xác nhận</button>
         </form>
 
         <p class="card-footnote">Đã có tài khoản?

@@ -79,6 +79,7 @@ public class AuthenticationFilter implements Filter {
 
     private static boolean isProtected(String path, String method) {
         return under(path, "/customer") || under(path, "/admin") || under(path, "/api/admin")
+                || path.equals("/auth/change-password") || under(path, "/api/auth/password/change")
                 || path.equals("/api/profile") || under(path, "/api/addresses")
                 || under(path, "/api/orders") || under(path, "/api/payments")
                 || under(path, "/api/payos/orders")
@@ -108,6 +109,7 @@ public class AuthenticationFilter implements Filter {
                     ? EmployeeRole.HR_MANAGER : EmployeeRole.ADMIN;
             SessionAuth.requireEmployee(request, expected);
         } else if (!path.equals("/api/profile") && !path.equals("/customer/profile")
+                && !path.equals("/auth/change-password") && !under(path, "/api/auth/password/change")
                 && user.accountType() != AccountType.CUSTOMER) {
             throw new AccountException("FORBIDDEN", "Chức năng này chỉ dành cho khách hàng.", 403);
         }

@@ -158,10 +158,11 @@ document.addEventListener("DOMContentLoaded", () => {
         return payload;
     }
 
-    function validate(form, payload) {
+    function validate(form, payload, selectedNames) {
         const errors = {};
         [...form.elements].forEach((input) => {
-            if (!input.name || input.matches(":disabled") || input.type === "checkbox") return;
+            if (!input.name || input.matches(":disabled") || input.type === "checkbox"
+                    || (selectedNames && !selectedNames.has(input.name))) return;
             const value = payload[input.name] || "";
             if (input.required && !value) errors[input.name] = "Vui lòng nhập thông tin này.";
             else if (input.name === "email" && (!input.validity.valid || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value))) {
@@ -169,13 +170,17 @@ document.addEventListener("DOMContentLoaded", () => {
             } else if (input.name === "phone" && (value.length < 9 || value.length > 15 || !/^\+?[0-9]{8,15}$/.test(value))) {
                 errors.phone = "Số điện thoại có từ 9 đến 15 ký tự, gồm chữ số và dấu + ở đầu.";
             }
+            else if (input.name === "verificationCode" && !/^[0-9]{6}$/.test(value)) {
+                errors.verificationCode = "Mã xác nhận cần đủ 6 chữ số.";
+            }
             else if (input.minLength > 0 && value.length < input.minLength) {
                 errors[input.name] = `Vui lòng nhập ít nhất ${input.minLength} ký tự.`;
             } else if (input.maxLength > 0 && value.length > input.maxLength) {
                 errors[input.name] = `Vui lòng nhập tối đa ${input.maxLength} ký tự.`;
             }
         });
-        if ("confirmPassword" in payload && payload.password !== payload.confirmPassword) {
+        if ("confirmPassword" in payload && (!selectedNames || selectedNames.has("confirmPassword"))
+                && payload.password !== payload.confirmPassword) {
             errors.confirmPassword = "Mật khẩu nhập lại chưa khớp.";
         }
         showFieldErrors(form, errors);
@@ -239,17 +244,182 @@ document.addEventListener("DOMContentLoaded", () => {
         const query = new URLSearchParams(window.location.search);
         if (query.get("registered") === "1") {
             showMessage(successBox, "Đăng ký thành công. Vui lòng đăng nhập để tiếp tục.");
+        } else if (query.get("passwordReset") === "1" || query.get("passwordChanged") === "1") {
+            showMessage(successBox, "Mật khẩu đã được cập nhật. Vui lòng đăng nhập bằng mật khẩu mới.");
         } else if (query.get("reason") === "session-expired") {
             showMessage(errorBox, "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.");
         } else if (query.get("loggedOut") === "1") {
             showMessage(successBox, "Bạn đã đăng xuất.");
         }
     }
-    bindForm(document.getElementById("registerForm"), () => {
-        const query = new URLSearchParams({registered: "1"});
-        if (returnTo) query.set("returnTo", returnTo);
-        window.location.assign(`${localUrl("/auth/login")}?${query}`);
-    });
+    function maskedEmail(email) {
+        const [name, domain] = email.split("@");
+        return `${name.slice(0, name.length > 2 ? 2 : 1)}•••@${domain}`;
+    }
+
+    function bindOtpForm(form, kind) {
+        if (!form) return;
+        form.noValidate = true;
+        const otpFields = form.querySelector("[data-otp-fields]");
+        const resend = document.getElementById("otp-resend");
+        const edit = document.getElementById("otp-edit");
+        const submit = document.getElementById("otp-submit");
+        const summary = document.getElementById("otp-summary");
+        const changingPassword = kind === "change";
+        const identity = form.elements.namedItem(changingPassword ? "currentPassword" : "email");
+        const initialNames = kind === "register"
+            ? new Set(["fullName", "email", "phone", "password", "confirmPassword"])
+            : new Set([changingPassword ? "currentPassword" : "email"]);
+        const finalNames = kind === "register"
+            ? ["fullName", "email", "phone", "password", "confirmPassword", "verificationCode"]
+            : [...(changingPassword ? [] : ["email"]), "verificationCode", "password", "confirmPassword"];
+        let awaitingCode = false;
+        let ready = !changingPassword;
+        let sessionLoading = false;
+        let targetEmail = "";
+        let resendAt = 0;
+        let cooldownTimer;
+
+        function updateCooldown() {
+            const seconds = Math.max(0, Math.ceil((resendAt - Date.now()) / 1000));
+            resend.disabled = seconds > 0 || busyStates.has(form);
+            resend.textContent = seconds ? `Gửi lại mã sau ${seconds}s` : "Gửi lại mã";
+            if (!seconds && cooldownTimer) {
+                clearInterval(cooldownTimer);
+                cooldownTimer = undefined;
+            }
+        }
+
+        function startCooldown(seconds = 60) {
+            resendAt = Date.now() + Math.max(1, Math.min(3600, Number(seconds) || 60)) * 1000;
+            if (cooldownTimer) clearInterval(cooldownTimer);
+            cooldownTimer = setInterval(updateCooldown, 1000);
+            updateCooldown();
+        }
+
+        function setCodeStage(active) {
+            awaitingCode = active;
+            form.dataset.otpStage = active ? "verify" : "send";
+            otpFields.hidden = !active;
+            otpFields.disabled = !active;
+            identity.readOnly = active;
+            submit.textContent = active
+                ? (kind === "register" ? "Xác nhận và tạo tài khoản" : "Xác nhận mật khẩu mới")
+                : "Gửi mã xác nhận";
+            if (!active) form.elements.verificationCode.value = "";
+        }
+        setCodeStage(false);
+
+        async function sendCode(isResend = false) {
+            if (!ready || busyStates.has(form)) return;
+            clearMessages();
+            clearFieldErrors(form);
+            const payload = formPayload(form);
+            const selectedNames = isResend
+                ? new Set([changingPassword ? "currentPassword" : "email"]) : initialNames;
+            if (!validate(form, payload, selectedNames)) return;
+            if (Date.now() < resendAt) {
+                showMessage(errorBox, "Vui lòng chờ hết thời gian đếm ngược trước khi gửi lại mã.");
+                return;
+            }
+            setBusy(form, true);
+            let sent = false;
+            try {
+                const codePayload = changingPassword
+                    ? {currentPassword: payload.currentPassword} : {email: payload.email};
+                const result = await request(form.dataset.codeUrl, "POST", codePayload);
+                if (!changingPassword) targetEmail = payload.email;
+                setCodeStage(true);
+                form.elements.verificationCode.value = "";
+                summary.textContent = kind === "reset"
+                    ? `Nếu ${maskedEmail(targetEmail)} thuộc tài khoản đang hoạt động, mã xác nhận đã được gửi.`
+                    : `Mã xác nhận được gửi đến ${maskedEmail(targetEmail)}.`;
+                showMessage(successBox, kind === "reset"
+                    ? "Nếu email thuộc tài khoản đang hoạt động, bạn sẽ nhận được mã xác nhận. Kiểm tra cả hộp thư rác."
+                    : "Đã gửi mã xác nhận. Kiểm tra email và hộp thư rác của bạn.");
+                startCooldown(result?.resendAfterSeconds || 60);
+                sent = true;
+            } catch (error) {
+                if (error.status === 429) startCooldown();
+                setBusy(form, false);
+                handleError(error, form, changingPassword);
+            } finally {
+                setBusy(form, false);
+                updateCooldown();
+                if (sent) form.elements.verificationCode.focus();
+            }
+        }
+
+        form.addEventListener("submit", async (event) => {
+            event.preventDefault();
+            if (!ready || busyStates.has(form)) return;
+            if (!awaitingCode) return sendCode();
+            clearMessages();
+            clearFieldErrors(form);
+            const allValues = formPayload(form);
+            if (!validate(form, allValues)) return;
+            const payload = Object.fromEntries(finalNames.map((name) => [name, allValues[name]]));
+            // Keep the verified email bound to the code even if an autofill tool changes the field.
+            if (!changingPassword) payload.email = targetEmail;
+            setBusy(form, true);
+            try {
+                await request(form.action, "POST", payload);
+                clearCheckoutVoucher();
+                const flag = {register: "registered", reset: "passwordReset", change: "passwordChanged"}[kind];
+                const query = new URLSearchParams({[flag]: "1"});
+                if (returnTo) query.set("returnTo", returnTo);
+                window.location.assign(`${localUrl("/auth/login")}?${query}`);
+            } catch (error) {
+                setBusy(form, false);
+                handleError(error, form, changingPassword);
+            } finally {
+                setBusy(form, false);
+                updateCooldown();
+            }
+        });
+        resend.addEventListener("click", () => sendCode(true));
+        edit.addEventListener("click", () => {
+            if (busyStates.has(form)) return;
+            setCodeStage(false);
+            clearMessages();
+            clearFieldErrors(form);
+            identity.focus();
+        });
+
+        if (!changingPassword) return;
+        const sessionFields = document.getElementById("password-change-fields");
+        const accountHint = document.getElementById("password-account");
+        const retry = document.getElementById("password-session-retry");
+        async function loadSession() {
+            if (sessionLoading) return;
+            sessionLoading = true;
+            ready = false;
+            sessionFields.disabled = true;
+            retry.hidden = true;
+            clearMessages();
+            accountHint.textContent = "Đang kiểm tra tài khoản...";
+            try {
+                const user = await request(localUrl("/api/auth/session"));
+                if (!user?.email || !user.email.includes("@")) {
+                    throw new Error("Chưa tải được email tài khoản. Vui lòng thử lại.");
+                }
+                targetEmail = user.email;
+                accountHint.textContent = `Mã xác nhận sẽ được gửi đến ${maskedEmail(targetEmail)}.`;
+                sessionFields.disabled = false;
+                ready = true;
+            } catch (error) {
+                accountHint.textContent = "Chưa tải được thông tin tài khoản.";
+                retry.hidden = error.status === 401;
+                handleError(error, null, true);
+            } finally { sessionLoading = false; }
+        }
+        retry.addEventListener("click", loadSession);
+        loadSession();
+    }
+
+    bindOtpForm(document.getElementById("registerForm"), "register");
+    bindOtpForm(document.getElementById("resetPasswordForm"), "reset");
+    bindOtpForm(document.getElementById("changePasswordForm"), "change");
 
     const logoutForm = document.getElementById("logoutForm");
     function clearCheckoutVoucher() {

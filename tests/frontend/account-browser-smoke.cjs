@@ -115,7 +115,10 @@ const cases = [
  assert(document.getElementById('address-fields').disabled,'Forbidden form enabled');
  assert(document.getElementById('address-empty-state').hidden,'Forbidden incorrectly displayed empty');
  `},
- {name:'register-redirect',page:'auth/register',setup:`const fixtureFetch=async()=>reply(201,profile);`,run:`setFields({fullName:'Nguyen Van A',email:'a@example.com',phone:'0901234567',password:'password1',confirmPassword:'password1'});submit('registerForm');`, redirect:'/crave/auth/login?registered=1'},
+ {name:'register-redirect',page:'auth/register',setup:`const fixtureFetch=async request=>reply(request.url.endsWith('/code')?200:201,request.url.endsWith('/code')?{resendAfterSeconds:60}:profile);`,run:`
+ setFields({fullName:'Nguyen Van A',email:'a@example.com',phone:'0901234567',password:'password1',confirmPassword:'password1'});submit('registerForm');
+ await waitFor(()=>document.getElementById('registerForm').dataset.otpStage==='verify'&&!document.getElementById('verificationCode').disabled);
+ setFields({verificationCode:'012345'});submit('registerForm');`, redirect:'/crave/auth/login?registered=1'},
  ...[
   ['login-external-redirect','https://evil.example/phishing','/crave/menu'],
   ['login-network-redirect','//evil.example/phishing','/crave/menu'],
@@ -411,8 +414,10 @@ cases.push(
  assert(new URL(link.href).searchParams.get('returnTo')==='/crave/checkout?code=SAVE10','Switching auth form lost checkout destination');
  `})),
  {name:'register-preserves-checkout-return',page:'auth/register',query:'returnTo='+encodeURIComponent('/crave/checkout?code=SAVE10'),
- setup:`const fixtureFetch=async()=>reply(201,profile);`,run:`
- setFields({fullName:'Nguyen Van A',email:'a@example.com',phone:'0901234567',password:'password1',confirmPassword:'password1'});submit('registerForm');`,
+ setup:`const fixtureFetch=async request=>reply(request.url.endsWith('/code')?200:201,request.url.endsWith('/code')?{resendAfterSeconds:60}:profile);`,run:`
+ setFields({fullName:'Nguyen Van A',email:'a@example.com',phone:'0901234567',password:'password1',confirmPassword:'password1'});submit('registerForm');
+ await waitFor(()=>document.getElementById('registerForm').dataset.otpStage==='verify'&&!document.getElementById('verificationCode').disabled);
+ setFields({verificationCode:'012345'});submit('registerForm');`,
  redirect:'/crave/auth/login?registered=1&returnTo=%2Fcrave%2Fcheckout%3Fcode%3DSAVE10'},
  {name:'auth-switch-drops-external-return',page:'auth/login',query:'returnTo='+encodeURIComponent('https://evil.example'),
  setup:`const fixtureFetch=async()=>reply(200,profile);`,run:`
@@ -700,6 +705,109 @@ cases.push(
  assert(!document.getElementById('orderContent').querySelector('img')&&!window.evil,'Server error was inserted as executable HTML');
  `}
 );
+cases.push(
+ {name:'otp-register-send-validation-cooldown',page:'auth/register',setup:`
+ let release;const fixtureFetch=async request=>{assert(request.url==='/crave/api/auth/register/code','Registration bypassed email code');assert(JSON.stringify(request.body)===JSON.stringify({email:'a@example.com'}),'Code request sent unrelated registration data');return new Promise(resolve=>release=()=>resolve(reply(200,{expiresInSeconds:600,resendAfterSeconds:60})));};`,run:`
+ setFields({fullName:'Nguyen Van A',email:' a@example.com ',phone:'0901234567',password:'password1',confirmPassword:'password1'});submit('registerForm');submit('registerForm');
+ await waitFor(()=>release);assert(calls.length===1,'Duplicate send reached API');assert(document.getElementById('email').disabled,'Sending left identity editable');release();
+ await waitFor(()=>document.getElementById('registerForm').dataset.otpStage==='verify'&&!document.getElementById('verificationCode').disabled);
+ assert(document.getElementById('email').readOnly,'Verified target email remained editable');assert(document.getElementById('otp-resend').disabled,'Resend cooldown missing');
+ assert(document.getElementById('otp-resend').textContent.includes('60s'),'Cooldown did not start at 60 seconds');
+ document.getElementById('otp-resend').dispatchEvent(new Event('click'));assert(calls.length===1,'Cooldown resend reached API');
+ setFields({verificationCode:'12A456'});submit('registerForm');assert(calls.length===1,'Non-digit code reached API');assert(document.getElementById('verificationCode-error'),'Code error missing');
+ `},
+ {name:'otp-register-wrong-code-safe-errors',page:'auth/register',setup:`
+ const fixtureFetch=async request=>request.url.endsWith('/code')?reply(200,{resendAfterSeconds:60}):reply(422,null,{message:'Code invalid',fieldErrors:{verificationCode:'<img src=x onerror=window.evil=1>'}});`,run:`
+ setFields({fullName:'Nguyen Van A',email:'a@example.com',phone:'0901234567',password:'password1',confirmPassword:'password1'});submit('registerForm');
+ await waitFor(()=>document.getElementById('registerForm').dataset.otpStage==='verify'&&!document.getElementById('verificationCode').disabled);
+ setFields({verificationCode:'012345'});submit('registerForm');await waitFor(()=>document.getElementById('verificationCode-error'));
+ assert(calls[1].body.verificationCode==='012345','Leading zero was discarded');assert(!document.getElementById('verificationCode-error').querySelector('img')&&!window.evil,'Code error became executable HTML');
+ assert(document.activeElement.id==='verificationCode','Wrong code was not focused');assert(!document.getElementById('otp-submit').disabled,'Code failure left form blocked');assert(document.getElementById('password').value==='password1','Code failure erased registration draft');
+ `},
+ {name:'otp-register-success-return-and-password-spaces',page:'auth/register',query:'returnTo=%2Fcrave%2Fcheckout',setup:`
+ const fixtureFetch=async request=>{if(request.url.endsWith('/code'))return reply(200,{resendAfterSeconds:60});assert(request.body.verificationCode==='012345','Missing confirmed code');assert(request.body.password===' password1 '&&request.body.confirmPassword===' password1 ','Password spaces changed');assert(request.body.email==='a@example.com','Registration email changed');return reply(201,profile);};`,run:`
+ setFields({fullName:'Nguyen Van A',email:'a@example.com',phone:'0901234567',password:' password1 ',confirmPassword:' password1 '});submit('registerForm');
+ await waitFor(()=>document.getElementById('registerForm').dataset.otpStage==='verify'&&!document.getElementById('verificationCode').disabled);
+ setFields({verificationCode:'012345'});window.addEventListener('beforeunload',()=>sessionStorage.setItem('otp-registration-writes',String(calls.filter(c=>c.url==='/crave/api/auth/register').length)));submit('registerForm');submit('registerForm');`,redirect:'/crave/auth/login?registered=1&returnTo=%2Fcrave%2Fcheckout',redirectCheck:`if(sessionStorage.getItem('otp-registration-writes')!=='1')throw Error('Duplicate final registration');`},
+ {name:'otp-register-send-network-retry',page:'auth/register',setup:`
+ let sends=0;const fixtureFetch=async request=>{assert(request.url.endsWith('/register/code'),'Network retry bypassed code request');if(++sends===1)throw Error('offline');return reply(200,{resendAfterSeconds:60});};`,run:`
+ setFields({fullName:'Nguyen Van A',email:'a@example.com',phone:'0901234567',password:'password1',confirmPassword:'password1'});submit('registerForm');
+ await waitFor(()=>!document.getElementById('form-error').hidden);assert(document.getElementById('otp-fields').hidden,'Failed send enabled verification');assert(!document.getElementById('otp-submit').disabled,'Network failure blocked retry');
+ submit('registerForm');await waitFor(()=>document.getElementById('registerForm').dataset.otpStage==='verify');assert(sends===2,'Retry did not send code');
+ `},
+ {name:'otp-reset-generic-send-and-client-validation',page:'auth/forgot-password',setup:`
+ const fixtureFetch=async request=>{assert(request.url==='/crave/api/auth/password/reset/code','Reset sent verification too soon');assert(Object.keys(request.body).join(',')==='email','Reset send leaked password or account type');return reply(200,{resendAfterSeconds:60});};`,run:`
+ setFields({email:'bad-email'});submit('resetPasswordForm');assert(calls.length===0&&document.getElementById('email-error'),'Invalid email reached reset API');
+ setFields({email:'unknown@example.com'});submit('resetPasswordForm');await waitFor(()=>document.getElementById('resetPasswordForm').dataset.otpStage==='verify'&&!document.getElementById('verificationCode').disabled);
+ assert(document.getElementById('form-success').textContent.includes('Nếu email thuộc tài khoản đang hoạt động'),'Reset message reveals account existence');
+ setFields({verificationCode:'12345',password:'password1',confirmPassword:'password1'});submit('resetPasswordForm');assert(calls.length===1&&document.getElementById('verificationCode-error'),'Short code reached API');
+ setFields({verificationCode:'012345',confirmPassword:'password2'});submit('resetPasswordForm');assert(calls.length===1&&document.getElementById('confirmPassword-error'),'Mismatched new passwords reached API');
+ `},
+ {name:'otp-reset-expired-code-resend',page:'auth/forgot-password',setup:`
+ let elapsed=0;const baseTime=Date.now();Date.now=()=>baseTime+elapsed;
+ const fixtureFetch=async request=>request.url.endsWith('/code')?reply(200,{resendAfterSeconds:60}):reply(400,null,{message:'Mã xác nhận đã hết hạn.',fieldErrors:{verificationCode:'Hãy yêu cầu mã mới.'}});`,run:`
+ setFields({email:'a@example.com'});submit('resetPasswordForm');await waitFor(()=>document.getElementById('resetPasswordForm').dataset.otpStage==='verify'&&!document.getElementById('verificationCode').disabled);
+ setFields({verificationCode:'012345',password:'password1',confirmPassword:'password1'});submit('resetPasswordForm');await waitFor(()=>document.getElementById('verificationCode-error'));
+ assert(!document.getElementById('otp-submit').disabled&&document.getElementById('otp-resend').disabled,'Expiry broke retry or cooldown');
+ elapsed=61000;await waitFor(()=>!document.getElementById('otp-resend').disabled);document.getElementById('otp-resend').click();
+ await waitFor(()=>calls.filter(c=>c.url.endsWith('/code')).length===2&&!document.getElementById('verificationCode').disabled);
+ assert(document.getElementById('verificationCode').value===''&&document.getElementById('otp-resend').disabled,'Resend retained previous code or skipped cooldown');
+ `},
+ {name:'otp-reset-success-login-and-return',page:'auth/forgot-password',query:'returnTo=%2Fcrave%2Fcheckout',setup:`
+ sessionStorage.setItem('crave_applied_voucher','private voucher');const fixtureFetch=async request=>{if(request.url.endsWith('/code'))return reply(200,{resendAfterSeconds:60});assert(JSON.stringify(request.body)===JSON.stringify({email:'staff@example.com',verificationCode:'012345',password:' password1 ',confirmPassword:' password1 '}),'Reset final contract or password whitespace wrong');return reply(200,{message:'Changed'});};`,run:`
+ setFields({email:'staff@example.com'});submit('resetPasswordForm');await waitFor(()=>document.getElementById('resetPasswordForm').dataset.otpStage==='verify'&&!document.getElementById('verificationCode').disabled);
+ setFields({verificationCode:'012345',password:' password1 ',confirmPassword:' password1 '});submit('resetPasswordForm');submit('resetPasswordForm');`,redirect:'/crave/auth/login?passwordReset=1&returnTo=%2Fcrave%2Fcheckout',redirectCheck:`if(sessionStorage.getItem('crave_applied_voucher')!==null)throw Error('Reset retained old account voucher');`},
+ {name:'otp-reset-email-edit-keeps-cooldown',page:'auth/forgot-password',setup:`
+ const fixtureFetch=async()=>reply(200,{resendAfterSeconds:60});`,run:`
+ setFields({email:'first@example.com'});submit('resetPasswordForm');await waitFor(()=>document.getElementById('resetPasswordForm').dataset.otpStage==='verify'&&!document.getElementById('verificationCode').disabled);
+ setFields({verificationCode:'123456'});document.getElementById('otp-edit').click();assert(!document.getElementById('email').readOnly&&document.getElementById('otp-fields').hidden,'Edit did not reset code stage');
+ assert(document.getElementById('verificationCode').value==='','Old target code retained');setFields({email:'second@example.com'});submit('resetPasswordForm');assert(calls.length===1,'Changing email bypassed cooldown');
+ `},
+ ...['CUSTOMER','EMPLOYEE'].map(accountType=>({name:'otp-change-session-mask-'+accountType.toLowerCase(),page:'auth/change-password',accountType,role:accountType==='EMPLOYEE'?'ADMIN':undefined,realHeader:true,setup:`
+ const fixtureFetch=async request=>{if(request.method==='GET'){assert(request.url==='/crave/api/auth/session','Change page did not read actual session');return reply(200,{...profile,accountType:'${accountType}',role:'ADMIN',email:'staff@example.com'});}assert(request.url==='/crave/api/auth/password/change/code','Unexpected change write');assert(JSON.stringify(request.body)===JSON.stringify({currentPassword:' password1 '}),'Change send accepted target email or changed password whitespace');return reply(200,{resendAfterSeconds:60});};`,run:`
+ await waitFor(()=>!document.getElementById('password-change-fields').disabled);
+ assert(document.getElementById('password-account').textContent.includes('st•••@example.com')&&!document.getElementById('password-account').textContent.includes('staff@'),'Actual session email was not masked');
+ assert(!document.querySelector('#changePasswordForm [name=email]'),'Change page accepts a target email');assert(document.querySelector('a[href$="/auth/change-password"]'),'Signed-in header omitted password link');
+ setFields({currentPassword:' password1 '});submit('changePasswordForm');await waitFor(()=>document.getElementById('changePasswordForm').dataset.otpStage==='verify'&&!document.getElementById('verificationCode').disabled);
+ assert(document.getElementById('currentPassword').readOnly,'Sending identity did not lock');assert(calls.every(c=>c.options.credentials==='same-origin'),'Change requests lost session credentials');
+ `})),
+ {name:'otp-change-session-load-retry',page:'auth/change-password',accountType:'EMPLOYEE',setup:`
+ let reads=0;const fixtureFetch=async request=>{assert(request.method==='GET','Failed session page accepted a code request');return ++reads===1?reply(503,null,{message:'Unavailable'}):reply(200,{...profile,accountType:'EMPLOYEE'});};`,run:`
+ await waitFor(()=>!document.getElementById('password-session-retry').hidden);assert(document.getElementById('password-change-fields').disabled,'Failed session enabled change form');submit('changePasswordForm');assert(calls.length===1,'Disabled change form accepted submit');
+ document.getElementById('password-session-retry').click();await waitFor(()=>!document.getElementById('password-change-fields').disabled);assert(reads===2,'Session retry missing');
+ `},
+ {name:'otp-change-wrong-current-password',page:'auth/change-password',accountType:'EMPLOYEE',setup:`
+ const fixtureFetch=async request=>request.method==='GET'?reply(200,{...profile,accountType:'EMPLOYEE'}):reply(400,null,{message:'Mật khẩu hiện tại không đúng.',fieldErrors:{currentPassword:'Vui lòng kiểm tra mật khẩu hiện tại.'}});`,run:`
+ await waitFor(()=>!document.getElementById('password-change-fields').disabled);setFields({currentPassword:'password1'});submit('changePasswordForm');await waitFor(()=>document.getElementById('currentPassword-error'));
+ assert(document.getElementById('otp-fields').hidden&&!document.getElementById('currentPassword').disabled,'Wrong current password enabled verification or blocked retry');assert(document.activeElement.id==='currentPassword','Current password error was not focused');
+ `},
+ {name:'otp-change-admin-success-login',page:'auth/change-password',accountType:'EMPLOYEE',role:'ADMIN',setup:`
+ sessionStorage.setItem('crave_applied_voucher','private voucher');const fixtureFetch=async request=>{if(request.method==='GET')return reply(200,{...profile,accountType:'EMPLOYEE',role:'ADMIN'});if(request.url.endsWith('/code'))return reply(200,{resendAfterSeconds:60});assert(JSON.stringify(request.body)===JSON.stringify({verificationCode:'012345',password:' password1 ',confirmPassword:' password1 '}),'Change verify accepted current password/target email or altered leading zero');return reply(200,{message:'Changed'});};`,run:`
+ await waitFor(()=>!document.getElementById('password-change-fields').disabled);setFields({currentPassword:'old-password1'});submit('changePasswordForm');await waitFor(()=>document.getElementById('changePasswordForm').dataset.otpStage==='verify'&&!document.getElementById('verificationCode').disabled);
+ setFields({verificationCode:'012345',password:' password1 ',confirmPassword:' password1 '});window.addEventListener('beforeunload',()=>sessionStorage.setItem('otp-change-writes',String(calls.filter(c=>c.url==='/crave/api/auth/password/change').length)));submit('changePasswordForm');submit('changePasswordForm');`,redirect:'/crave/auth/login?passwordChanged=1',redirectCheck:`if(sessionStorage.getItem('crave_applied_voucher')!==null)throw Error('Password change retained old account voucher');if(sessionStorage.getItem('otp-change-writes')!=='1')throw Error('Duplicate password change');`},
+ {name:'otp-change-expired-session-login',page:'auth/change-password',setup:`const fixtureFetch=async()=>reply(401,null,{message:'Unauthorized'});`,run:``,redirect:'/crave/auth/login?reason=session-expired'},
+ {name:'otp-login-reset-success-and-forgot-return',page:'auth/login',query:'passwordReset=1&returnTo=%2Fcrave%2Fcheckout',setup:`const fixtureFetch=async()=>reply(200,profile);`,run:`
+ assert(!document.getElementById('form-success').hidden&&document.getElementById('form-success').textContent.includes('Mật khẩu đã được cập nhật'),'Password reset confirmation missing');
+ const forgot=document.querySelector('a[href*="/auth/forgot-password"]');assert(forgot&&new URL(forgot.href).searchParams.get('returnTo')==='/crave/checkout','Forgot link lost safe returnTo');
+ `},
+ {name:'otp-employee-readonly-profile-has-password-link',page:'customer/profile',accountType:'EMPLOYEE',setup:`const fixtureFetch=async()=>reply(200,{...profile,accountType:'EMPLOYEE',role:'ADMIN'});`,run:`
+ await waitFor(()=>document.getElementById('profile-loading').hidden);const link=document.querySelector('.account-sidebar a[href$="/auth/change-password"]');assert(link&&!link.closest('fieldset')&&document.getElementById('profile-fields').disabled,'Employee readonly profile blocks password change');
+ `},
+ ...[
+  ['register','registerForm'],['forgot-password','resetPasswordForm'],['change-password','changePasswordForm']
+ ].map(([page,form])=>({name:'otp-mobile-layout-'+page,page:'auth/'+page,viewport:390,realHeader:true,screenshot:true,accountType:page==='change-password'?'EMPLOYEE':undefined,role:page==='change-password'?'ADMIN':undefined,setup:`
+ const fixtureFetch=async request=>reply(200,request.method==='GET'?{...profile,accountType:'EMPLOYEE',role:'ADMIN'}:{resendAfterSeconds:60});`,run:`
+ await waitFor(()=>window.innerWidth===390,'Mobile device metrics were not applied');
+ if('${page}'==='change-password'){await waitFor(()=>!document.getElementById('password-change-fields').disabled);setFields({currentPassword:'password1'});}
+ else if('${page}'==='register')setFields({fullName:'Nguyen Van A',email:'a@example.com',phone:'0901234567',password:'password1',confirmPassword:'password1'});
+ else setFields({email:'a@example.com'});
+ submit('${form}');await waitFor(()=>document.getElementById('${form}').dataset.otpStage==='verify'&&!document.getElementById('verificationCode').disabled);
+ assert(document.documentElement.scrollWidth<=window.innerWidth,'OTP page overflows mobile viewport');
+ for(const id of ['verificationCode','otp-submit','otp-resend','otp-edit']){const box=document.getElementById(id).getBoundingClientRect();assert(box.width>0&&box.left>=0&&box.right<=window.innerWidth,id+' escaped viewport');}
+ assert(document.getElementById('verificationCode').getAttribute('autocomplete')==='one-time-code'&&document.getElementById('verificationCode').getAttribute('inputmode')==='numeric','Mobile code entry hints missing');
+ `}))
+);
+
 const selectedCases = cases.filter(test => !process.argv[2] || new RegExp(process.argv[2]).test(test.name));
 if (!selectedCases.length) throw new Error('No browser cases matched.');
 let current;
@@ -760,7 +868,7 @@ const server=http.createServer((req,res)=>{
  res.end(`<!doctype html><html><body><script>try{${current.redirectCheck||''}document.body.innerHTML='<pre id="smoke-result">PASS ${current.name}</pre>';}catch(e){document.body.innerHTML='<pre id="smoke-result">FAIL '+e.message+'</pre>';}</script></body></html>`);return;}
  const run=current.redirect?current.run:current.run+`finish('PASS ${current.name}');`;
  const pageStyle=current.page.startsWith('cart/')?'cart':current.page.startsWith('order/')?'order':'account';
- const shell=current.realHeader?headerMarkup():`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="${context}/assets/css/styles.css?v=20261013-palette2"><link rel="stylesheet" href="${context}/assets/css/${pageStyle}.css?v=20261013-palette2"></head><body class="crave-body ${current.page.startsWith('order/')?'order-page':''}" data-context-path="${context}">`;
+ const shell=current.realHeader?headerMarkup():`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="${context}/assets/css/styles.css?v=20261013-palette2"><link rel="stylesheet" href="${context}/assets/css/${pageStyle}.css?v=20261013-auth1"></head><body class="crave-body ${current.page.startsWith('order/')?'order-page':''}" data-context-path="${context}">`;
  const footer=current.realHeader?footerMarkup():`<form id="logoutForm" action="${context}/api/auth/logout"><button type="submit">Logout</button></form><p id="logout-error"></p>`;
  res.end(`${shell}${markup(current.page)}${footer}
  <script>${common}${current.setup}</script><script src="${context}/assets/js/account.js"></script>
@@ -801,6 +909,7 @@ async function browser(url,index){
            socket=new WebSocket(target.webSocketDebuggerUrl);
            await new Promise((resolve,reject)=>{socket.addEventListener('open',resolve,{once:true});socket.addEventListener('error',reject,{once:true});});
            socket.addEventListener('message',event=>{const data=JSON.parse(event.data);if(data.id){pending.get(data.id)?.(data);pending.delete(data.id);}});
+           if(current.screenshot&&current.viewport){await send('Emulation.setDeviceMetricsOverride',{width:current.viewport,height:900,deviceScaleFactor:1,mobile:false});}
          }
        }
      }
@@ -808,7 +917,10 @@ async function browser(url,index){
        // Explicitly wait for the fixture result; --dump-dom can stall across async checkout redirects.
        const response=await send('Runtime.evaluate',{expression:"document.getElementById('smoke-result') ? document.documentElement.outerHTML : null",returnByValue:true});
        const output=response.result?.result?.value;
-       if(output)return output;
+       if(output){
+         if(current.screenshot){await send('Runtime.evaluate',{expression:"window.scrollTo({top:0,behavior:'instant'})"});const shot=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:true});if(shot.result?.data)fs.writeFileSync(path.join(work,current.name+'.png'),Buffer.from(shot.result.data,'base64'));}
+         return output;
+       }
      }
      await new Promise(resolve=>setTimeout(resolve,50));
    }

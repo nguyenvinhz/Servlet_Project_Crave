@@ -40,6 +40,9 @@ public abstract class User {
     @Column(name = "password_hash", length = 255, nullable = false)
     private String passwordHash;
 
+    @Column(name = "password_version", nullable = false)
+    private long passwordVersion;
+
     @Column(name = "created_at", nullable = false, insertable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -99,6 +102,18 @@ public abstract class User {
 
     public void setPasswordHash(String passwordHash) {
         this.passwordHash = passwordHash;
+    }
+
+    public long getPasswordVersion() {
+        return passwordVersion;
+    }
+
+    public void setPasswordVersion(long passwordVersion) {
+        this.passwordVersion = passwordVersion;
+    }
+
+    public void incrementPasswordVersion() {
+        passwordVersion = Math.addExact(passwordVersion, 1);
     }
 
     public LocalDateTime getCreatedAt() {

@@ -62,6 +62,7 @@
                     </small>
                 </div>
                 <a class="user-dropdown-link" href="<c:url value='/customer/profile'/>">Hồ sơ tài khoản</a>
+                <a class="user-dropdown-link" href="<c:url value='/auth/change-password'/>">Đổi mật khẩu</a>
                 <a class="user-dropdown-link" href="<c:url value='/menu'/>">Xem cửa hàng</a>
                 <button class="user-dropdown-logout" id="adminLogout" type="button">Đăng xuất</button>
             </div>

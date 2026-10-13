@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Deploy a tested WAR and additive payOS migration to the existing EC2 application.
+# Deploy a tested WAR and additive payment/account migrations to the existing EC2 application.
 set -Eeuo pipefail
 umask 077
 
@@ -7,7 +7,7 @@ fail() { printf 'Deploy error: %s\n' "$*" >&2; exit 1; }
 log() { printf '%s\n' "$*"; }
 
 [[ $# -eq 1 ]] || fail 'Usage: DEPLOY_PATH=/home/ubuntu/crave bash scripts/deploy-ec2.sh /path/to/crave.war'
-for dependency in docker curl python3 flock realpath mktemp install mv unzip sha256sum chmod env; do
+for dependency in docker curl python3 flock realpath mktemp install mv unzip sha256sum chmod env cat; do
   command -v "$dependency" >/dev/null || fail "Missing command: $dependency"
 done
 
@@ -26,10 +26,14 @@ unzip -tq "$artifact" >/dev/null || fail 'The WAR artifact is not a valid ZIP ar
 
 script_file=$(realpath -e -- "${BASH_SOURCE[0]}")
 source_root=$(dirname -- "$(dirname -- "$script_file")")
-migration_input=$source_root/database/migrations/2026-10-13-payos-payment.sql
-[[ -f $migration_input && -s $migration_input && ! -L $migration_input ]] || fail 'The release payOS migration is missing or invalid.'
-migration_file=$(realpath -e -- "$migration_input")
-[[ $migration_file == "$source_root/database/migrations/2026-10-13-payos-payment.sql" ]] || fail 'Migration must belong to this release checkout.'
+migration_files=()
+for migration_name in 2026-10-13-payos-payment.sql 2026-10-13-email-verification.sql; do
+  migration_input=$source_root/database/migrations/$migration_name
+  [[ -f $migration_input && -s $migration_input && ! -L $migration_input ]] || fail 'A release migration is missing or invalid.'
+  migration_file=$(realpath -e -- "$migration_input")
+  [[ $migration_file == "$source_root/database/migrations/$migration_name" ]] || fail 'Migration must belong to this release checkout.'
+  migration_files+=("$migration_file")
+done
 
 compose_input=${COMPOSE_FILE:-compose.yaml}
 [[ $compose_input != /* ]] || fail 'COMPOSE_FILE must be relative to DEPLOY_PATH.'
@@ -66,6 +70,8 @@ fi
 # New workflow secrets must not change interpolation in the existing base Compose file.
 # The private override supplies literal payOS values; .env keeps all existing DB settings.
 base_compose=(env -u PAYOS_CLIENT_ID -u PAYOS_API_KEY -u PAYOS_CHECKSUM_KEY -u PAYOS_PUBLIC_BASE_URL
+  -u EMAIL_SMTP_HOST -u EMAIL_SMTP_PORT -u EMAIL_SMTP_USERNAME -u EMAIL_SMTP_PASSWORD
+  -u EMAIL_FROM -u EMAIL_SMTP_STARTTLS -u EMAIL_OTP_SECRET
   "${docker_command[@]}" compose --project-directory "$deploy_root" --file "$compose_file")
 compose=("${base_compose[@]}")
 "${base_compose[@]}" version >/dev/null
@@ -142,13 +148,13 @@ finish() {
   trap - EXIT INT TERM
   if [[ $rollback_needed == true && $status -ne 0 ]]; then
     set +e
-    log 'Deployment failed. Restoring the previous WAR and payOS configuration.'
+    log 'Deployment failed. Restoring the previous WAR and application configuration.'
     if atomic_copy "$backup_path" "$war_path" && restore_override && recreate_app && wait_for_health; then
       log 'Rollback completed; the previous application is healthy.'
     else
       log 'Rollback did not become healthy. Check the app container on EC2.' >&2
     fi
-    # The additive payment-link table and any financial reservations remain intact.
+    # Additive payment and email-verification tables remain intact during rollback.
   fi
   if [[ -n $staging_file && -f $staging_file ]]; then rm -f -- "$staging_file"; fi
   if [[ -n $candidate_file && -f $candidate_file ]]; then rm -f -- "$candidate_file"; fi
@@ -206,6 +212,28 @@ try:
 except (ValueError, TypeError):
     fail("PAYOS_PUBLIC_BASE_URL is invalid.")
 
+mail_defaults = {"EMAIL_SMTP_HOST": "smtp.gmail.com", "EMAIL_SMTP_PORT": "587", "EMAIL_SMTP_STARTTLS": "true"}
+for name in ("EMAIL_SMTP_HOST", "EMAIL_SMTP_PORT", "EMAIL_SMTP_USERNAME", "EMAIL_SMTP_PASSWORD", "EMAIL_FROM", "EMAIL_SMTP_STARTTLS", "EMAIL_OTP_SECRET"):
+    value = os.environ.get(name, mail_defaults.get(name, ""))
+    if not value or len(value) > 512 or any(ord(char) < 32 or ord(char) > 126 for char in value):
+        fail("All production email settings are required and must be valid.")
+    environment[name] = value
+if not re.fullmatch(r"[a-zA-Z0-9](?:[a-zA-Z0-9.-]*[a-zA-Z0-9])?", environment["EMAIL_SMTP_HOST"]):
+    fail("EMAIL_SMTP_HOST is invalid.")
+try:
+    mail_port = int(environment["EMAIL_SMTP_PORT"])
+except ValueError:
+    fail("EMAIL_SMTP_PORT is invalid.")
+if not 1 <= mail_port <= 65535 or environment["EMAIL_SMTP_STARTTLS"].lower() != "true":
+    fail("Production email requires STARTTLS and a valid SMTP port.")
+if environment["EMAIL_SMTP_HOST"].lower() == "smtp.gmail.com" and mail_port != 587:
+    fail("Gmail SMTP must use port 587 with STARTTLS.")
+for name in ("EMAIL_SMTP_USERNAME", "EMAIL_FROM"):
+    if not re.fullmatch(r"[^@\s<>]+@[^@\s<>]+\.[^@\s<>]+", environment[name]):
+        fail("Production email addresses must be valid.")
+if len(environment["EMAIL_OTP_SECRET"]) < 32 or any(char.isspace() for char in environment["EMAIL_OTP_SECRET"]):
+    fail("EMAIL_OTP_SECRET must contain at least 32 non-whitespace characters.")
+
 escaped = {name: value.replace("$", "$$") for name, value in environment.items()}
 try:
     with open(sys.argv[2], "w", encoding="utf-8") as output:
@@ -239,18 +267,18 @@ try:
     environment = service.get("environment", {})
     # Compose config serializes literal dollars as $$, matching the staged escaped values.
     if any(environment.get(name) != value for name, value in expected.items()):
-        sys.exit("Compose must pass all production payOS settings to the app.")
+        sys.exit("Compose must pass all production payment and email settings to the app.")
 except (ValueError, KeyError, TypeError, AttributeError, OSError):
     sys.exit("Cannot validate production Compose configuration.")
 ' "$service" "$war_path" "$db_service" "$candidate_file"
 
 # The old WAR keeps serving while this idempotent, additive migration runs.
 # The password is read inside the existing DB container, not passed in argv or runner logs.
-log 'Applying the additive payOS migration to the existing database service.'
+log 'Applying additive payment and email-verification migrations to the existing database service.'
 migration_status=0
-"${base_compose[@]}" exec -T "$db_service" sh -c \
+cat -- "${migration_files[@]}" | "${base_compose[@]}" exec -T "$db_service" sh -c \
   'test -n "${MYSQL_ROOT_PASSWORD:-}" || { printf "%s\n" "Database migration credentials are unavailable." >&2; exit 1; }; MYSQL_PWD="$MYSQL_ROOT_PASSWORD" exec mysql --user=root --default-character-set=utf8mb4 --database=crave' \
-  < "$migration_file" >/dev/null 2>&1 || migration_status=$?
+  >/dev/null 2>&1 || migration_status=$?
 if (( migration_status != 0 )); then
   log 'Database migration failed; the existing application was left running.' >&2
   exit "$migration_status"
@@ -278,5 +306,5 @@ atomic_copy "$artifact" "$war_path"
 recreate_app
 wait_for_health || fail "Application did not become healthy within ${health_timeout}s."
 rollback_needed=false
-log 'Deployment succeeded. Previous WAR and payOS configuration saved in .deploy-backups.'
+log 'Deployment succeeded. Previous WAR and application configuration saved in .deploy-backups.'
 sha256sum "$war_path"
