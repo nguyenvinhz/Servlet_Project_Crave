@@ -2191,8 +2191,112 @@ label {
 .crave-body .clean-card-body { padding: 12px 0 0; }
 .crave-body .clean-card-title a { color: inherit; }
 .crave-body .clean-card-desc { margin-bottom: 12px; }
-.crave-body .food-card-action { display: grid; place-items: center; width: 36px; height: 36px; border: 1px solid var(--line); border-radius: 50%; color: var(--accent); }
-.crave-body .food-card-action:hover { background: var(--accent); color: #fff; }
+.crave-body .food-card-action {
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    border: 1px solid var(--line);
+    border-radius: 50%;
+    color: var(--accent);
+    background: transparent;
+    cursor: pointer;
+    padding: 0;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    outline: none;
+}
+.crave-body .food-card-action:hover:not(:disabled) {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+    transform: scale(1.08);
+}
+.crave-body .food-card-action:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+    background: rgba(255, 255, 255, 0.05);
+}
+.crave-body .food-card-action.adding {
+    pointer-events: none;
+    background: rgba(255, 102, 56, 0.15);
+    border-color: var(--accent);
+    color: var(--accent);
+}
+.crave-body .food-card-action.success {
+    background: #16a34a !important;
+    border-color: #16a34a !important;
+    color: #ffffff !important;
+    transform: scale(1.1);
+}
+
+@keyframes spinIcon {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+.spin-icon {
+    animation: spinIcon 0.8s linear infinite;
+}
+
+@keyframes cartBump {
+    0% { transform: scale(1); }
+    40% { transform: scale(1.25); }
+    100% { transform: scale(1); }
+}
+.header-cart-icon-btn.cart-bump {
+    animation: cartBump 0.35s ease-out;
+}
+
+/* Toast Notifications */
+.crave-toast-container {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    pointer-events: none;
+}
+.crave-toast {
+    background: #251d18;
+    color: #fffaf6;
+    padding: 13px 20px;
+    border-radius: 12px;
+    font-size: 0.92rem;
+    font-weight: 600;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    pointer-events: auto;
+    animation: toastSlideUp 0.25s ease-out;
+    border: 1px solid #4a382e;
+}
+.crave-toast.success {
+    background: #143823;
+    border-color: #22c55e;
+    color: #bbf7d0;
+}
+.crave-toast.error {
+    background: #421818;
+    border-color: #ef4444;
+    color: #fecaca;
+}
+.crave-toast.info {
+    background: #1d2c3f;
+    border-color: #38bdf8;
+    color: #bae6fd;
+}
+@keyframes toastSlideUp {
+    from {
+        opacity: 0;
+        transform: translateY(16px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
 .crave-body .feature-card, .crave-body .order-action-bar, .crave-body .empty-state { background: var(--surface); border-color: var(--line); box-shadow: none; }
 .crave-body .feature-card { flex-direction: row; align-items: flex-start; }
 .crave-body .feature-symbol { color: var(--accent); font-size: 28px; line-height: 1.3; }

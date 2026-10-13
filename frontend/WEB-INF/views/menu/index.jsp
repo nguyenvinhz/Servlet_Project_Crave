@@ -95,7 +95,23 @@
                         <p class="clean-card-desc"><c:out value="${not empty food.description ? food.description : 'Món ngon được chuẩn bị riêng cho bữa ăn của bạn.'}"/></p>
                         <div class="clean-card-bottom">
                             <span class="clean-price"><fmt:formatNumber value="${food.price}" type="number" groupingUsed="true"/> ₫</span>
-                            <a href="<c:out value='${foodUrl}'/>" class="food-card-action" aria-label="Chọn món <c:out value='${food.name}'/>"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></a>
+                            <c:choose>
+                                <c:when test="${food.status == 'UNAVAILABLE'}">
+                                    <button type="button" class="food-card-action" disabled aria-label="Món <c:out value='${food.name}'/> tạm hết" title="Món tạm hết">
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                                    </button>
+                                </c:when>
+                                <c:otherwise>
+                                    <button type="button" 
+                                            class="food-card-action" 
+                                            data-quick-add="<c:out value='${food.id}'/>" 
+                                            data-food-name="<c:out value='${food.name}'/>" 
+                                            aria-label="Thêm nhanh <c:out value='${food.name}'/> vào giỏ hàng"
+                                            title="Thêm nhanh vào giỏ hàng">
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+                                    </button>
+                                </c:otherwise>
+                            </c:choose>
                         </div>
                     </div>
                 </article>
