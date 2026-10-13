@@ -36,4 +36,6 @@ public interface CustomerOrderService {
     List<OrderSummaryResponse> getOrdersByCustomer(String customerId);
     List<OrderResponse> getAllOrdersForAdmin();
     void updateOrderStatus(String orderId, OrderStatus status, String employeeId, String note);
+    void cancelOrder(String orderId, String customerId, String reason);
 }
+

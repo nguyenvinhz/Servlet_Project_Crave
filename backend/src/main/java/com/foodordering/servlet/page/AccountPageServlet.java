@@ -1,4 +1,4 @@
-package com.foodordering.servlet;
+package com.foodordering.servlet.page;
 
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;

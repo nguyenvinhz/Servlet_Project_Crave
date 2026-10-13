@@ -83,6 +83,124 @@
         return data?.error?.message || data?.message || fallback;
     }
 
+    function showAddressHint(text) {
+        const hint = document.getElementById('addressHint');
+        if (hint) hint.textContent = text;
+    }
+
+    let addressesLoaded = false;
+    async function loadSavedAddresses() {
+        if (addressesLoaded) return;
+        try {
+            const data = await requestApi('/api/addresses');
+            if (!data || !data.success || !Array.isArray(data.data)) return;
+            const addresses = data.data;
+            const selectWrap = document.getElementById('savedAddressWrap');
+            const select = document.getElementById('savedAddressSelect');
+            const addressInput = document.getElementById('deliveryAddress');
+            const noteInput = document.getElementById('customerNote');
+
+            if (!select || !addressInput) return;
+
+            if (addresses.length > 0) {
+                select.innerHTML = '';
+
+                let defaultIdx = -1;
+                addresses.forEach((addr, idx) => {
+                    const opt = document.createElement('option');
+                    opt.value = String(idx);
+                    const isDef = Boolean(addr.isDefault);
+                    if (isDef && defaultIdx === -1) defaultIdx = idx;
+
+                    const notePart = addr.note ? ` (${addr.note})` : '';
+                    opt.textContent = `${isDef ? '★ [Mặc định] ' : '📍 '}${addr.addressLine}${notePart}`;
+                    select.appendChild(opt);
+                });
+
+                const customOpt = document.createElement('option');
+                customOpt.value = 'custom';
+                customOpt.textContent = '✏️ Nhập địa chỉ khác...';
+                select.appendChild(customOpt);
+
+                const chosenIdx = defaultIdx !== -1 ? defaultIdx : 0;
+                select.value = String(chosenIdx);
+
+                // Điền địa chỉ mặc định vào ô nhập nếu ô đang trống
+                if (!addressInput.value.trim() && addresses[chosenIdx]) {
+                    addressInput.value = addresses[chosenIdx].addressLine || '';
+                    if (addresses[chosenIdx].note && noteInput && !noteInput.value.trim()) {
+                        noteInput.value = addresses[chosenIdx].note;
+                    }
+                }
+
+                if (selectWrap) {
+                    selectWrap.style.display = 'block';
+                }
+
+                showAddressHint(addresses[chosenIdx]?.isDefault
+                    ? 'Đang dùng địa chỉ mặc định của bạn. Bạn có thể chọn địa chỉ khác ở danh sách hoặc sửa trực tiếp.'
+                    : 'Đang dùng địa chỉ từ sổ địa chỉ của bạn.');
+
+                select.addEventListener('change', () => {
+                    if (select.value === 'custom') {
+                        addressInput.value = '';
+                        addressInput.focus();
+                        showAddressHint('Vui lòng nhập địa chỉ giao hàng cho đơn này.');
+                    } else {
+                        const selectedAddr = addresses[parseInt(select.value, 10)];
+                        if (selectedAddr) {
+                            addressInput.value = selectedAddr.addressLine || '';
+                            if (selectedAddr.note && noteInput && (!noteInput.value.trim() || noteInput.value === addresses[chosenIdx]?.note)) {
+                                noteInput.value = selectedAddr.note;
+                            }
+                            showAddressHint(selectedAddr.isDefault
+                                ? 'Đang dùng địa chỉ mặc định của bạn.'
+                                : 'Đang dùng địa chỉ từ sổ địa chỉ của bạn.');
+                        }
+                    }
+                });
+
+                addressInput.addEventListener('input', () => {
+                    const currentVal = addressInput.value.trim();
+                    const matchedIdx = addresses.findIndex(a => a.addressLine.trim() === currentVal);
+                    if (matchedIdx !== -1) {
+                        select.value = String(matchedIdx);
+                        showAddressHint(addresses[matchedIdx].isDefault ? 'Đang dùng địa chỉ mặc định.' : 'Đang dùng địa chỉ đã lưu.');
+                    } else {
+                        select.value = 'custom';
+                        showAddressHint('Địa chỉ tùy chỉnh cho đơn hàng này.');
+                    }
+                });
+
+                addressesLoaded = true;
+            }
+        } catch (_) {}
+    }
+
+    let profileLoaded = false;
+    async function loadProfileInfo() {
+        if (profileLoaded) return;
+        const nameInput = document.getElementById('receiverName');
+        const phoneInput = document.getElementById('receiverPhone');
+        if (nameInput?.value && phoneInput?.value) {
+            profileLoaded = true;
+            return;
+        }
+
+        try {
+            const data = await requestApi('/api/profile');
+            if (data?.success && data.data) {
+                if (nameInput && !nameInput.value.trim() && data.data.fullName) {
+                    nameInput.value = data.data.fullName;
+                }
+                if (phoneInput && !phoneInput.value.trim() && data.data.phone) {
+                    phoneInput.value = data.data.phone;
+                }
+                profileLoaded = true;
+            }
+        } catch (_) {}
+    }
+
     async function loadCheckout(warning = '', blockOrder = false) {
         if (state.loading || state.submitting || state.completed || state.sessionExpired) return;
         state.loading = true;
@@ -101,6 +219,9 @@
                 updateSummary();
                 throw new Error('Giỏ hàng đang trống. Vui lòng thêm món trước khi đặt hàng.');
             }
+
+            // Tải thông tin người nhận và sổ địa chỉ giao hàng
+            await Promise.all([loadProfileInfo(), loadSavedAddresses()]);
 
             const code = voucherCode();
             if (code) {
@@ -157,7 +278,9 @@
             if (data.success && data.data?.orderId) {
                 state.completed = true;
                 clearVoucher();
-                alert('Đặt hàng thành công! Mã đơn: ' + data.data.orderId, true);
+                const onlinePayment = ['BANK_TRANSFER', 'E_WALLET'].includes(payload.paymentMethod);
+                alert('Đặt hàng thành công! Mã đơn: ' + data.data.orderId
+                    + (onlinePayment ? '. Đang chuyển đến mã QR thanh toán...' : ''), true);
                 setTimeout(() => window.location.assign(`${API_BASE}/orders/${encodeURIComponent(data.data.orderId)}`), 2000);
             } else {
                 const errorCode = data.error?.code || '';

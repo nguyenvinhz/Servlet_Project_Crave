@@ -82,7 +82,8 @@
 .order-page textarea:focus,
 .order-page select:focus {
     border-color: var(--border-focus);
-    outline: 3px solid rgba(239, 91, 53, 0.2);
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(239, 91, 53, 0.2);
 }
 
 .order-page label {
@@ -477,3 +478,217 @@
     .order-page .step { flex-direction: row; gap: 16px; }
     .order-page .step-label { max-width: none; text-align: left; }
 }
+
+/* Checkout Saved Address Picker */
+.address-label-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin: 12px 0 4px;
+}
+.address-label-row label {
+    margin: 0 !important;
+}
+.address-manage-link {
+    font-size: 0.82rem;
+    color: var(--accent);
+    text-decoration: none;
+    font-weight: 600;
+}
+.address-manage-link:hover {
+    text-decoration: underline;
+}
+.saved-address-wrap {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 12px;
+}
+.saved-address-wrap .sub-label {
+    display: block;
+    margin: 0 0 6px !important;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    font-weight: 600;
+}
+.saved-address-select {
+    width: 100%;
+    font-size: 0.9rem;
+    cursor: pointer;
+}
+.field-hint {
+    margin: 6px 0 0;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    line-height: 1.4;
+}
+
+/* --- Order Cancellation Styles --- */
+.btn-cancel-order {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.4rem 0.85rem;
+    border-radius: 8px;
+    border: 1px solid rgba(239, 68, 68, 0.4);
+    background: rgba(239, 68, 68, 0.08);
+    color: #f87171;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.btn-cancel-order:hover {
+    background: rgba(239, 68, 68, 0.2);
+    border-color: #ef4444;
+    color: #fca5a5;
+}
+
+.btn-cancel-order:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.order-page .modal-dialog {
+    background: var(--bg-card);
+    color: var(--text);
+    border: 1px solid var(--border);
+}
+
+.order-page .modal-header {
+    border-bottom: 1px solid var(--border);
+}
+
+.order-page .modal-header h3 {
+    color: var(--text);
+}
+
+.order-page .modal-close {
+    color: var(--text-muted);
+}
+
+.order-page .modal-footer {
+    border-top: 1px solid var(--border);
+}
+
+.cancel-reason-option {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.6rem 0.75rem;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--bg-card-alt);
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: border-color 0.15s, background-color 0.15s;
+}
+
+.cancel-reason-option:hover {
+    border-color: var(--accent);
+}
+
+.cancel-reason-option input[type="radio"] {
+    width: auto;
+    accent-color: var(--accent);
+    cursor: pointer;
+}
+
+/* QR thanh toán trên trang chi tiết đơn hàng */
+.payos-payment {
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.payos-payment h2 {
+    margin: 0 0 0.75rem;
+    font-size: 1.2rem;
+}
+
+.payos-hint {
+    color: var(--text-muted);
+    line-height: 1.6;
+    margin: 0 0 1rem;
+}
+
+.payos-status {
+    margin: 0 0 1rem;
+    font-weight: 600;
+    line-height: 1.6;
+}
+
+.payos-paid .payos-status {
+    color: #4ade80;
+    margin-bottom: 0;
+}
+
+.payos-details {
+    display: grid;
+    grid-template-columns: minmax(0, 240px) minmax(0, 1fr);
+    align-items: center;
+    gap: 1.5rem;
+    margin: 1.25rem 0;
+}
+
+.payos-qr {
+    display: block;
+    width: 100%;
+    height: auto;
+    max-width: 240px;
+    padding: 0.75rem;
+    background: white;
+    border-radius: 12px;
+}
+
+.payos-bank-details {
+    margin: 0;
+    display: grid;
+    gap: 1rem;
+    min-width: 0;
+}
+
+.payos-bank-details dt {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    margin-bottom: 0.25rem;
+}
+
+.payos-bank-details dd {
+    margin: 0;
+    font-weight: 700;
+    overflow-wrap: anywhere;
+}
+
+.payos-bank-details .payos-amount {
+    color: var(--accent);
+    font-size: 1.5rem;
+}
+
+.payos-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.payos-payment [hidden] {
+    display: none !important;
+}
+
+@media (max-width: 600px) {
+    .payos-details {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .payos-qr-wrap {
+        justify-self: center;
+        width: min(240px, 100%);
+    }
+
+    .payos-actions > * {
+        width: 100%;
+        text-align: center;
+    }
+}
+

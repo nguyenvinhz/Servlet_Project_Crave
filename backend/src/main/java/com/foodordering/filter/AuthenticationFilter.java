@@ -54,7 +54,7 @@ public class AuthenticationFilter implements Filter {
         boolean protectedRoute = isProtected(path, request.getMethod());
         SessionAuth.Snapshot snapshot = null;
         try {
-            if (!READ_METHODS.contains(request.getMethod())) {
+            if (!READ_METHODS.contains(request.getMethod()) && !path.equals("/api/payos/webhook")) {
                 validateOrigin(request);
             }
             if (protectedRoute) {
@@ -81,6 +81,7 @@ public class AuthenticationFilter implements Filter {
         return under(path, "/customer") || under(path, "/admin") || under(path, "/api/admin")
                 || path.equals("/api/profile") || under(path, "/api/addresses")
                 || under(path, "/api/orders") || under(path, "/api/payments")
+                || under(path, "/api/payos/orders")
                 || under(path, "/api/cart") || under(path, "/cart")
                 || (under(path, "/api/promotions") && !READ_METHODS.contains(method))
                 || under(path, "/checkout") || under(path, "/orders");

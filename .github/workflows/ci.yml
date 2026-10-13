@@ -91,10 +91,13 @@ jobs:
           node --check tests/frontend/account-browser-smoke.cjs
           node --check tests/frontend/admin-management-browser-smoke.cjs
           node --check tests/frontend/admin-orders-dashboard-browser-smoke.cjs
+          node --check tests/frontend/payos-payment-browser-smoke.cjs
           node --check tests/runtime/http-smoke.cjs
 
       - name: Verify deployment and rollback script
-        run: bash scripts/tests/deploy-ec2-test.sh
+        run: |
+          bash tests/scripts/deploy-ec2-test.sh
+          python3 tests/scripts/register-payos-webhook-test.py
 
       - name: Run browser smoke tests
         run: |
@@ -103,6 +106,7 @@ jobs:
           node tests/frontend/account-browser-smoke.cjs
           node tests/frontend/admin-management-browser-smoke.cjs
           node tests/frontend/admin-orders-dashboard-browser-smoke.cjs
+          node tests/frontend/payos-payment-browser-smoke.cjs
 
       - name: Run packaged WAR HTTP smoke tests
         env:

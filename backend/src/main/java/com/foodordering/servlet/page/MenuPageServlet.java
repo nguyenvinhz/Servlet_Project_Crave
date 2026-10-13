@@ -1,4 +1,4 @@
-package com.foodordering.servlet;
+package com.foodordering.servlet.page;
 
 import com.foodordering.enums.FoodStatus;
 import com.foodordering.exception.ResourceNotFoundException;

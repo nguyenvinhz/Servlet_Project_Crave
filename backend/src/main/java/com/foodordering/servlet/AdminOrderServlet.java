@@ -17,6 +17,7 @@ import com.foodordering.dto.UpdateOrderStatusRequest;
 import com.foodordering.enums.OrderStatus;
 import com.foodordering.service.CustomerOrderService;
 import com.foodordering.service.CustomerOrderServiceImpl;
+import com.foodordering.service.PayosPaymentService;
 import com.foodordering.repository.CustomerOrderRepositoryImpl;
 import com.foodordering.repository.PaymentRepositoryImpl;
 
@@ -24,6 +25,7 @@ import com.foodordering.repository.PaymentRepositoryImpl;
 public class AdminOrderServlet extends BaseApiServlet {
 
     private CustomerOrderService orderService;
+    private PayosPaymentService payosPayments;
 
     public AdminOrderServlet() {
     }
@@ -37,6 +39,7 @@ public class AdminOrderServlet extends BaseApiServlet {
         if (orderService == null) {
             orderService = new CustomerOrderServiceImpl(new CustomerOrderRepositoryImpl(), new PaymentRepositoryImpl());
         }
+        if (payosPayments == null) payosPayments = new PayosPaymentService();
     }
 
     @Override
@@ -84,6 +87,13 @@ public class AdminOrderServlet extends BaseApiServlet {
             catch (IllegalArgumentException invalid) { badRequest(resp, "Trạng thái đơn hàng không hợp lệ."); return; }
             
             orderService.updateOrderStatus(orderId, status, employeeId, updateReq.getNote());
+            if (status == OrderStatus.CANCELLED && payosPayments != null) {
+                try {
+                    payosPayments.cancelForOrder(orderId);
+                } catch (RuntimeException unavailable) {
+                    log("Chưa đồng bộ được hủy link payOS; sẽ thử lại khi kiểm tra trạng thái.");
+                }
+            }
             
             writeJson(resp, HttpServletResponse.SC_OK, ApiResponse.success("Cập nhật trạng thái thành công"));
         } catch (Exception e) {

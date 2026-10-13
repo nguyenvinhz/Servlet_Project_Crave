@@ -39,7 +39,7 @@ thử lên server mà giữ nguyên database và cấu hình production.
 
 - `.github/workflows/ci.yml`, `.github/workflows/deploy.yml`,
   `.github/actionlint.yaml`, `.gitattributes`.
-- `scripts/deploy-ec2.sh`, `scripts/tests/deploy-ec2-test.sh`.
+- `scripts/deploy-ec2.sh`, `tests/scripts/deploy-ec2-test.sh`.
 - `docs/project/ci-cd-ec2.md`, README và các mục lục docs.
 
 ## Kiểm chứng ban đầu

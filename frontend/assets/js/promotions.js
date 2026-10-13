@@ -7,7 +7,11 @@ document.addEventListener("DOMContentLoaded", () => {
     const error = document.getElementById("promosErrorState");
     const feedback = document.getElementById("promosFeedback");
     const contextPath = document.body.dataset.contextPath || "";
-    const price = value => `${new Intl.NumberFormat("vi-VN").format(Number(value) || 0)} đ`;
+    const price = value => `${new Intl.NumberFormat("vi-VN").format(Number(value) || 0)}\u00A0đ`;
+    const formatCurrencyText = text => {
+        if (!text) return "";
+        return String(text).replace(/(\d+[\d.,]*)\s*([đ₫Đ]|VNĐ|VND|vnđ|vnd)/g, "$1\u00A0$2");
+    };
     const element = (tag, className, value) => {
         const node = document.createElement(tag);
         node.className = className;
@@ -40,8 +44,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 const top = element("div", "promo-ticket-top");
                 top.append(element("span", "promo-ticket-code", code), element("span", "promo-ticket-value", discount));
                 content.append(top, element("h2", "promo-ticket-name", promotion.name || "Ưu đãi cho bạn"));
-                if (promotion.description) content.append(element("p", "promo-ticket-desc", promotion.description));
-                content.append(element("p", "promo-ticket-desc", terms));
+                if (promotion.description) content.append(element("p", "promo-ticket-desc", formatCurrencyText(promotion.description)));
+                content.append(element("p", "promo-ticket-desc", formatCurrencyText(terms)));
                 const actions = element("div", "promo-ticket-bottom");
                 const copy = element("button", "btn-copy-code", "Sao chép mã");
                 copy.type = "button";

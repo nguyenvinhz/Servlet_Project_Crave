@@ -36,8 +36,20 @@
                 <c:forEach var="cat" items="${categories}">
                     <c:url var="categoryUrl" value="/menu"><c:param name="categoryId" value="${cat.id}"/></c:url>
                     <a href="<c:out value='${categoryUrl}'/>#catalogSection" class="craving-tile ${currentCategoryId == cat.id ? 'active' : ''}">
-                        <span class="craving-tile-media category-art" aria-hidden="true">
-                            <svg viewBox="0 0 120 90" fill="none"><ellipse cx="60" cy="48" rx="38" ry="28" fill="currentColor" opacity=".12"/><ellipse cx="60" cy="48" rx="29" ry="20" stroke="currentColor" stroke-width="3"/><path d="M18 22v19m-5-19v13c0 4 10 4 10 0V22M18 40v27M103 23c-8 2-9 19-1 21v23m1-44v21M47 48l9 7 19-17" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        <span class="craving-tile-media category-art" aria-hidden="true" data-category-carousel>
+                            <c:choose>
+                                <c:when test="${not empty cat.imageUrls}">
+                                    <c:forEach var="imgUrl" items="${cat.imageUrls}" varStatus="imgStatus">
+                                        <img src="<c:out value='${imgUrl}'/>"
+                                             alt="<c:out value='${cat.name}'/>"
+                                             class="category-carousel-img ${imgStatus.first ? 'active' : ''}"
+                                             loading="lazy">
+                                    </c:forEach>
+                                </c:when>
+                                <c:otherwise>
+                                    <svg viewBox="0 0 120 90" fill="none"><ellipse cx="60" cy="48" rx="38" ry="28" fill="currentColor" opacity=".12"/><ellipse cx="60" cy="48" rx="29" ry="20" stroke="currentColor" stroke-width="3"/><path d="M18 22v19m-5-19v13c0 4 10 4 10 0V22M18 40v27M103 23c-8 2-9 19-1 21v23m1-44v21M47 48l9 7 19-17" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                </c:otherwise>
+                            </c:choose>
                         </span>
                         <span class="craving-tile-name"><c:out value="${cat.name}"/></span>
                     </a>
@@ -83,7 +95,23 @@
                         <p class="clean-card-desc"><c:out value="${not empty food.description ? food.description : 'Món ngon được chuẩn bị riêng cho bữa ăn của bạn.'}"/></p>
                         <div class="clean-card-bottom">
                             <span class="clean-price"><fmt:formatNumber value="${food.price}" type="number" groupingUsed="true"/> ₫</span>
-                            <a href="<c:out value='${foodUrl}'/>" class="food-card-action" aria-label="Chọn món <c:out value='${food.name}'/>"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></a>
+                            <c:choose>
+                                <c:when test="${food.status == 'UNAVAILABLE'}">
+                                    <button type="button" class="food-card-action" disabled aria-label="Món <c:out value='${food.name}'/> tạm hết" title="Món tạm hết">
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                                    </button>
+                                </c:when>
+                                <c:otherwise>
+                                    <button type="button" 
+                                            class="food-card-action" 
+                                            data-quick-add="<c:out value='${food.id}'/>" 
+                                            data-food-name="<c:out value='${food.name}'/>" 
+                                            aria-label="Thêm nhanh <c:out value='${food.name}'/> vào giỏ hàng"
+                                            title="Thêm nhanh vào giỏ hàng">
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+                                    </button>
+                                </c:otherwise>
+                            </c:choose>
                         </div>
                     </div>
                 </article>

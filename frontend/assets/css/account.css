@@ -22,11 +22,13 @@
 
 .account-ui .intro-panel h1,
 .account-ui .account-sidebar h1,
-.account-ui .card-heading h2 {
-    font-family: 'Plus Jakarta Sans', 'Nunito', ui-sans-serif, system-ui, -apple-system, sans-serif;
+.account-ui .card-heading h2,
+#profile-title {
+    font-family: 'Nunito', 'Plus Jakarta Sans', ui-sans-serif, system-ui, -apple-system, sans-serif;
     margin: 0.25rem 0 1rem;
     font-size: clamp(2rem, 4vw, 3rem);
     line-height: 1.2;
+    letter-spacing: normal;
 }
 
 .account-ui .intro-panel p:last-child,
@@ -86,12 +88,20 @@
     resize: vertical;
 }
 
+.account-ui input:focus,
+.account-ui textarea:focus {
+    border-color: var(--accent);
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(239, 91, 53, 0.15);
+}
+
 .account-ui input:focus-visible,
 .account-ui textarea:focus-visible,
 .account-ui button:focus-visible,
-.account-ui a:focus-visible {
-    outline: 3px solid var(--accent);
-    outline-offset: 3px;
+.account-ui a:focus-visible,
+.account-ui button:focus,
+.account-ui a:focus {
+    outline: none;
 }
 
 .account-ui [aria-invalid="true"] {

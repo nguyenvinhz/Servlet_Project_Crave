@@ -65,7 +65,8 @@ public class MenuService {
         List<CategoryResponse> responses = new ArrayList<>();
         for (Category category : categories) {
             long count = foodRepository.countByCategoryId(category.getId());
-            responses.add(MenuMapper.toCategoryResponse(category, count));
+            List<String> imageUrls = getFoodImageUrlsForCategory(category.getId());
+            responses.add(MenuMapper.toCategoryResponse(category, count, imageUrls));
         }
         return responses;
     }
@@ -74,7 +75,25 @@ public class MenuService {
         Category category = categoryRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy danh mục với mã: " + id));
         long count = foodRepository.countByCategoryId(category.getId());
-        return MenuMapper.toCategoryResponse(category, count);
+        List<String> imageUrls = getFoodImageUrlsForCategory(category.getId());
+        return MenuMapper.toCategoryResponse(category, count, imageUrls);
+    }
+
+    private List<String> getFoodImageUrlsForCategory(String categoryId) {
+        List<Food> foods = foodRepository.findByCategoryId(categoryId);
+        if (foods == null || foods.isEmpty()) {
+            return List.of();
+        }
+        return foods.stream()
+                .filter(f -> f.getImageUrl() != null && !f.getImageUrl().isBlank())
+                .sorted((f1, f2) -> {
+                    if (f1.getStatus() == FoodStatus.AVAILABLE && f2.getStatus() != FoodStatus.AVAILABLE) return -1;
+                    if (f1.getStatus() != FoodStatus.AVAILABLE && f2.getStatus() == FoodStatus.AVAILABLE) return 1;
+                    return 0;
+                })
+                .map(Food::getImageUrl)
+                .distinct()
+                .toList();
     }
 
     public CategoryResponse createCategory(CategoryRequest request) {
@@ -88,7 +107,7 @@ public class MenuService {
         String description = request.description() != null ? request.description().trim() : null;
         Category category = new Category(id, trimmedName, description);
         Category saved = categoryRepository.save(category);
-        return MenuMapper.toCategoryResponse(saved, 0L);
+        return MenuMapper.toCategoryResponse(saved, 0L, List.of());
     }
 
     public CategoryResponse updateCategory(String id, CategoryRequest request) {
@@ -105,7 +124,8 @@ public class MenuService {
         category.setDescription(request.description() != null ? request.description().trim() : null);
         Category updated = categoryRepository.update(category);
         long count = foodRepository.countByCategoryId(id);
-        return MenuMapper.toCategoryResponse(updated, count);
+        List<String> imageUrls = getFoodImageUrlsForCategory(id);
+        return MenuMapper.toCategoryResponse(updated, count, imageUrls);
     }
 
     public void deleteCategory(String id) {

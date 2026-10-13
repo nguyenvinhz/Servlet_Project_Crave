@@ -29,7 +29,8 @@ backend/
   pom.xml
   src/main/java/com/foodordering/
     api/                 API JSON
-    servlet/             Servlet và trang JSP; servlet/page/ chứa trang đơn hàng
+    servlet/             Servlet API đơn hàng và thanh toán
+      page/              Toàn bộ servlet hiển thị JSP
     service/             Nghiệp vụ, kiểm tra quyền theo tài khoản, transaction
     repository/          Truy cập JPA và database
     entity/              Domain/JPA theo sơ đồ lớp
@@ -44,19 +45,22 @@ backend/
   src/test/java/         Unit/integration tests
   src/dev/java/          Launcher Tomcat và công cụ thiết lập tài khoản, chỉ profile dev
 frontend/
+  WEB-INF/web.xml        Cấu hình session và trang vào ứng dụng
   WEB-INF/views/         JSP không truy cập trực tiếp
     components/          Header/footer dùng chung
     admin/, auth/, customer/, menu/, cart/, order/, promotions/
   assets/                CSS, JavaScript và hình ảnh
+  index.jsp              Trang vào ứng dụng
 database/
   schema.sql, seed.sql
   migrations/            Bản cập nhật cho database đã tồn tại
 tests/
   frontend/              Kiểm thử trên Chrome/Edge, nằm ngoài WAR
   runtime/               Kiểm tra HTTP trên WAR/Tomcat/MySQL thật
+  scripts/               Kiểm tra deploy và rollback bằng fixture
 scripts/
   dev/                   Chạy ứng dụng cục bộ
-  tests/                 Kiểm tra deploy và rollback
+  deploy-ec2.sh          Triển khai WAR lên EC2
 docs/
   architecture/          Diagram và ánh xạ lớp
   previews/              Trang mẫu phát triển, nằm ngoài WAR

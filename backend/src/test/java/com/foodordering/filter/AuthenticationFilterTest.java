@@ -117,7 +117,8 @@ class AuthenticationFilterTest {
     @Test
     void protectedApisRejectAnonymousRequestsWith401Json() throws Exception {
         for (String path : new String[]{"/api/profile", "/api/addresses", "/api/addresses/DC01",
-                "/api/orders", "/api/orders/DH01", "/api/cart", "/api/payments/TT01", "/api/admin/foods"}) {
+                "/api/orders", "/api/orders/DH01", "/api/cart", "/api/payments/TT01", "/api/admin/foods",
+                "/api/payos/orders/DH01", "/api/payos/orders/DH01/qr"}) {
             Exchange exchange = request("GET", path, null);
             exchange.send();
             exchange.assertError(401, "UNAUTHORIZED");
@@ -136,6 +137,23 @@ class AuthenticationFilterTest {
             verifyNoInteractions(exchange.chain);
         }
         verifyNoInteractions(accounts);
+    }
+
+    @Test
+    void payosWebhookUsesItsOwnSignatureAuthenticationWithoutBrowserOriginOrSession() throws Exception {
+        Exchange webhook = request("POST", "/api/payos/webhook", null);
+        when(webhook.request.getHeader("Origin")).thenReturn("https://payos.vn");
+        when(webhook.request.getHeader("Sec-Fetch-Site")).thenReturn("cross-site");
+        webhook.send();
+        verify(webhook.chain).doFilter(webhook.request, webhook.response);
+        verifyNoInteractions(accounts);
+        verify(webhook.request, never()).getSession(false);
+
+        Exchange browser = request("POST", "/api/payos/orders/DH01", CUSTOMER);
+        when(browser.request.getHeader("Origin")).thenReturn("https://attacker.invalid");
+        browser.send();
+        browser.assertError(403, "FORBIDDEN");
+        verifyNoInteractions(browser.chain);
     }
 
     @Test

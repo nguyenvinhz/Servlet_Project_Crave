@@ -1,7 +1,7 @@
 package com.foodordering.api;
 
-import com.foodordering.servlet.CartPageServlet;
-import com.foodordering.servlet.PromotionPageServlet;
+import com.foodordering.servlet.page.CartPageServlet;
+import com.foodordering.servlet.page.PromotionPageServlet;
 import com.foodordering.utils.JsonProvider;
 import jakarta.servlet.RequestDispatcher;
 import jakarta.servlet.http.HttpServlet;
