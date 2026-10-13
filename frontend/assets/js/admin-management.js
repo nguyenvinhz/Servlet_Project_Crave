@@ -29,6 +29,22 @@ document.addEventListener('DOMContentLoaded', () => {
         return node;
     }
 
+    function closeAllActionMenus() {
+        document.querySelectorAll('.management-action-menu.is-open').forEach(menu => {
+            menu.classList.remove('is-open', 'open-upward');
+            const trigger = menu.querySelector('.management-dots-btn');
+            if (trigger) trigger.setAttribute('aria-expanded', 'false');
+        });
+    }
+
+    document.addEventListener('click', event => {
+        if (!event.target.closest('.management-action-menu')) closeAllActionMenus();
+    });
+
+    document.addEventListener('keydown', event => {
+        if (event.key === 'Escape') closeAllActionMenus();
+    });
+
     function notify(message, success = false) {
         feedback.textContent = message;
         feedback.dataset.tone = success ? 'success' : 'error';
@@ -161,10 +177,65 @@ document.addEventListener('DOMContentLoaded', () => {
             const isAdminAccount = employeePage && item.role === 'ADMIN';
             const currentAccount = employeePage && item.id === document.body.dataset.userId;
             const mayChange = !currentAccount && (!isAdminAccount || document.body.dataset.role === 'ADMIN');
-            if (employeePage && mayChange) actions.append(button('Đổi chức vụ', () => openRole(item), 'Đổi chức vụ của ' + item.fullName));
-            if (mayChange) actions.append(button(active ? (employeePage ? 'Cho nghỉ việc' : 'Khóa') : (employeePage ? 'Làm việc lại' : 'Mở khóa'),
-                () => confirmStatus(item), 'Cập nhật trạng thái của ' + item.fullName));
-            if (!mayChange) actions.append(element('span', currentAccount ? 'Tài khoản hiện tại' : 'Quản trị viên quản lý', 'management-count'));
+            if (!mayChange) {
+                actions.append(element('span', currentAccount ? 'Tài khoản hiện tại' : 'Quản trị viên quản lý', 'management-current-badge'));
+            } else {
+                const menuWrapper = element('div', null, 'management-action-menu');
+                const triggerBtn = element('button', null, 'management-dots-btn');
+                triggerBtn.type = 'button';
+                triggerBtn.setAttribute('aria-label', 'Thao tác với ' + (item.fullName || 'tài khoản'));
+                triggerBtn.setAttribute('aria-haspopup', 'true');
+                triggerBtn.setAttribute('aria-expanded', 'false');
+                triggerBtn.title = 'Thao tác';
+                triggerBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg>';
+
+                const dropdown = element('div', null, 'management-action-dropdown');
+                dropdown.setAttribute('role', 'menu');
+
+                if (employeePage) {
+                    const roleBtn = element('button', 'Đổi chức vụ', 'management-dropdown-item');
+                    roleBtn.type = 'button';
+                    roleBtn.dataset.action = 'role';
+                    roleBtn.title = 'Đổi chức vụ của ' + item.fullName;
+                    roleBtn.setAttribute('role', 'menuitem');
+                    roleBtn.addEventListener('click', e => {
+                        e.stopPropagation();
+                        closeAllActionMenus();
+                        openRole(item);
+                    });
+                    dropdown.append(roleBtn);
+                }
+
+                const statusText = active ? (employeePage ? 'Cho nghỉ việc' : 'Khóa') : (employeePage ? 'Làm việc lại' : 'Mở khóa');
+                const statusBtn = element('button', statusText, 'management-dropdown-item' + (active ? ' management-dropdown-item-danger' : ''));
+                statusBtn.type = 'button';
+                statusBtn.dataset.action = active ? 'deactivate' : 'activate';
+                statusBtn.title = 'Cập nhật trạng thái của ' + item.fullName;
+                statusBtn.setAttribute('role', 'menuitem');
+                statusBtn.addEventListener('click', e => {
+                    e.stopPropagation();
+                    closeAllActionMenus();
+                    confirmStatus(item);
+                });
+                dropdown.append(statusBtn);
+
+                triggerBtn.addEventListener('click', e => {
+                    e.stopPropagation();
+                    const wasOpen = menuWrapper.classList.contains('is-open');
+                    closeAllActionMenus();
+                    if (!wasOpen) {
+                        menuWrapper.classList.add('is-open');
+                        triggerBtn.setAttribute('aria-expanded', 'true');
+                        const rect = triggerBtn.getBoundingClientRect();
+                        if (window.innerHeight - rect.bottom < 130) {
+                            menuWrapper.classList.add('open-upward');
+                        }
+                    }
+                });
+
+                menuWrapper.append(triggerBtn, dropdown);
+                actions.append(menuWrapper);
+            }
             row.append(cell(identity(item)));
             if (employeePage) row.append(cell(roleLabels[item.role] || 'Chưa phân công'));
             row.append(cell(item.phone), cell(item.email), cell(dateLabel(employeePage ? item.hireDate : item.registeredAt)));

@@ -4,7 +4,7 @@
 <c:set var="pageTitle" value="Danh mục"/>
 <%@ include file="/WEB-INF/views/admin/components/begin.jspf" %>
 
-<main class="page-container admin-page">
+<main class="admin-content page-container admin-page">
     <header class="admin-header">
         <div class="admin-header-title">
             <h1>Danh mục</h1>

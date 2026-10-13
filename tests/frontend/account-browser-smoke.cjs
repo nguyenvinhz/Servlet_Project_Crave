@@ -477,7 +477,7 @@ cases.push(
  document.body.append(frame);await loaded;
  const screen=frame.contentWindow,doc=frame.contentDocument,main=doc.querySelector('main');
  assert(screen.innerWidth===320,'Fixture did not use exact 320px viewport');
- assert(doc.querySelectorAll('header nav a').length===${role==='ADMIN'?5:role==='MENU_MANAGER'?4:accountType==='CUSTOMER'?4:3},'Fixture did not render expected role navigation');
+ assert(doc.querySelectorAll('header nav a').length===${accountType==='CUSTOMER'?3:2},'Fixture did not render expected role navigation');
  if(${accountType==='CUSTOMER'})assert(doc.querySelector('header nav a[href$="/orders"]'),'Customer navigation omitted order history');
  if(${Boolean(role)})assert(doc.querySelector('a[href$="/admin"]'),'Employee navigation omitted admin entry');
   if(${page==='customer/profile'})assert(Boolean(doc.querySelector('.account-sidebar a[href$="/customer/addresses"]'))===${accountType==='CUSTOMER'},'Profile sidebar disagrees with account type');
@@ -697,7 +697,12 @@ function renderTags(source) {
    if(condition==="sessionScope.currentUser.accountType == 'CUSTOMER'")return accountType==='CUSTOMER'?content:'';
    if(condition==="sessionScope.currentUser.accountType == 'EMPLOYEE'")return accountType==='EMPLOYEE'?content:'';
    if(condition==="sessionScope.currentUser.accountType != 'EMPLOYEE'")return accountType!=='EMPLOYEE'?content:'';
-   if(condition==='not empty pageStyle')return content;
+   if(condition==="sessionScope.currentUser.role == 'ADMIN'")return current.role==='ADMIN'?content:'';
+    if(condition==="sessionScope.currentUser.role == 'MENU_MANAGER'")return current.role==='MENU_MANAGER'?content:'';
+    if(condition==="sessionScope.currentUser.role == 'ORDER_STAFF'")return current.role==='ORDER_STAFF'?content:'';
+    if(condition==="sessionScope.currentUser.role == 'HR_MANAGER'")return current.role==='HR_MANAGER'?content:'';
+    if(condition==="sessionScope.currentUser.role == 'PROMOTION_MANAGER'")return current.role==='PROMOTION_MANAGER'?content:'';
+    if(condition==='not empty pageStyle')return content;
    throw new Error('Unrecognized JSP condition: '+condition);
  })
  .replace(/\$\{pageStyle\}/g,pageStyle).replace(/\$\{pageBodyClass\}/g,current.page.startsWith('order/')?'order-page':'')

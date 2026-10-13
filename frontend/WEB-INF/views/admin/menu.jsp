@@ -6,7 +6,7 @@
 <c:set var="pageTitle" value="Món ăn - Thức uống"/>
 <%@ include file="/WEB-INF/views/admin/components/begin.jspf" %>
 
-<main class="page-container admin-page">
+<main class="admin-content page-container admin-page">
     <header class="admin-header">
         <div class="admin-header-title">
             <h1>Món ăn - Thức uống</h1>

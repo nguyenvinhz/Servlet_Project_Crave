@@ -19,6 +19,10 @@ public final class MenuMapper {
     }
 
     public static CategoryResponse toCategoryResponse(Category category, long foodCount) {
+        return toCategoryResponse(category, foodCount, Collections.emptyList());
+    }
+
+    public static CategoryResponse toCategoryResponse(Category category, long foodCount, List<String> imageUrls) {
         if (category == null) {
             return null;
         }
@@ -26,7 +30,8 @@ public final class MenuMapper {
                 category.getId(),
                 category.getName(),
                 category.getDescription(),
-                foodCount
+                foodCount,
+                imageUrls != null ? imageUrls : Collections.emptyList()
         );
     }
 

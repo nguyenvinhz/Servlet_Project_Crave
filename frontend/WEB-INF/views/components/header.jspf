@@ -14,6 +14,33 @@
         <link rel="stylesheet" href="<c:url value='/assets/css/${pageStyle}.css'/>">
     </c:if>
     <script>window.CONTEXT_PATH = '${pageContext.request.contextPath}';</script>
+    <style>
+        .site-header{background:#2d211b;border-bottom:1px solid #4b392f;position:sticky;top:0;z-index:1000}
+        .site-header-inner{max-width:1360px;margin:0 auto;padding:0 32px;min-height:72px;display:grid;grid-template-columns:1fr auto 1fr;align-items:center}
+        .main-nav{display:flex;align-items:center;justify-content:center;gap:32px;flex-wrap:wrap}
+        .main-nav a{color:#fffaf6;font-size:15px;font-weight:600;padding:8px 0;position:relative;text-decoration:none;transition:color .15s ease}
+        .main-nav a:hover,.main-nav a.active{color:#ff6638}
+        .main-nav a.active::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2.5px;background:#ff6638;border-radius:99px}
+        .header-actions{justify-self:end;display:inline-flex;align-items:center;gap:16px}
+        .header-cart-icon-btn{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;background:#372820;border:1px solid #4b392f;color:#fffaf6;position:relative;transition:all .15s ease;flex-shrink:0;text-decoration:none}
+        .header-cart-icon-btn:hover{background:#ff6638;color:#fff;border-color:#ff6638;transform:scale(1.05)}
+        .header-cart-icon-btn .cart-badge-count{position:absolute;top:-3px;right:-3px;background:#ff6638;color:#fff;font-size:11px;font-weight:800;min-width:18px;height:18px;border-radius:999px;display:grid;place-items:center;padding:0 4px;border:2px solid #2d211b}
+        .user-profile-menu{position:relative;display:inline-flex;align-items:center;gap:10px;cursor:pointer;padding:3px 8px 3px 3px;border-radius:99px;transition:background .15s ease}
+        .user-profile-menu:hover{background:rgba(255,255,255,0.06)}
+        .user-avatar-btn{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;background:#ff6638;color:#ffffff;font-weight:700;font-size:15px;border:0;cursor:pointer;padding:0;margin:0;flex-shrink:0;box-shadow:0 2px 8px rgba(255,102,56,.35);transition:transform .15s ease,box-shadow .15s ease}
+        .user-profile-menu:hover .user-avatar-btn{transform:scale(1.06);box-shadow:0 4px 14px rgba(255,102,56,.5)}
+        .user-caption{line-height:1.25;text-align:left;user-select:none}
+        .user-caption strong{display:block;font-size:13.5px;color:#fffaf6;font-weight:700;letter-spacing:-0.01em}
+        .user-caption small{display:block;color:#c6b9ae;font-size:11px;font-weight:500;margin-top:2px}
+        .user-dropdown-popover{position:absolute;top:calc(100% + 12px);right:0;background:#fff;border:1px solid #e7e1d6;border-radius:14px;box-shadow:0 16px 40px rgba(0,0,0,.25);min-width:190px;padding:8px;z-index:1000;display:flex;flex-direction:column;gap:4px}
+        .user-dropdown-popover strong{color:#21201d}
+        .user-dropdown-popover small{color:#6f6a60}
+        .user-dropdown-link,.user-dropdown-logout{display:flex;align-items:center;width:100%;padding:9px 12px;border-radius:8px;font-size:13.5px;font-weight:500;font-family:inherit;text-decoration:none;border:0;background:transparent;box-sizing:border-box;cursor:pointer;transition:all .15s ease;color:#21201d}
+        .user-dropdown-link:hover{background:#faf7f2;color:#ff6638}
+        .user-dropdown-logout{color:#c1432c;border-top:1px solid #f2ede4;margin-top:4px;padding-top:10px;text-align:left}
+        .user-dropdown-logout:hover{background:#fbe6e1;color:#b34632}
+        @media (max-width: 900px){.site-header-inner{display:flex;justify-content:space-between;padding:12px 20px;gap:12px}}
+    </style>
 </head>
 <body class="crave-body ${pageBodyClass}" data-context-path="<c:out value='${pageContext.request.contextPath}'/>">
 <header class="site-header">
@@ -22,24 +49,11 @@
         <nav class="main-nav" aria-label="Điều hướng chính">
             <a href="<c:url value='/menu'/>" class="${pageTitle == 'Thực đơn' ? 'active' : ''}">Thực đơn</a>
             <a href="<c:url value='/promotions'/>" class="${pageTitle == 'Ưu đãi & Khuyến mãi' ? 'active' : ''}">Khuyến mãi</a>
-            <c:if test="${sessionScope.currentUser.accountType != 'EMPLOYEE'}">
-                <a href="<c:url value='/cart'/>" class="${pageTitle == 'Giỏ hàng của bạn' ? 'active' : ''}">Giỏ hàng</a>
-            </c:if>
             <c:if test="${sessionScope.currentUser.accountType == 'CUSTOMER'}">
                 <a href="<c:url value='/orders'/>" class="${pageTitle == 'Đơn hàng của bạn' ? 'active' : ''}">Đơn hàng</a>
             </c:if>
-            <c:if test="${sessionScope.currentUser.role == 'ADMIN' or sessionScope.currentUser.role == 'MENU_MANAGER'}">
-                <a href="<c:url value='/admin/menu'/>" class="${pageTitle == 'Quản lý thực đơn' ? 'active' : ''}">Quản lý món</a>
-                <a href="<c:url value='/admin/categories'/>" class="${pageTitle == 'Quản lý danh mục' ? 'active' : ''}">Quản lý danh mục</a>
-            </c:if>
-            <c:if test="${sessionScope.currentUser.role == 'ADMIN' or sessionScope.currentUser.role == 'ORDER_STAFF'}">
-                <a href="<c:url value='/admin/orders'/>">Quản lý đơn hàng</a>
-            </c:if>
         </nav>
         <div class="header-actions header-actions-right">
-            <c:if test="${sessionScope.currentUser.accountType == 'EMPLOYEE'}">
-                <a href="<c:url value='/admin'/>" class="header-login-link">Trang quản trị</a>
-            </c:if>
             <c:if test="${sessionScope.currentUser.accountType != 'EMPLOYEE'}">
             <a href="<c:url value='/cart'/>" class="header-cart-icon-btn" title="Giỏ hàng" aria-label="Giỏ hàng">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -52,13 +66,31 @@
             </c:if>
             <c:choose>
                 <c:when test="${not empty sessionScope.currentUser}">
-                    <a href="<c:url value='/customer/profile'/>" class="header-login-link">Hồ sơ</a>
-                    <c:if test="${sessionScope.currentUser.accountType == 'CUSTOMER'}">
-                        <a href="<c:url value='/customer/addresses'/>" class="header-login-link">Địa chỉ</a>
-                    </c:if>
-                    <form id="logoutForm" class="logout-form" action="<c:url value='/api/auth/logout'/>" method="post">
-                        <button class="nav-button" type="submit">Đăng xuất</button>
-                    </form>
+                    <div class="user-profile-menu customer-user-menu" id="customerUserMenu">
+                        <button type="button" class="user-avatar-btn header-avatar-btn" id="customerAvatarBtn" onclick="toggleCustomerDropdown(event)" aria-label="Tài khoản người dùng" title="Bấm để xem menu tài khoản">
+                            <c:out value="${not empty sessionScope.currentUser.fullName ? sessionScope.currentUser.fullName.substring(0, 1).toUpperCase() : 'C'}"/>
+                        </button>
+                        <div class="user-dropdown-popover customer-dropdown-menu" id="customerDropdownMenu" style="display: none;">
+                            <div class="dropdown-user-header" style="padding: 6px 12px 10px; border-bottom: 1px solid #f2ede4; margin-bottom: 4px;">
+                                <strong style="display: block; font-size: 14px; color: #21201d;"><c:out value="${sessionScope.currentUser.fullName}"/></strong>
+                                <small style="display: block; font-size: 11.5px; color: #766e65; margin-top: 2px;">
+                                    <c:if test="${sessionScope.currentUser.accountType == 'CUSTOMER'}">Khách hàng</c:if>
+                                    <c:if test="${sessionScope.currentUser.role == 'ADMIN'}">Quản trị viên</c:if>
+                                    <c:if test="${sessionScope.currentUser.role == 'MENU_MANAGER'}">Quản lý thực đơn</c:if>
+                                    <c:if test="${sessionScope.currentUser.role == 'ORDER_STAFF'}">Nhân viên đơn hàng</c:if>
+                                    <c:if test="${sessionScope.currentUser.role == 'HR_MANAGER'}">Quản lý nhân sự</c:if>
+                                    <c:if test="${sessionScope.currentUser.role == 'PROMOTION_MANAGER'}">Quản lý khuyến mãi</c:if>
+                                </small>
+                            </div>
+                            <c:if test="${sessionScope.currentUser.accountType == 'EMPLOYEE'}">
+                                <a class="user-dropdown-link customer-dropdown-item" href="<c:url value='/admin'/>">Trang quản trị</a>
+                            </c:if>
+                            <a class="user-dropdown-link customer-dropdown-item" href="<c:url value='/customer/profile'/>">Tài khoản của tôi</a>
+                            <form id="logoutForm" class="logout-form" action="<c:url value='/api/auth/logout'/>" method="post" style="margin: 0; padding: 0;">
+                                <button class="user-dropdown-logout customer-dropdown-item customer-logout-btn" id="customerLogoutBtn" type="submit">Đăng xuất</button>
+                            </form>
+                        </div>
+                    </div>
                 </c:when>
                 <c:otherwise>
                     <a href="<c:url value='/auth/login'/>" class="header-login-link">Đăng nhập</a>
@@ -68,5 +100,24 @@
         </div>
     </div>
 </header>
+<script>
+    function toggleCustomerDropdown(e) {
+        if (e) e.stopPropagation();
+        var m = document.getElementById('customerDropdownMenu');
+        if (m) m.style.display = (m.style.display === 'none' ? 'flex' : 'none');
+    }
+    document.addEventListener('click', function(e) {
+        var m = document.getElementById('customerDropdownMenu');
+        if (m && m.style.display !== 'none' && !e.target.closest('#customerUserMenu')) {
+            m.style.display = 'none';
+        }
+    });
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            var m = document.getElementById('customerDropdownMenu');
+            if (m && m.style.display !== 'none') m.style.display = 'none';
+        }
+    });
+</script>
 <p id="logout-error" class="form-error header-message" role="alert" hidden></p>
 <noscript><p class="header-message">Vui lòng bật JavaScript để sử dụng chức năng tài khoản.</p></noscript>

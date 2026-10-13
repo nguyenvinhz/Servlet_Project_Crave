@@ -36,8 +36,20 @@
                 <c:forEach var="cat" items="${categories}">
                     <c:url var="categoryUrl" value="/menu"><c:param name="categoryId" value="${cat.id}"/></c:url>
                     <a href="<c:out value='${categoryUrl}'/>#catalogSection" class="craving-tile ${currentCategoryId == cat.id ? 'active' : ''}">
-                        <span class="craving-tile-media category-art" aria-hidden="true">
-                            <svg viewBox="0 0 120 90" fill="none"><ellipse cx="60" cy="48" rx="38" ry="28" fill="currentColor" opacity=".12"/><ellipse cx="60" cy="48" rx="29" ry="20" stroke="currentColor" stroke-width="3"/><path d="M18 22v19m-5-19v13c0 4 10 4 10 0V22M18 40v27M103 23c-8 2-9 19-1 21v23m1-44v21M47 48l9 7 19-17" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        <span class="craving-tile-media category-art" aria-hidden="true" data-category-carousel>
+                            <c:choose>
+                                <c:when test="${not empty cat.imageUrls}">
+                                    <c:forEach var="imgUrl" items="${cat.imageUrls}" varStatus="imgStatus">
+                                        <img src="<c:out value='${imgUrl}'/>"
+                                             alt="<c:out value='${cat.name}'/>"
+                                             class="category-carousel-img ${imgStatus.first ? 'active' : ''}"
+                                             loading="lazy">
+                                    </c:forEach>
+                                </c:when>
+                                <c:otherwise>
+                                    <svg viewBox="0 0 120 90" fill="none"><ellipse cx="60" cy="48" rx="38" ry="28" fill="currentColor" opacity=".12"/><ellipse cx="60" cy="48" rx="29" ry="20" stroke="currentColor" stroke-width="3"/><path d="M18 22v19m-5-19v13c0 4 10 4 10 0V22M18 40v27M103 23c-8 2-9 19-1 21v23m1-44v21M47 48l9 7 19-17" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                </c:otherwise>
+                            </c:choose>
                         </span>
                         <span class="craving-tile-name"><c:out value="${cat.name}"/></span>
                     </a>
