@@ -3,7 +3,7 @@
 <c:set var="adminPage" value="customers" />
 <c:set var="pageTitle" value="Quản lý khách hàng" />
 <%@ include file="/WEB-INF/views/admin/components/begin.jspf" %>
-<link rel="stylesheet" href="<c:url value='/assets/css/admin-management.css' />">
+<link rel="stylesheet" href="<c:url value='/assets/css/admin-management.css?v=20261013-palette2' />">
 <main class="admin-content">
     <header class="management-heading">
         <div><p class="management-eyebrow">Tài khoản</p><h1>Quản lý khách hàng</h1>

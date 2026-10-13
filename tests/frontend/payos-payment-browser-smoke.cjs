@@ -242,8 +242,8 @@ const server = http.createServer((req, res) => {
         .replace(/<%@[^]*?%>/g, '').replace(/<c:set[^]*?\/>/g, '')
         .replace(/<c:url value='([^']*)'\s*\/>/g, (_, value) => '/crave' + value);
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    res.end(`<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="/crave/assets/css/order.css"></head>
-        <body class="order-page" data-context-path="/crave"><script>${common}${current.setup}</script>${markup}
+    res.end(`<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="/crave/assets/css/styles.css?v=20261013-palette2"><link rel="stylesheet" href="/crave/assets/css/order.css?v=20261013-palette2"></head>
+        <body class="crave-body order-page" data-context-path="/crave"><script>${common}${current.setup}</script>${markup}
         <script>document.addEventListener('DOMContentLoaded', async () => {
             const result = document.createElement('pre'); result.id = 'smoke-result';
             try { ${current.run} result.textContent = 'PASS ${current.name}'; }

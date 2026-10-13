@@ -3,7 +3,7 @@
 <c:set var="adminPage" value="employees" />
 <c:set var="pageTitle" value="Quản lý nhân viên" />
 <%@ include file="/WEB-INF/views/admin/components/begin.jspf" %>
-<link rel="stylesheet" href="<c:url value='/assets/css/admin-management.css' />">
+<link rel="stylesheet" href="<c:url value='/assets/css/admin-management.css?v=20261013-palette2' />">
 <main class="admin-content">
     <header class="management-heading"><div><p class="management-eyebrow">Nhân sự</p><h1>Quản lý nhân viên</h1>
         <p>Quản lý chức vụ, thông tin liên hệ và trạng thái làm việc của đội ngũ.</p></div>

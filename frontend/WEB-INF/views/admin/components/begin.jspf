@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="<c:url value='/assets/css/admin.css'/>">
+    <link rel="stylesheet" href="<c:url value='/assets/css/admin.css?v=20261013-palette2'/>">
 </head>
 <body class="admin-body" data-page="<c:out value='${adminPage}'/>" data-context-path="<c:out value='${pageContext.request.contextPath}'/>" data-role="<c:out value='${sessionScope.role}'/>" data-user-id="<c:out value='${sessionScope.currentUser.id}'/>">
 <svg class="icon-definitions" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">

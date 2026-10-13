@@ -1,4 +1,4 @@
-@import url("./cart.css");
+@import url("./cart.css?v=20261013-palette2");
 
 .promos-page-wrapper {
     background-color: var(--crave-bg-page);
@@ -41,7 +41,7 @@
 
 .promo-ticket-card {
     background: var(--crave-bg-card);
-    border: 1px dashed #e3cbbe;
+    border: 1px dashed #cbb8a7;
     border-radius: var(--crave-radius-xl);
     padding: 24px;
     display: flex;
@@ -87,7 +87,7 @@
     font-family: var(--crave-font-heading);
     font-size: 1.25rem;
     font-weight: 800;
-    color: var(--crave-brand);
+    color: var(--crave-brand-text);
     background: var(--crave-brand-light);
     padding: 4px 12px;
     border-radius: 8px;

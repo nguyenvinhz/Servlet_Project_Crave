@@ -12,19 +12,19 @@
     font-weight: 750;
     letter-spacing: -.6px;
     margin: 0 0 6px;
-    color: #1c2321;
+    color: var(--ink);
 }
 
 .management-heading p {
     margin: 0;
-    color: #6f6a60;
+    color: var(--muted);
     font-size: 13.5px;
     line-height: 1.5;
     max-width: 740px;
 }
 
 .management-heading .management-eyebrow {
-    color: #e8552b;
+    color: var(--ember-text);
     font-size: 11px;
     font-weight: 700;
     text-transform: uppercase;
@@ -54,7 +54,7 @@
     gap: 6px;
     flex-direction: column;
     padding: 0 24px;
-    border-left: 1px solid #e9e4db;
+    border-left: 1px solid var(--line);
 }
 
 .management-summary > div:first-child {
@@ -65,14 +65,14 @@
 .management-summary span {
     font-size: 12px;
     font-weight: 500;
-    color: #6f6a60;
+    color: var(--muted);
 }
 
 .management-summary strong {
     font-size: 26px;
     font-weight: 750;
     letter-spacing: -0.6px;
-    color: #1c2321;
+    color: var(--ink);
 }
 
 .management-toolbar {
@@ -97,10 +97,10 @@
 .management-toolbar select,
 .management-form input,
 .management-form select {
-    border: 1px solid #ded8cd;
+    border: 1px solid var(--control-line);
     border-radius: 8px;
-    background: #fffdf9;
-    color: #29271f;
+    background: var(--surface);
+    color: var(--ink);
     padding: 0 13px;
     font: inherit;
     font-size: 13px;
@@ -115,13 +115,21 @@
 .management-form input:focus,
 .management-form select:focus {
     outline: none;
-    border-color: #e8552b;
-    box-shadow: 0 0 0 3px rgba(232, 85, 43, 0.15);
+    border-color: var(--ember-text);
+    box-shadow: 0 0 0 3px rgba(201, 75, 36, 0.15);
+}
+
+.management-toolbar input:disabled,
+.management-toolbar select:disabled,
+.management-form input:disabled,
+.management-form select:disabled {
+    color: var(--muted);
+    background: #eee6de;
 }
 
 .management-count {
     margin-left: auto;
-    color: #81796d;
+    color: var(--muted);
     font-size: 12px;
     white-space: nowrap;
 }
@@ -131,7 +139,7 @@
     padding: 0;
     min-height: 240px;
     border-radius: 12px;
-    border: 1px solid #e7e1d6;
+    border: 1px solid var(--line);
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
 }
 
@@ -143,21 +151,21 @@
 
 .management-table-wrap th {
     white-space: nowrap;
-    background: #faf7f2;
-    color: #766e65;
+    background: var(--paper);
+    color: var(--muted);
     font-weight: 600;
     font-size: 11px;
     text-transform: uppercase;
     letter-spacing: .6px;
     padding: 13px 18px;
-    border-bottom: 1px solid #e7e1d6;
+    border-bottom: 1px solid var(--line);
 }
 
 .management-table-wrap td {
     vertical-align: middle;
     padding: 14px 18px;
     border-bottom: 1px solid #f2ede4;
-    color: #21201d;
+    color: var(--ink);
 }
 
 .management-table-wrap th:last-child,
@@ -181,8 +189,8 @@
     display: grid;
     place-items: center;
     flex-shrink: 0;
-    background: #ece8df;
-    color: #685946;
+    background: var(--char-raised);
+    color: var(--ember-text);
     font-size: 13px;
     font-weight: 750;
 }
@@ -194,7 +202,7 @@
 
 .management-identity small {
     display: block;
-    color: #938979;
+    color: var(--muted);
     font-size: 10px;
     margin-top: 3px;
     letter-spacing: .4px;
@@ -222,9 +230,9 @@
     border-radius: 999px;
     font-size: 11px;
     font-weight: 600;
-    color: #7d7366;
-    background: #f4efe6;
-    border: 1px solid #e5dfd5;
+    color: var(--muted);
+    background: var(--soft);
+    border: 1px solid var(--line);
     letter-spacing: .2px;
 }
 
@@ -244,7 +252,7 @@
     border-radius: 8px;
     border: none;
     background: transparent;
-    color: #8c8275;
+    color: var(--muted);
     cursor: pointer;
     transition: background-color .15s ease, color .15s ease;
     padding: 0;
@@ -252,12 +260,12 @@
 
 .management-dots-btn:hover,
 .management-action-menu.is-open .management-dots-btn {
-    background: #ede8de;
-    color: #1c2321;
+    background: var(--soft);
+    color: var(--ink);
 }
 
 .management-dots-btn:focus-visible {
-    outline: 2px solid #e8552b;
+    outline: 2px solid var(--ember);
     outline-offset: 1px;
 }
 
@@ -268,7 +276,7 @@
     z-index: 120;
     min-width: 155px;
     background: #ffffff;
-    border: 1px solid #ded8cd;
+    border: 1px solid var(--control-line);
     border-radius: 10px;
     box-shadow: 0 10px 25px -5px rgba(0,0,0,0.12), 0 8px 10px -6px rgba(0,0,0,0.08);
     padding: 6px;
@@ -318,7 +326,7 @@
     padding: 8px 12px;
     font-size: 13px;
     font-weight: 500;
-    color: #332f28;
+    color: var(--ink);
     background: transparent;
     border: none;
     border-radius: 6px;
@@ -329,8 +337,8 @@
 }
 
 .management-dropdown-item:hover {
-    background: #f4efe6;
-    color: #171512;
+    background: var(--soft);
+    color: var(--ink);
 }
 
 .management-dropdown-item[data-action="role"]::before {
@@ -364,25 +372,25 @@
 }
 
 .management-dropdown-item.management-dropdown-item-danger {
-    color: #c93b2b;
+    color: var(--danger);
 }
 
 .management-dropdown-item.management-dropdown-item-danger:hover {
     background: #fdf0ed;
-    color: #a82718;
+    color: var(--danger);
 }
 
 .management-empty {
     text-align: center;
     padding: 52px 18px!important;
-    color: #8a8173;
+    color: var(--muted);
     font-size: 14px;
 }
 
 .management-feedback {
     padding: 12px 16px;
     background: #fcece7;
-    color: #9c352b;
+    color: var(--danger);
     border: 1px solid #eed3c9;
     border-radius: 8px;
     margin-bottom: 18px;
@@ -392,7 +400,7 @@
 .management-feedback[data-tone=success] {
     background: #edf4e8;
     border-color: #d9e7cd;
-    color: #4c653b;
+    color: var(--success);
 }
 
 .management-promotion-list {
@@ -406,25 +414,25 @@
     padding: 0;
     overflow: hidden;
     border-radius: 12px;
-    border: 1px solid #e5dfd4;
-    background: #fffdf9;
+    border: 1px solid var(--line);
+    background: var(--surface);
 }
 
 .management-promo-value {
     width: 125px;
     min-width: 125px;
-    background: #252920;
+    background: var(--char);
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     gap: 13px;
     padding: 24px 12px;
-    border-right: 2px dashed #bd6039;
+    border-right: 2px dashed #e7b498;
 }
 
 .management-promo-value span {
-    color: #cdc7b8;
+    color: var(--muted);
     font-size: 10px;
     font-weight: 700;
     letter-spacing: 1px;
@@ -435,7 +443,7 @@
 
 .management-promo-value strong {
     font-size: 24px;
-    color: #eb966c;
+    color: var(--ember-text);
     font-weight: 700;
     letter-spacing: -1px;
     text-align: center;
@@ -463,7 +471,7 @@
 .management-promo-dates,
 .management-promo-rules {
     font-size: 11px;
-    color: #8a8173;
+    color: var(--muted);
     line-height: 1.7;
     margin: 0 0 9px;
 }
@@ -478,7 +486,7 @@
 
 .management-promo-progress>span {
     height: 100%;
-    background: #bc653f;
+    background: var(--ember);
     display: block;
     border-radius: 8px;
 }
@@ -499,7 +507,7 @@
     display: inline-flex;
     border-radius: 20px;
     background: #edf2e8;
-    color: #55704a;
+    color: var(--success);
     align-items: center;
     padding: 5px 8px;
     font-size: 10px;
@@ -517,17 +525,17 @@
 }
 
 .management-badge[data-tone=inactive] {
-    color: #8d7767;
+    color: var(--muted);
     background: #eeeae3;
 }
 
 .management-badge[data-tone=upcoming] {
-    color: #a07735;
+    color: var(--warning);
     background: #f8efd9;
 }
 
 .management-badge[data-tone=locked] {
-    color: #af5550;
+    color: var(--danger);
     background: #f8e9e5;
 }
 
@@ -539,8 +547,8 @@
     border-radius: 14px;
     padding: 0;
     margin: auto;
-    background: #fffdf9;
-    color: #2a2b25;
+    background: var(--surface);
+    color: var(--ink);
     box-shadow: 0 28px 90px #23251d40;
 }
 
@@ -554,7 +562,7 @@
     align-items: center;
     justify-content: space-between;
     padding: 22px 25px;
-    border-bottom: 1px solid #e8e2d7;
+    border-bottom: 1px solid var(--line);
 }
 
 .admin-management-dialog h2 {
@@ -574,8 +582,8 @@
     display: flex;
     justify-content: flex-end;
     gap: 9px;
-    border-top: 1px solid #e8e2d7;
-    background: #faf7f1;
+    border-top: 1px solid var(--line);
+    background: var(--paper);
 }
 
 .management-close {
@@ -583,7 +591,7 @@
     background: none;
     font: inherit;
     font-size: 24px;
-    color: #81796d;
+    color: var(--muted);
     cursor: pointer;
     padding: 0 4px;
 }
@@ -605,17 +613,17 @@
 .management-form label {
     font-size: 12px;
     font-weight: 650;
-    color: #5f5b51;
+    color: var(--ink);
 }
 
 .management-form small {
-    color: #8a8173;
+    color: var(--muted);
     font-size: 11px;
     line-height: 1.6;
 }
 
 .management-form-error {
-    color: #b14a3e;
+    color: var(--danger);
     background: #faeae5;
     border-radius: 7px;
     padding: 10px 13px;

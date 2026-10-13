@@ -74,7 +74,7 @@
                                             data-food-count="<c:out value='${cat.foodCount}'/>"
                                             onclick="handleDeleteCategoryClick(this)"
                                             title="${cat.foodCount > 0 ? 'Không thể xóa danh mục đang có món' : 'Xóa danh mục'}"
-                                            ${cat.foodCount > 0 ? 'disabled style="opacity: 0.5; cursor: not-allowed;"' : ''}>
+                                            ${cat.foodCount > 0 ? 'disabled' : ''}>
                                         Xóa
                                     </button>
                                 </div>

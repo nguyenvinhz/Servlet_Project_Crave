@@ -75,7 +75,7 @@ const cases = [
 ];
 let current;
 const server = http.createServer((request,response) => {
-    const asset = /^\/crave\/assets\/(js|css)\/([\w.-]+)$/.exec(request.url);
+    const asset = /^\/crave\/assets\/(js|css)\/([\w.-]+)$/.exec(new URL(request.url,'http://127.0.0.1').pathname);
     if (asset) {
         response.setHeader('Content-Type',asset[1]==='js'?'text/javascript; charset=utf-8':'text/css; charset=utf-8');
         response.end(fs.readFileSync(path.join(project,'frontend/assets',asset[1],asset[2])));return;
@@ -84,7 +84,7 @@ const server = http.createServer((request,response) => {
     const markup = fs.readFileSync(path.join(project,'frontend/WEB-INF/views/admin',current.page+'.jsp'),'utf8')
         .replace(/<%@[^]*?%>/g,'').replace(/<c:set[^]*?\/>/g,'')
         .replace(/<c:url value='([^']*)'\s*\/>/g,(_,value)=>'/crave'+value);
-    response.end(`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="/crave/assets/css/admin.css"></head>
+    response.end(`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="/crave/assets/css/admin.css?v=20261013-palette2"></head>
         <body data-page="${current.page}" data-context-path="/crave" data-role="${current.role}"><script>${common}${current.setup}</script><script src="/crave/assets/js/admin.js"></script>${markup}
         <script>document.addEventListener('DOMContentLoaded',async()=>{const result=document.createElement('pre');result.id='smoke-result';try{${current.run}result.textContent='PASS ${current.name}';}catch(error){result.textContent='FAIL '+error.message;}document.body.append(result);});</script></body></html>`);
 });

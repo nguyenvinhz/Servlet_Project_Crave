@@ -11,5 +11,5 @@
     </header>
     <div id="orderList" class="orders-list" aria-live="polite"><div class="card order-loading"><p>Đang tải danh sách đơn hàng...</p></div></div>
 </main>
-<script src="<c:url value='/assets/js/orders.js'/>"></script>
+<script src="<c:url value='/assets/js/orders.js?v=20261013-palette2'/>"></script>
 <%@ include file="/WEB-INF/views/components/footer.jspf" %>

@@ -1,29 +1,27 @@
 :root {
-    --ink: #1c1e21;
-    --muted: #6b7280;
-    --paper: #fffaf5;
-    --cream: #fdede5;
-    --accent: #ef5b35;
-    --accent-dark: #d84824;
-    --line: #f0e6dd;
+    --ink: #29241f;
+    --muted: #6b6057;
+    --paper: #fffdf9;
+    --cream: #fff5ee;
+    --surface: #ffffff;
+    --accent: #c94b24;
+    --accent-text: #a63a1b;
+    --accent-dark: #a63a1b;
+    --line: #e7ddd3;
+    --control-line: #a48e7b;
+    --header-surface: #fff1e5;
+    --header-ink: #49362a;
+    --header-muted: #756052;
+    --header-accent: #b7441e;
+    --header-hover: #ffe4d0;
     --error: #b42318;
     --success: #18794e;
-    --shadow: 0 20px 60px rgba(74, 45, 31, 0.08);
+    --shadow: 0 20px 60px rgba(74, 45, 31, 0.06);
 }
 
-/* Customer theme follows the published Crave reference. Admin uses its own shell. */
+/* One light palette for customer pages, independent of the browser's theme. */
 body.crave-body {
-    --ink: #fffaf6;
-    --muted: #c6b9ae;
-    --paper: #211711;
-    --cream: #37271e;
-    --accent: #ff6638;
-    --accent-dark: #ff865e;
-    --line: #4b392f;
-    --error: #ffa497;
-    --success: #96dcaf;
-    --surface: #2d211b;
-    --shadow: 0 18px 48px rgb(0 0 0 / 15%);
+    color-scheme: light;
     background: var(--paper);
     color: var(--ink);
     font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
@@ -2116,13 +2114,17 @@ label {
 
 /* Shared customer components */
 .crave-body h1, .crave-body h2, .crave-body h3 { font-family: 'Nunito', system-ui, sans-serif; }
-.crave-body .site-header { background: #2d211b; border-color: var(--line); box-shadow: none; }
+.crave-body .site-header { background: var(--header-surface); border-color: var(--header-hover); box-shadow: none; }
+.crave-body .site-header .brand { color: var(--header-accent); }
 .crave-body .site-header-inner { max-width: 1360px; }
-.crave-body .main-nav a, .crave-body .header-login-link, .crave-body .nav-button { color: var(--ink); }
-.crave-body .main-nav a:hover, .crave-body .main-nav a.active { color: var(--accent); }
-.crave-body .header-cart-icon-btn { background: var(--surface); border-color: var(--line); color: var(--ink); }
-.crave-body .header-login-link:hover { background: var(--cream); }
-.crave-body .header-cart-icon-btn .cart-badge-count { border-color: var(--surface); }
+.crave-body .main-nav a, .crave-body .header-login-link, .crave-body .nav-button { color: var(--header-ink); }
+.crave-body .main-nav a:hover, .crave-body .main-nav a.active { color: var(--header-accent); }
+.crave-body .header-cart-icon-btn { background: var(--header-hover); border-color: var(--header-hover); color: var(--header-ink); }
+.crave-body .header-login-link:hover { background: var(--header-hover); color: var(--header-ink); }
+.crave-body .header-cart-icon-btn .cart-badge-count { border-color: var(--header-surface); }
+.crave-body .user-avatar-btn { background: var(--accent); color: #fff; }
+.crave-body .user-dropdown-link:hover { background: var(--cream); color: var(--accent-dark); }
+.crave-body input::placeholder, .crave-body textarea::placeholder { color: var(--muted); opacity: 1; }
 .crave-body main { flex: 1; }
 .crave-body .page-container { width: min(1280px, calc(100% - 48px)); }
 .crave-body .section-title, .crave-body .catalog-main-title, .crave-body .clean-card-title, .crave-body .craving-tile-name,
@@ -2131,11 +2133,12 @@ label {
 .crave-body .crave-hero-banner { background: linear-gradient(120deg, #fff2ea, #ffe5d7); padding: clamp(1.5rem, 5vw, 4.5rem); }
 .crave-body .hero-heading { color: #202a36; font-family: 'Nunito', sans-serif; }
 .crave-body .hero-subtext { color: #667486; }
-.crave-body .hero-search-pill { background: #2d211b; border-radius: 18px; box-shadow: none; max-width: 100%; }
-.crave-body .search-input-field input { color: #fffaf6; min-width: 0; border: 0 !important; outline: none !important; box-shadow: none !important; }
+.crave-body .hero-search-pill { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; box-shadow: none; max-width: 100%; }
+.crave-body .search-input-field svg { color: var(--muted); }
+.crave-body .search-input-field input { color: var(--ink); min-width: 0; border: 0 !important; outline: none !important; box-shadow: none !important; }
 .crave-body .search-input-field input:focus,
 .crave-body .search-input-field input:focus-visible { border: 0 !important; outline: none !important; box-shadow: none !important; }
-.crave-body .search-input-field input::placeholder { color: #d2c5bc; }
+.crave-body .search-input-field input::placeholder { color: var(--muted); }
 .crave-body .hero-photo-wrapper { aspect-ratio: 1.18; border: 0; box-shadow: none; }
 .crave-body .craving-tile {
     padding: 12px;
@@ -2146,7 +2149,7 @@ label {
 }
 .crave-body .craving-tile:hover {
     transform: translateY(-4px);
-    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 10px 24px rgba(74, 45, 31, 0.1);
 }
 .crave-body .craving-tile.active {
     border-color: var(--accent);
@@ -2157,10 +2160,10 @@ label {
     justify-content: center;
     position: relative;
     overflow: hidden;
-    color: #ff9d75;
+    color: var(--accent-text);
     height: 116px;
     border-radius: 14px;
-    background: linear-gradient(135deg, #443024, #2d211b);
+    background: linear-gradient(135deg, #ffe8d5, #fff5ee);
     box-shadow: none;
 }
 .crave-body .category-art svg {
@@ -2172,8 +2175,8 @@ label {
 .crave-body .craving-tile:hover .category-art svg {
     transform: scale(1.06);
 }
-.crave-body .craving-tile:nth-child(3n + 2) .category-art { color: #dfc27c; background: linear-gradient(135deg, #443823, #2d211b); }
-.crave-body .craving-tile:nth-child(3n) .category-art { color: #a4c9a5; background: linear-gradient(135deg, #2c3927, #2d211b); }
+.crave-body .craving-tile:nth-child(3n + 2) .category-art { color: #8a570c; background: linear-gradient(135deg, #fff0c9, #fff9e9); }
+.crave-body .craving-tile:nth-child(3n) .category-art { color: #28764c; background: linear-gradient(135deg, #e1f2df, #f2faee); }
 
 /* Hình món ăn trong từng thể loại với hiệu ứng chuyển đổi mượt mà */
 .category-carousel-img {
@@ -2298,34 +2301,34 @@ label {
     pointer-events: none;
 }
 .crave-toast {
-    background: #251d18;
-    color: #fffaf6;
+    background: var(--surface);
+    color: var(--ink);
     padding: 13px 20px;
     border-radius: 12px;
     font-size: 0.92rem;
     font-weight: 600;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+    box-shadow: 0 10px 30px rgba(74, 45, 31, 0.12);
     display: flex;
     align-items: center;
     gap: 10px;
     pointer-events: auto;
     animation: toastSlideUp 0.25s ease-out;
-    border: 1px solid #4a382e;
+    border: 1px solid var(--line);
 }
 .crave-toast.success {
-    background: #143823;
-    border-color: #22c55e;
-    color: #bbf7d0;
+    background: #edf8f1;
+    border-color: #b8ddc8;
+    color: var(--success);
 }
 .crave-toast.error {
-    background: #421818;
-    border-color: #ef4444;
-    color: #fecaca;
+    background: #fff1ee;
+    border-color: #f0c5bc;
+    color: var(--error);
 }
 .crave-toast.info {
-    background: #1d2c3f;
-    border-color: #38bdf8;
-    color: #bae6fd;
+    background: #eef6ff;
+    border-color: #c2d8ef;
+    color: #245c90;
 }
 @keyframes toastSlideUp {
     from {
@@ -2343,7 +2346,7 @@ label {
 .crave-body .feature-info h3 { margin-top: 0; }
 .crave-body .empty-state h3, .crave-body .empty-title { color: var(--ink); }
 .crave-body .product-description-box, .crave-body .option-card-inner { background: var(--surface); color: var(--ink); border-color: var(--line); }
-.crave-body .option-card input:checked + .option-card-inner { background: #473024; border-color: var(--accent); }
+.crave-body .option-card input:checked + .option-card-inner { background: var(--cream); border-color: var(--accent); }
 .crave-body .option-group-title, .crave-body .options-title, .crave-body .opt-label, .crave-body .qty-label { color: var(--ink); }
 .crave-body .product-description-box p, .crave-body .price-note { color: var(--muted); }
 .crave-body .product-image-container { background: var(--surface); }
@@ -2357,8 +2360,11 @@ label {
 .crave-body .product-detail-layout > * { min-width: 0; }
 .crave-body .product-media-badges { flex-wrap: wrap; gap: 8px; }
 .crave-body .button.outline, .crave-body .address-action { background: var(--surface); color: var(--ink); }
-.crave-body .site-footer { background: #202b3a; color: #c6ccd5; }
-.crave-body .button.primary:hover, .crave-body .hero-order-btn:hover { background: #dd491e; color: #fff; }
+.crave-body .site-footer { background: var(--header-surface); color: var(--header-muted); border-top-color: var(--line); }
+.crave-body .site-footer .footer-brand { color: var(--header-ink); }
+.crave-body .site-footer .footer-copy, .crave-body .site-footer .footer-tagline { color: var(--header-muted); }
+.crave-body .site-footer .footer-brand span { color: var(--header-accent); }
+.crave-body .button.primary:hover, .crave-body .hero-order-btn:hover { background: var(--accent-dark); color: #fff; }
 .crave-body :focus,
 .crave-body :focus-visible { outline: none !important; }
 .crave-body button:disabled { cursor: not-allowed; opacity: .65; }
@@ -2403,7 +2409,7 @@ label {
     flex-wrap: wrap;
 }
 .crave-body .main-nav a {
-    color: #fffaf6;
+    color: var(--header-ink);
     font-size: 15px;
     font-weight: 600;
     padding: 8px 0;
@@ -2413,7 +2419,7 @@ label {
 }
 .crave-body .main-nav a:hover,
 .crave-body .main-nav a.active {
-    color: #ff6638;
+    color: var(--header-accent);
 }
 .crave-body .main-nav a.active::after {
     content: '';
@@ -2422,7 +2428,7 @@ label {
     left: 0;
     right: 0;
     height: 2.5px;
-    background: #ff6638;
+    background: var(--header-accent);
     border-radius: 99px;
 }
 .crave-body .header-actions {
@@ -2437,25 +2443,25 @@ label {
     border-radius: 50%;
     display: grid;
     place-items: center;
-    background: #372820;
-    border: 1px solid #4b392f;
-    color: #fffaf6;
+    background: var(--header-hover);
+    border: 1px solid var(--line);
+    color: var(--header-ink);
     position: relative;
     transition: all .15s ease;
     flex-shrink: 0;
     text-decoration: none;
 }
 .crave-body .header-cart-icon-btn:hover {
-    background: #ff6638;
+    background: var(--accent);
     color: #fff;
-    border-color: #ff6638;
+    border-color: var(--accent);
     transform: scale(1.05);
 }
 .crave-body .header-cart-icon-btn .cart-badge-count {
     position: absolute;
     top: -3px;
     right: -3px;
-    background: #ff6638;
+    background: var(--accent);
     color: #fff;
     font-size: 11px;
     font-weight: 800;
@@ -2465,7 +2471,7 @@ label {
     display: grid;
     place-items: center;
     padding: 0 4px;
-    border: 2px solid #2d211b;
+    border: 2px solid var(--header-surface);
 }
 .user-profile-menu {
     position: relative;
@@ -2478,7 +2484,7 @@ label {
     transition: background .15s ease;
 }
 .user-profile-menu:hover {
-    background: rgba(255, 255, 255, 0.06);
+    background: var(--header-hover);
 }
 .user-avatar-btn {
     width: 40px;
@@ -2510,13 +2516,13 @@ label {
 .user-caption strong {
     display: block;
     font-size: 13.5px;
-    color: #fffaf6;
+    color: var(--header-ink);
     font-weight: 700;
     letter-spacing: -0.01em;
 }
 .user-caption small {
     display: block;
-    color: #c6b9ae;
+    color: var(--header-muted);
     font-size: 11px;
     font-weight: 500;
     margin-top: 2px;

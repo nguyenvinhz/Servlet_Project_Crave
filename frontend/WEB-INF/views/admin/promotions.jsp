@@ -3,7 +3,7 @@
 <c:set var="adminPage" value="promotions" />
 <c:set var="pageTitle" value="Quản lý khuyến mãi" />
 <%@ include file="/WEB-INF/views/admin/components/begin.jspf" %>
-<link rel="stylesheet" href="<c:url value='/assets/css/admin-management.css' />">
+<link rel="stylesheet" href="<c:url value='/assets/css/admin-management.css?v=20261013-palette2' />">
 <main class="admin-content">
     <header class="management-heading"><div><p class="management-eyebrow">Ưu đãi</p><h1>Quản lý khuyến mãi</h1>
         <p>Tạo chương trình giảm giá và theo dõi thời gian áp dụng cho khách hàng.</p></div>

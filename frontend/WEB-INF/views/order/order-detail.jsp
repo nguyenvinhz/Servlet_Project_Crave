@@ -31,5 +31,5 @@
         </section>
     </template>
 </main>
-<script src="<c:url value='/assets/js/order-detail.js'/>"></script>
+<script src="<c:url value='/assets/js/order-detail.js?v=20261013-palette2'/>"></script>
 <%@ include file="/WEB-INF/views/components/footer.jspf" %>

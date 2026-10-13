@@ -1,52 +1,28 @@
 /* ============================================================
-   Order & Payment Module — Dark Theme
+   Order & Payment Module — Warm customer palette
    Dùng cho: checkout, orders, order-detail, admin-orders
    Kế thừa --accent, --accent-dark từ styles.css
    ============================================================ */
 
-/* --- Dark-theme tokens --- */
+/* --- Shared customer colors with standalone fallbacks --- */
 .order-page {
-    --bg: #141414;
-    --bg-card: #1e1e1e;
-    --bg-card-alt: #252525;
-    --bg-input: #2a2a2a;
-    --text: #f5f5f5;
-    --text-muted: #9ca3af;
-    --border: #333;
-    --border-focus: var(--accent);
+    --bg: var(--paper, #fffaf5);
+    --bg-card: var(--surface, #ffffff);
+    --bg-card-alt: var(--cream, #fff2e8);
+    --bg-input: var(--surface, #ffffff);
+    --text: var(--ink, #29241f);
+    --text-muted: var(--muted, #6b6057);
+    --border: var(--line, #e7ddd3);
+    --border-focus: var(--accent, #c94b24);
 }
 
-/* --- Override body & header khi nằm trong trang order --- */
+/* --- Page surface; shared header and footer keep their own palette --- */
 .order-theme {
     background: var(--bg);
     color: var(--text);
 }
 
-.order-theme .site-header {
-    background: var(--bg);
-    border-bottom-color: var(--border);
-}
-
-.order-theme .site-header .brand {
-    color: var(--text);
-}
-
-.order-theme .site-header nav a {
-    color: var(--text-muted);
-}
-
-.order-theme .site-header nav a:hover,
-.order-theme .site-header nav a.active {
-    color: var(--accent);
-}
-
-.order-theme .site-footer {
-    background: var(--bg);
-    border-top-color: var(--border);
-    color: var(--text-muted);
-}
-
-/* --- Card chung (dark) --- */
+/* --- Shared cards --- */
 .order-page .card {
     background: var(--bg-card);
     border-color: var(--border);
@@ -60,7 +36,7 @@
     font-family: 'Plus Jakarta Sans', 'Nunito', ui-sans-serif, system-ui, -apple-system, sans-serif;
 }
 
-/* --- Input & Select (dark) --- */
+/* --- Inputs and selects --- */
 .order-page input,
 .order-page textarea,
 .order-page select {
@@ -83,7 +59,7 @@
 .order-page select:focus {
     border-color: var(--border-focus);
     outline: none;
-    box-shadow: 0 0 0 3px rgba(239, 91, 53, 0.2);
+    box-shadow: 0 0 0 3px rgba(201, 75, 36, 0.16);
 }
 
 .order-page label {
@@ -102,7 +78,7 @@
     padding: 0.9rem 1.25rem;
     border: 0;
     border-radius: 10px;
-    background: var(--accent);
+    background: var(--accent, #c94b24);
     color: #fff;
     font: inherit;
     font-weight: 800;
@@ -111,7 +87,7 @@
 }
 
 .order-page .btn-primary:hover {
-    background: var(--accent-dark);
+    background: var(--accent-dark, #aa3918);
 }
 
 /* ============================================================
@@ -255,11 +231,11 @@
     letter-spacing: 0.04em;
 }
 
-.badge-pending { background: #3b2f00; color: #fbbf24; }
-.badge-preparing { background: #1e3a5f; color: #60a5fa; }
-.badge-delivering { background: #3b1f00; color: var(--accent); }
-.badge-completed { background: #052e16; color: #4ade80; }
-.badge-cancelled { background: #2d0a0a; color: #f87171; }
+.badge-pending { background: #fff4d6; color: #7c570e; }
+.badge-preparing { background: #edf3ff; color: #2457a7; }
+.badge-delivering { background: var(--cream, #fff2e8); color: var(--accent-text, #a63a1b); }
+.badge-completed { background: #edf8f1; color: var(--success, #18794e); }
+.badge-cancelled { background: #fff1ee; color: var(--error, #b42318); }
 
 /* ============================================================
    ORDER DETAIL / TRACKING — Stepper bar
@@ -333,7 +309,7 @@
     background: var(--accent);
     color: #fff;
     border-color: var(--accent);
-    box-shadow: 0 0 0 4px rgba(239, 91, 53, 0.25);
+    box-shadow: 0 0 0 4px rgba(201, 75, 36, 0.18);
 }
 
 .step-label {
@@ -346,7 +322,7 @@
 
 .step.done .step-label,
 .step.active .step-label {
-    color: var(--accent);
+    color: var(--accent-text, #a63a1b);
 }
 
 /* Item card trong tracking */
@@ -370,7 +346,7 @@
 }
 
 /* ============================================================
-   ADMIN ORDERS — Dark table
+   ADMIN ORDERS — Shared table
    ============================================================ */
 .admin-table {
     width: 100%;
@@ -438,12 +414,12 @@
     }
 }
 
-/* Customer order pages share the brown and orange Crave palette. */
+/* Customer order pages share the warm cream and orange Crave palette. */
 .crave-body.order-page {
-    --bg: var(--paper); --bg-card: var(--surface); --bg-card-alt: #35261e;
-    --bg-input: #211711; --text: var(--ink); --text-muted: var(--muted); --border: var(--line);
+    background: var(--bg);
+    color: var(--text);
 }
-.crave-body.order-page .card { border: 1px solid var(--line); border-radius: 20px; }
+.crave-body.order-page .card { border: 1px solid var(--border); border-radius: 20px; }
 .crave-body.order-page .card h2, .crave-body.order-page .card h3, .crave-body.order-page .tracking-header h1 { font-family: 'Nunito', sans-serif; }
 .crave-body.order-page .checkout-grid { grid-template-columns: minmax(0, 1.5fr) minmax(280px, 1fr); }
 .customer-page-heading { margin: 8px 0 32px; }
@@ -458,11 +434,11 @@
 .order-summary { position: sticky; top: 100px; }
 .order-page .summary-row { gap: 12px; }
 .order-page .summary-row strong { white-space: nowrap; }
-.order-page .summary-row.total { color: var(--accent); }
-.order-page .discount-row { color: var(--success); }
+.order-page .summary-row.total { color: var(--accent-text, #a63a1b); }
+.order-page .discount-row { color: var(--success, #18794e); }
 .order-page .alert { display: none; padding: 14px 16px; border-radius: 12px; }
-.order-page .alert.error { background: #48251f; color: var(--error); border: 1px solid #8c4939; }
-.order-page .alert.success { background: #20392a; color: var(--success); border: 1px solid #397449; }
+.order-page .alert.error { background: #fff1ee; color: var(--error, #b42318); border: 1px solid #f0c5bc; }
+.order-page .alert.success { background: #edf8f1; color: var(--success, #18794e); border: 1px solid #b8ddc8; }
 .order-page .btn-back { display: inline-block; margin: 12px 0 24px; font-weight: 600; }
 .order-page .order-loading { padding: 36px; text-align: center; color: var(--muted); }
 .order-page .order-card { gap: 20px; }
@@ -491,7 +467,7 @@
 }
 .address-manage-link {
     font-size: 0.82rem;
-    color: var(--accent);
+    color: var(--accent-text, #a63a1b);
     text-decoration: none;
     font-weight: 600;
 }
@@ -499,7 +475,7 @@
     text-decoration: underline;
 }
 .saved-address-wrap {
-    background: rgba(255, 255, 255, 0.03);
+    background: var(--bg-card-alt);
     border: 1px solid var(--border);
     border-radius: 10px;
     padding: 10px 12px;
@@ -530,9 +506,9 @@
     gap: 0.35rem;
     padding: 0.4rem 0.85rem;
     border-radius: 8px;
-    border: 1px solid rgba(239, 68, 68, 0.4);
-    background: rgba(239, 68, 68, 0.08);
-    color: #f87171;
+    border: 1px solid #f0c5bc;
+    background: #fff1ee;
+    color: var(--error, #b42318);
     font-size: 0.85rem;
     font-weight: 600;
     cursor: pointer;
@@ -540,9 +516,9 @@
 }
 
 .btn-cancel-order:hover {
-    background: rgba(239, 68, 68, 0.2);
-    border-color: #ef4444;
-    color: #fca5a5;
+    background: #ffe2dc;
+    border-color: var(--error, #b42318);
+    color: #941d14;
 }
 
 .btn-cancel-order:disabled {
@@ -619,7 +595,7 @@
 }
 
 .payos-paid .payos-status {
-    color: #4ade80;
+    color: var(--success, #18794e);
     margin-bottom: 0;
 }
 
@@ -661,7 +637,7 @@
 }
 
 .payos-bank-details .payos-amount {
-    color: var(--accent);
+    color: var(--accent-text, #a63a1b);
     font-size: 1.5rem;
 }
 

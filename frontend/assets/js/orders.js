@@ -91,7 +91,7 @@ async function loadOrders() {
 
                 const aView = document.createElement('a');
                 aView.href = `${API_BASE}/orders/${encodeURIComponent(o.orderId)}`;
-                aView.style.color = 'var(--accent)';
+                aView.style.color = 'var(--accent-text, #a63a1b)';
                 aView.style.fontWeight = '600';
                 aView.style.fontSize = '0.85rem';
                 aView.style.textDecoration = 'none';
@@ -105,14 +105,14 @@ async function loadOrders() {
             });
         } else {
             listEl.innerHTML = `
-                <div class="card" style="padding: 2rem; text-align: center; color: #f87171;">
+                <div class="card" style="padding: 2rem; text-align: center; color: var(--error, #b42318);">
                     <p>${escapeHtml(data?.error?.message || data?.message || 'Không thể tải danh sách đơn hàng.')}</p>
                 </div>
             `;
         }
     } catch (err) {
         listEl.innerHTML = `
-            <div class="card" style="padding: 2rem; text-align: center; color: #f87171;">
+            <div class="card" style="padding: 2rem; text-align: center; color: var(--error, #b42318);">
                 <p>Lỗi kết nối máy chủ. Vui lòng thử lại sau.</p>
             </div>
         `;
@@ -179,11 +179,11 @@ function showCancelModal(orderId, apiBase, onCancelled) {
                         <input type="text" id="otherReasonInput" placeholder="Nhập lý do cụ thể..." maxlength="200" style="padding: 0.6rem 0.8rem; font-size: 0.9rem;" />
                     </div>
                 </div>
-                <div id="cancelErrorMsg" style="display: none; color: #f87171; font-size: 0.85rem;"></div>
+                <div id="cancelErrorMsg" style="display: none; color: var(--error, #b42318); font-size: 0.85rem;"></div>
             </div>
             <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 0.75rem;">
                 <button type="button" class="btn-cancel-modal-close" style="padding: 0.6rem 1.2rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card-alt); color: var(--text); font-weight: 600; cursor: pointer;">Không, giữ đơn</button>
-                <button type="button" id="btnConfirmCancel" style="padding: 0.6rem 1.25rem; border-radius: 8px; border: 0; background: #ef4444; color: #fff; font-weight: 700; cursor: pointer; transition: background 0.15s ease;">Xác nhận hủy đơn</button>
+                <button type="button" id="btnConfirmCancel" style="padding: 0.6rem 1.25rem; border-radius: 8px; border: 0; background: var(--error, #b42318); color: #fff; font-weight: 700; cursor: pointer; transition: background 0.15s ease;">Xác nhận hủy đơn</button>
             </div>
         </div>
     `;

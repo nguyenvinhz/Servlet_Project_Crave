@@ -473,7 +473,7 @@ cases.push(
  const frame=document.createElement('iframe');frame.style.cssText='width:320px;height:900px;border:0';
  const loaded=new Promise(resolve=>frame.addEventListener('load',resolve,{once:true}));
  const head=[...document.head.querySelectorAll('link[rel=stylesheet],style')].map(element=>element.outerHTML).join('');
- frame.srcdoc='<!doctype html><html><head>'+head+'<link rel="stylesheet" href="'+location.origin+'/crave/assets/css/account.css"></head><body class="crave-body">'+document.querySelector('header').outerHTML+document.querySelector('main').outerHTML+document.querySelector('footer').outerHTML+'</body></html>';
+ frame.srcdoc='<!doctype html><html><head>'+head+'<link rel="stylesheet" href="'+location.origin+'/crave/assets/css/account.css?v=20261013-palette2"></head><body class="crave-body">'+document.querySelector('header').outerHTML+document.querySelector('main').outerHTML+document.querySelector('footer').outerHTML+'</body></html>';
  document.body.append(frame);await loaded;
  const screen=frame.contentWindow,doc=frame.contentDocument,main=doc.querySelector('main');
  assert(screen.innerWidth===320,'Fixture did not use exact 320px viewport');
@@ -747,9 +747,10 @@ function footerMarkup() {
 }
 const server=http.createServer((req,res)=>{
  const context=current.context??'/crave';
- const script=/\/assets\/js\/(account|cart|checkout|orders|order-detail)\.js$/.exec(req.url);
+ const assetPath=new URL(req.url,'http://127.0.0.1').pathname;
+ const script=/\/assets\/js\/(account|cart|checkout|orders|order-detail)\.js$/.exec(assetPath);
  if(script){res.setHeader('Content-Type','text/javascript; charset=utf-8');res.end(fs.readFileSync(path.join(project,'frontend/assets/js',script[1]+'.js')));return;}
- const stylesheet=/\/assets\/css\/(styles|account|cart|order)\.css$/.exec(req.url);
+ const stylesheet=/\/assets\/css\/(styles|account|cart|order)\.css$/.exec(assetPath);
  if(stylesheet){res.setHeader('Content-Type','text/css; charset=utf-8');res.end(fs.readFileSync(path.join(project,'frontend/assets/css',stylesheet[1]+'.css')));return;}
  if(req.url==='/assets/images/fixture.svg'){res.setHeader('Content-Type','image/svg+xml');res.end('<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"></svg>');return;}
  res.setHeader('Content-Type','text/html; charset=utf-8');
@@ -759,7 +760,7 @@ const server=http.createServer((req,res)=>{
  res.end(`<!doctype html><html><body><script>try{${current.redirectCheck||''}document.body.innerHTML='<pre id="smoke-result">PASS ${current.name}</pre>';}catch(e){document.body.innerHTML='<pre id="smoke-result">FAIL '+e.message+'</pre>';}</script></body></html>`);return;}
  const run=current.redirect?current.run:current.run+`finish('PASS ${current.name}');`;
  const pageStyle=current.page.startsWith('cart/')?'cart':current.page.startsWith('order/')?'order':'account';
- const shell=current.realHeader?headerMarkup():`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="${context}/assets/css/styles.css"><link rel="stylesheet" href="${context}/assets/css/${pageStyle}.css"></head><body data-context-path="${context}">`;
+ const shell=current.realHeader?headerMarkup():`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="${context}/assets/css/styles.css?v=20261013-palette2"><link rel="stylesheet" href="${context}/assets/css/${pageStyle}.css?v=20261013-palette2"></head><body class="crave-body ${current.page.startsWith('order/')?'order-page':''}" data-context-path="${context}">`;
  const footer=current.realHeader?footerMarkup():`<form id="logoutForm" action="${context}/api/auth/logout"><button type="submit">Logout</button></form><p id="logout-error"></p>`;
  res.end(`${shell}${markup(current.page)}${footer}
  <script>${common}${current.setup}</script><script src="${context}/assets/js/account.js"></script>

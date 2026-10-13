@@ -1,36 +1,37 @@
 /* ==========================================================================
    CRAVE - CART & PROMOTION STYLES
-   Design System matching https://thrilled-calendar-459980.framer.app/food
+   Shared warm customer palette
    Tokens:
-   --brand: #f4511e
-   --text-dark: #1f2937
-   --text-muted: #6b7280
-   --bg-page: #fff8f3
+   --brand: #c94b24
+   --text-dark: #29241f
+   --text-muted: #6b6057
+   --bg-page: #fffaf5
    --bg-card: #ffffff
-   --border-color: #f2e6df
+   --border-color: #e7ddd3
    ========================================================================== */
 
 :root {
-    --crave-brand: #f4511e;
-    --crave-brand-hover: #d84315;
-    --crave-brand-light: #fff0eb;
-    --crave-text: #1f2937;
-    --crave-text-muted: #6b7280;
-    --crave-bg-page: #fff8f3;
-    --crave-bg-card: #ffffff;
-    --crave-border: #f2e6df;
-    --crave-border-focus: #f4511e;
-    --crave-success: #16a34a;
-    --crave-success-bg: #f0fdf4;
-    --crave-danger: #dc2626;
-    --crave-danger-bg: #fef2f2;
+    --crave-brand: var(--accent, #c94b24);
+    --crave-brand-hover: var(--accent-dark, #aa3918);
+    --crave-brand-text: var(--accent-text, #a63a1b);
+    --crave-brand-light: var(--cream, #fff2e8);
+    --crave-text: var(--ink, #29241f);
+    --crave-text-muted: var(--muted, #6b6057);
+    --crave-bg-page: var(--paper, #fffaf5);
+    --crave-bg-card: var(--surface, #ffffff);
+    --crave-border: var(--line, #e7ddd3);
+    --crave-border-focus: var(--accent, #c94b24);
+    --crave-success: var(--success, #18794e);
+    --crave-success-bg: #edf8f1;
+    --crave-danger: var(--error, #b42318);
+    --crave-danger-bg: #fff1ee;
     --crave-radius-sm: 8px;
     --crave-radius-md: 14px;
     --crave-radius-lg: 20px;
     --crave-radius-xl: 24px;
     --crave-shadow-sm: 0 2px 6px rgba(0, 0, 0, 0.03);
-    --crave-shadow-md: 0 6px 20px rgba(31, 41, 55, 0.05);
-    --crave-shadow-lg: 0 12px 36px rgba(244, 81, 30, 0.12);
+    --crave-shadow-md: 0 6px 20px rgba(41, 36, 31, 0.05);
+    --crave-shadow-lg: 0 12px 36px rgba(201, 75, 36, 0.12);
     --crave-font-heading: 'Nunito', sans-serif;
     --crave-font-body: 'Inter', system-ui, -apple-system, sans-serif;
 }
@@ -117,7 +118,7 @@ body.crave-body {
 
 .cart-item-card:hover {
     box-shadow: var(--crave-shadow-md);
-    border-color: #ebd3c8;
+    border-color: #cbb8a7;
 }
 
 /* Item Image Thumbnail */
@@ -169,7 +170,7 @@ body.crave-body {
 
 .cart-item-note {
     font-size: 0.8rem;
-    color: #9ca3af;
+    color: var(--crave-text-muted);
     font-style: italic;
     display: flex;
     align-items: center;
@@ -231,7 +232,7 @@ body.crave-body {
 /* Price Display (Matches: "$12.90 × 1" in Orange) */
 .cart-item-price-tag {
     font-family: var(--crave-font-heading);
-    color: var(--crave-brand);
+    color: var(--crave-brand-text);
     font-weight: 800;
     font-size: 1.15rem;
     white-space: nowrap;
@@ -241,7 +242,7 @@ body.crave-body {
 .cart-item-remove-btn {
     background: transparent;
     border: none;
-    color: #9ca3af;
+    color: var(--crave-text-muted);
     cursor: pointer;
     padding: 6px;
     border-radius: 8px;
@@ -282,7 +283,7 @@ body.crave-body {
 }
 
 .btn-link-action:hover {
-    color: var(--crave-brand);
+    color: var(--crave-brand-text);
     background: #fff;
     text-decoration: none;
 }
@@ -373,7 +374,7 @@ body.crave-body {
 .voucher-section {
     margin-bottom: 24px;
     background: var(--crave-bg-page);
-    border: 1px dashed #e4cfc2;
+    border: 1px dashed #cbb8a7;
     border-radius: var(--crave-radius-md);
     padding: 16px;
 }
@@ -390,7 +391,7 @@ body.crave-body {
 
 .voucher-view-all-link {
     font-size: 0.8rem;
-    color: var(--crave-brand);
+    color: var(--crave-brand-text);
     font-weight: 700;
     text-decoration: none;
     cursor: pointer;
@@ -424,18 +425,18 @@ body.crave-body {
 
 .voucher-input:focus {
     border-color: var(--crave-border-focus);
-    box-shadow: 0 0 0 3px rgba(244, 81, 30, 0.12);
+    box-shadow: 0 0 0 3px rgba(201, 75, 36, 0.16);
 }
 
 .voucher-input::placeholder {
     text-transform: none;
     letter-spacing: normal;
-    color: #9ca3af;
+    color: var(--crave-text-muted);
     font-weight: 400;
 }
 
 .voucher-apply-btn {
-    background: var(--crave-text);
+    background: var(--crave-brand);
     color: #fff;
     border: none;
     border-radius: 10px;
@@ -451,7 +452,7 @@ body.crave-body {
 }
 
 .voucher-apply-btn:hover:not(:disabled) {
-    background: #111827;
+    background: var(--crave-brand-hover);
 }
 
 .voucher-apply-btn:disabled {
@@ -464,8 +465,8 @@ body.crave-body {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    background: #fff;
-    border: 1px solid #86efac;
+    background: var(--crave-success-bg);
+    border: 1px solid #b8ddc8;
     border-radius: 10px;
     padding: 10px 14px;
     margin-top: 10px;
@@ -479,7 +480,7 @@ body.crave-body {
 
 .voucher-code-badge {
     background: var(--crave-brand-light);
-    color: var(--crave-brand);
+    color: var(--crave-brand-text);
     font-family: var(--crave-font-heading);
     font-weight: 800;
     font-size: 0.85rem;
@@ -496,7 +497,7 @@ body.crave-body {
 .voucher-remove-btn {
     background: transparent;
     border: none;
-    color: #9ca3af;
+    color: var(--crave-text-muted);
     font-size: 1.1rem;
     cursor: pointer;
     padding: 2px 6px;
@@ -550,7 +551,7 @@ body.crave-body {
 .btn-checkout:hover:not(:disabled) {
     background-color: var(--crave-brand-hover);
     transform: translateY(-1px);
-    box-shadow: 0 14px 40px rgba(244, 81, 30, 0.22);
+    box-shadow: 0 14px 40px rgba(201, 75, 36, 0.22);
 }
 
 .btn-checkout:active {
@@ -558,7 +559,8 @@ body.crave-body {
 }
 
 .btn-checkout:disabled {
-    background-color: #d1d5db;
+    background-color: var(--crave-border);
+    color: var(--crave-text-muted);
     box-shadow: none;
     cursor: not-allowed;
 }
@@ -587,7 +589,7 @@ body.crave-body {
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--crave-brand);
+    color: var(--crave-brand-text);
 }
 
 .cart-empty-illustration svg {
@@ -640,7 +642,7 @@ body.crave-body {
 
 .cart-error-state {
     background: var(--crave-danger-bg);
-    border: 1px solid #fecaca;
+    border: 1px solid #f0c5bc;
     border-radius: var(--crave-radius-lg);
     padding: 32px 24px;
     text-align: center;
@@ -663,12 +665,12 @@ body.crave-body {
     font-family: var(--crave-font-heading);
     font-size: 1.3rem;
     font-weight: 800;
-    color: #991b1b;
+    color: var(--crave-danger);
     margin: 0 0 8px 0;
 }
 
 .cart-error-desc {
-    color: #7f1d1d;
+    color: var(--crave-danger);
     font-size: 0.95rem;
     margin: 0 0 20px 0;
 }
@@ -685,7 +687,7 @@ body.crave-body {
 }
 
 .btn-retry:hover {
-    background: #b91c1c;
+    background: #941d14;
 }
 
 /* Toast Notification for errors / success */
@@ -700,7 +702,7 @@ body.crave-body {
 }
 
 .crave-toast {
-    background: #1f2937;
+    background: var(--crave-text);
     color: #fff;
     padding: 14px 20px;
     border-radius: 12px;
@@ -715,13 +717,13 @@ body.crave-body {
 }
 
 .crave-toast.error {
-    background: #991b1b;
-    border-left: 4px solid #ef4444;
+    background: var(--crave-danger);
+    border-left: 4px solid #f5b2a6;
 }
 
 .crave-toast.success {
-    background: #14532d;
-    border-left: 4px solid #22c55e;
+    background: var(--crave-success);
+    border-left: 4px solid #b8ddc8;
 }
 
 @keyframes toastSlideIn {
@@ -887,7 +889,7 @@ body.crave-body {
 
 .promo-card {
     background: var(--crave-bg-page);
-    border: 1px dashed #e3cbbe;
+    border: 1px dashed #cbb8a7;
     border-radius: var(--crave-radius-md);
     padding: 16px 18px;
     display: flex;
@@ -900,7 +902,7 @@ body.crave-body {
 
 .promo-card:hover {
     border-color: var(--crave-brand);
-    background: #fff5ee;
+    background: var(--crave-brand-light);
 }
 
 .promo-badge-tag {
@@ -931,7 +933,7 @@ body.crave-body {
 
 .btn-apply-promo-card {
     background: #fff;
-    color: var(--crave-brand);
+    color: var(--crave-brand-text);
     border: 1.5px solid var(--crave-brand);
     border-radius: 8px;
     padding: 8px 16px;
@@ -949,33 +951,20 @@ body.crave-body {
 
 /* Keep cart and promotion screens on the shared customer palette. */
 body.crave-body {
-    --crave-brand: var(--accent);
-    --crave-brand-hover: #dd491e;
-    --crave-brand-light: #473024;
-    --crave-text: var(--ink);
-    --crave-text-muted: var(--muted);
-    --crave-bg-page: var(--paper);
-    --crave-bg-card: var(--surface);
-    --crave-border: var(--line);
-    --crave-success: var(--success);
-    --crave-success-bg: #20392a;
-    --crave-danger: var(--error);
-    --crave-danger-bg: #48251f;
     --crave-font-heading: 'Nunito', system-ui, sans-serif;
     --crave-font-body: 'Inter', system-ui, sans-serif;
 }
 .crave-body .cart-item-card, .crave-body .order-summary-card, .crave-body .promo-modal-dialog,
 .crave-body .promo-card, .crave-body .skeleton-card, .crave-body .cart-empty-state,
-.crave-body .promo-ticket-card { background: var(--surface); border-color: var(--line); }
-.crave-body .voucher-input, .crave-body .cart-stepper, .crave-body .voucher-apply-btn { background: var(--paper); color: var(--ink); border-color: var(--line); }
-.crave-body .voucher-view-all-link { color: var(--accent); }
-.crave-body .cart-item-image-wrapper { background: var(--cream); }
-.crave-body .promo-modal-dialog { color: var(--ink); }
-.crave-body .cart-error-state { background: #48251f; border-color: #8c4939; }
-.crave-body .cart-error-title, .crave-body .cart-error-desc { color: var(--error); }
-.crave-body .btn-retry { background: #b42318; color: #fff; }
-.crave-body .btn-link-action:hover, .crave-body .btn-copy-code:hover { background: var(--cream); color: var(--accent); }
-.crave-body .cart-stepper-btn { background: var(--surface); color: var(--ink); }
+.crave-body .promo-ticket-card { background: var(--crave-bg-card); border-color: var(--crave-border); }
+.crave-body .cart-item-card:hover { border-color: #cbb8a7; }
+.crave-body .promo-card:hover { background: var(--crave-brand-light); border-color: var(--crave-brand); }
+.crave-body .voucher-input, .crave-body .cart-stepper { background: var(--crave-bg-card); color: var(--crave-text); border-color: var(--crave-border); }
+.crave-body .cart-item-image-wrapper { background: var(--crave-brand-light); }
+.crave-body .promo-modal-dialog { color: var(--crave-text); }
+.crave-body .btn-link-action:hover, .crave-body .btn-copy-code:hover { background: var(--crave-brand-light); color: var(--crave-brand-text); }
+.crave-body .cart-stepper-btn { background: var(--crave-bg-card); color: var(--crave-text); }
+.crave-body .cart-stepper-btn:hover:not(:disabled) { background: var(--crave-brand); color: #fff; }
 .crave-body .voucher-apply-btn { flex-shrink: 0; white-space: nowrap; }
 .crave-body .voucher-input { min-width: 0; }
 .crave-body .cart-summary-column { min-width: 0; }

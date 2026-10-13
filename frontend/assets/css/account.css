@@ -76,7 +76,7 @@
     width: 100%;
     min-width: 0;
     padding: 0.8rem 0.9rem;
-    border: 1px solid var(--line);
+    border: 1px solid var(--control-line, var(--line));
     border-radius: 10px;
     background: var(--surface, #fff);
     color: var(--ink);

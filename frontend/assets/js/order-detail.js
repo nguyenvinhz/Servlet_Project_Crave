@@ -20,7 +20,7 @@ async function loadOrderDetail() {
 
     if (!orderId || orderId === 'orders') {
         container.innerHTML = `
-            <div class="card" style="padding: 2.5rem; text-align: center; color: #f87171;">
+            <div class="card" style="padding: 2.5rem; text-align: center; color: var(--error, #b42318);">
                 <p>Không tìm thấy mã đơn hàng hợp lệ.</p>
                 <a href="${API_BASE}/orders" class="btn-primary" style="display: inline-block; width: auto; margin-top: 1rem; text-decoration: none;">Quay lại danh sách đơn</a>
             </div>
@@ -48,7 +48,7 @@ async function loadOrderDetail() {
             container.innerHTML = `
                 <div class="card" style="padding: 2.5rem; text-align: center;">
                     <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">🔒</div>
-                    <h3 style="color: #f87171; margin-bottom: 0.5rem;">Không có quyền truy cập</h3>
+                    <h3 style="color: var(--error, #b42318); margin-bottom: 0.5rem;">Không có quyền truy cập</h3>
                     <p style="color: var(--text-muted); margin-bottom: 1.5rem;">Đơn hàng này không thuộc tài khoản của bạn.</p>
                     <a href="${API_BASE}/orders" class="btn-primary" style="display: inline-block; width: auto; margin: 0 auto; text-decoration: none;">Quay lại đơn hàng của tôi</a>
                 </div>
@@ -121,9 +121,9 @@ async function loadOrderDetail() {
                 const cancelHistory = o.history && o.history.length > 0 
                     ? o.history.slice().reverse().find(h => h.status === 'CANCELLED') 
                     : null;
-                const cancelNote = cancelHistory?.note ? `<p style="margin: 0.5rem 0 0; font-size: 0.9rem; color: #fca5a5; font-style: italic;">Lý do: ${escapeHtml(cancelHistory.note)}</p>` : '';
+                const cancelNote = cancelHistory?.note ? `<p style="margin: 0.5rem 0 0; font-size: 0.9rem; color: var(--error, #b42318); font-style: italic;">Lý do: ${escapeHtml(cancelHistory.note)}</p>` : '';
                 stepperCard.innerHTML = `
-                    <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid #f87171; padding: 1.25rem; border-radius: 10px; text-align: center; color: #f87171;">
+                    <div style="background: #fff1ee; border: 1px solid #f0c5bc; padding: 1.25rem; border-radius: 10px; text-align: center; color: var(--error, #b42318);">
                         <span style="font-size: 1.5rem; display: block; margin-bottom: 0.25rem;">✕</span>
                         <strong>Đơn hàng đã bị hủy</strong>
                         <p style="margin: 0.25rem 0 0; font-size: 0.85rem; color: var(--text-muted);">Đơn hàng đã được ghi nhận hủy trong hệ thống.</p>
@@ -207,7 +207,7 @@ async function loadOrderDetail() {
                                 ${item.options.map(opt => `+ ${escapeHtml(opt.optionName)} (${Number(opt.extraPrice).toLocaleString('vi-VN')}\u00A0đ)`).join(', ')}
                             </div>
                         ` : ''}
-                        ${item.note ? `<div style="font-size: 0.85rem; color: var(--accent); font-style: italic; margin-top: 0.2rem;">Ghi chú: ${escapeHtml(item.note)}</div>` : ''}
+                        ${item.note ? `<div style="font-size: 0.85rem; color: var(--accent-text, #a63a1b); font-style: italic; margin-top: 0.2rem;">Ghi chú: ${escapeHtml(item.note)}</div>` : ''}
                     `;
                     
                     const right = document.createElement('div');
@@ -245,12 +245,12 @@ async function loadOrderDetail() {
                     <span>${deliveryFee.toLocaleString('vi-VN')}\u00A0đ</span>
                 </div>
                 ${discount > 0 ? `
-                    <div style="display: flex; justify-content: space-between; padding: 0.35rem 0; color: #4ade80;">
+                    <div style="display: flex; justify-content: space-between; padding: 0.35rem 0; color: var(--success, #18794e);">
                         <span>Mã khuyến mãi:</span>
                         <span>-${discount.toLocaleString('vi-VN')}\u00A0đ</span>
                     </div>
                 ` : ''}
-                <div style="display: flex; justify-content: space-between; padding-top: 1rem; margin-top: 0.5rem; border-top: 1px solid var(--border); font-size: 1.25rem; font-weight: 800; color: var(--accent);">
+                <div style="display: flex; justify-content: space-between; padding-top: 1rem; margin-top: 0.5rem; border-top: 1px solid var(--border); font-size: 1.25rem; font-weight: 800; color: var(--accent-text, #a63a1b);">
                     <span>Tổng cộng:</span>
                     <span>${total.toLocaleString('vi-VN')}\u00A0đ</span>
                 </div>
@@ -259,7 +259,7 @@ async function loadOrderDetail() {
             
         } else {
             container.innerHTML = `
-                <div class="card" style="padding: 2rem; text-align: center; color: #f87171;">
+                <div class="card" style="padding: 2rem; text-align: center; color: var(--error, #b42318);">
                     <p>${escapeHtml(data?.error?.message || data?.message || 'Không tìm thấy thông tin đơn hàng.')}</p>
                     <a href="${API_BASE}/orders" class="btn-primary" style="display: inline-block; width: auto; margin-top: 1rem; text-decoration: none;">Quay lại danh sách đơn</a>
                 </div>
@@ -267,7 +267,7 @@ async function loadOrderDetail() {
         }
     } catch (err) {
         container.innerHTML = `
-            <div class="card" style="padding: 2rem; text-align: center; color: #f87171;">
+            <div class="card" style="padding: 2rem; text-align: center; color: var(--error, #b42318);">
                 <p>Lỗi kết nối máy chủ. Vui lòng thử lại sau.</p>
                 <a href="${API_BASE}/orders" class="btn-primary" style="display: inline-block; width: auto; margin-top: 1rem; text-decoration: none;">Quay lại danh sách</a>
             </div>
@@ -506,11 +506,11 @@ function showCancelModal(orderId, apiBase, onCancelled) {
                         <input type="text" id="otherReasonInput" placeholder="Nhập lý do cụ thể..." maxlength="200" style="padding: 0.6rem 0.8rem; font-size: 0.9rem;" />
                     </div>
                 </div>
-                <div id="cancelErrorMsg" style="display: none; color: #f87171; font-size: 0.85rem;"></div>
+                <div id="cancelErrorMsg" style="display: none; color: var(--error, #b42318); font-size: 0.85rem;"></div>
             </div>
             <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 0.75rem;">
                 <button type="button" class="btn-cancel-modal-close" style="padding: 0.6rem 1.2rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card-alt); color: var(--text); font-weight: 600; cursor: pointer;">Không, giữ đơn</button>
-                <button type="button" id="btnConfirmCancel" style="padding: 0.6rem 1.25rem; border-radius: 8px; border: 0; background: #ef4444; color: #fff; font-weight: 700; cursor: pointer; transition: background 0.15s ease;">Xác nhận hủy đơn</button>
+                <button type="button" id="btnConfirmCancel" style="padding: 0.6rem 1.25rem; border-radius: 8px; border: 0; background: var(--error, #b42318); color: #fff; font-weight: 700; cursor: pointer; transition: background 0.15s ease;">Xác nhận hủy đơn</button>
             </div>
         </div>
     `;
