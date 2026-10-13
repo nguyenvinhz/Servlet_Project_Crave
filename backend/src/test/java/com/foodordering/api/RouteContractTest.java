@@ -1,6 +1,6 @@
 package com.foodordering.api;
 
-import com.foodordering.servlet.AccountPageServlet;
+import com.foodordering.servlet.page.AccountPageServlet;
 import jakarta.servlet.annotation.WebServlet;
 import org.junit.jupiter.api.Test;
 
@@ -33,8 +33,8 @@ class RouteContractTest {
 
     @Test
     void cartAndPromotionRoutesAreRegistered() {
-        assertEquals(Set.of("/cart", "/cart/"), patterns(com.foodordering.servlet.CartPageServlet.class));
-        assertEquals(Set.of("/promotions", "/promotions/"), patterns(com.foodordering.servlet.PromotionPageServlet.class));
+        assertEquals(Set.of("/cart", "/cart/"), patterns(com.foodordering.servlet.page.CartPageServlet.class));
+        assertEquals(Set.of("/promotions", "/promotions/"), patterns(com.foodordering.servlet.page.PromotionPageServlet.class));
         assertEquals(Set.of("/api/cart", "/api/cart/*"), patterns(CartApiServlet.class));
         assertEquals(Set.of("/api/promotions", "/api/promotions/*"), patterns(PromotionApiServlet.class));
     }

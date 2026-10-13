@@ -6,6 +6,38 @@ HikariCP và MySQL.
 Tài liệu được chia thành API, kế hoạch/quy ước làm việc và báo cáo theo chức năng.
 Xem [mục lục tài liệu](docs/README.md) để tìm đúng phần cần đọc.
 
+## Cấu trúc project
+
+```text
+backend/
+  pom.xml                Build ứng dụng WAR
+  src/main/java/         Java: API, servlet/page, service, repository, entity...
+  src/main/resources/    Cấu hình persistence và logging
+  src/test/java/         Kiểm thử Java
+  src/dev/java/          Launcher và công cụ cục bộ (profile dev)
+frontend/
+  WEB-INF/views/         JSP và các thành phần dùng chung
+  WEB-INF/web.xml        Cấu hình web
+  assets/                CSS, JavaScript, hình ảnh
+  index.jsp              Trang vào ứng dụng
+database/                Schema, dữ liệu mẫu và migrations
+scripts/
+  dev/                   Chạy ứng dụng, chọn JDK, tạo tài khoản quản trị
+  deploy-ec2.sh           Triển khai WAR lên EC2
+tests/
+  frontend/              Kiểm thử trình duyệt
+  runtime/               Kiểm thử HTTP trên ứng dụng thật
+  scripts/               Kiểm thử deploy và rollback
+docs/                    API, kiến trúc, preview, kế hoạch và báo cáo
+```
+
+Servlet hiển thị JSP nằm trong `com.foodordering.servlet.page`; API JSON nằm
+trong `api/`, cùng các servlet đơn hàng/thanh toán trong `servlet/`.
+Trang giỏ hàng và khuyến mãi nằm trong `WEB-INF/views/cart/` và
+`WEB-INF/views/promotions/`, được servlet phục vụ tại `/cart` và `/promotions`.
+Báo cáo nằm trong `docs/reports/<chức-năng>/` với ngày trong tên file.
+Kiểm thử và preview nằm ngoài `frontend/` để không đóng gói vào WAR.
+
 ## CI/CD trên AWS EC2
 
 Pull request vào `main` chạy kiểm thử và build WAR. Push/merge `main` chạy CI rồi
@@ -151,6 +183,12 @@ node tests/frontend/admin-orders-dashboard-browser-smoke.cjs
 ```
 
 Nếu browser chưa được tìm thấy tự động, đặt `CHROME_PATH` tới file thực thi Chrome/Edge.
+
+Kiểm thử script deploy và rollback bằng fixture độc lập (Bash, Python 3 và các công cụ GNU):
+
+```bash
+bash tests/scripts/deploy-ec2-test.sh
+```
 
 Kiểm thử HTTP trên WAR/Tomcat/MySQL thật (chạy với database test riêng đã seed,
 công cụ sẽ tạo dữ liệu thử cho tài khoản, món ăn, khuyến mãi và đơn hàng):

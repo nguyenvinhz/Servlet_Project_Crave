@@ -3,7 +3,7 @@
 set -Eeuo pipefail
 
 script_directory=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
-deploy_script=$(realpath -- "$script_directory/../deploy-ec2.sh")
+deploy_script=$(realpath -- "$script_directory/../../scripts/deploy-ec2.sh")
 for dependency in bash python3 cmp mktemp install sha256sum unzip; do
   command -v "$dependency" >/dev/null || { printf 'Missing test dependency: %s\n' "$dependency" >&2; exit 1; }
 done

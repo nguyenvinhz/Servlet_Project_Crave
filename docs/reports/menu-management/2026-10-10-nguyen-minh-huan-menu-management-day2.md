@@ -104,7 +104,7 @@ Hoàn thiện toàn diện chức năng vertical slice Menu và Quản lý món 
 - `backend/src/main/java/com/foodordering/exception/ForbiddenException.java`
 - `backend/src/main/java/com/foodordering/exception/ValidationException.java`
 - `backend/src/main/java/com/foodordering/service/MenuService.java`
-- `backend/src/main/java/com/foodordering/servlet/MenuPageServlet.java`
+- `backend/src/main/java/com/foodordering/servlet/page/MenuPageServlet.java`
 - `backend/src/main/java/com/foodordering/validator/MenuValidator.java`
 - `backend/src/test/java/com/foodordering/api/AdminMenuApiServletTest.java`
 - `backend/src/test/java/com/foodordering/api/MenuRouteContractTest.java`
@@ -116,7 +116,7 @@ Hoàn thiện toàn diện chức năng vertical slice Menu và Quản lý món 
 - `frontend/WEB-INF/views/menu/index.jsp`
 - `frontend/assets/css/styles.css`
 - `frontend/assets/js/menu-admin.js`
-- `docs/reports/2026-10-10/02-nguyen-minh-huan-menu-management-day2.md`
+- `docs/reports/menu-management/2026-10-10-nguyen-minh-huan-menu-management-day2.md`
 
 ## Cách kiểm tra
 

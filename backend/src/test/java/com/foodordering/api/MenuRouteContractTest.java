@@ -1,6 +1,6 @@
 package com.foodordering.api;
 
-import com.foodordering.servlet.MenuPageServlet;
+import com.foodordering.servlet.page.MenuPageServlet;
 import jakarta.servlet.annotation.WebServlet;
 import org.junit.jupiter.api.Test;
 

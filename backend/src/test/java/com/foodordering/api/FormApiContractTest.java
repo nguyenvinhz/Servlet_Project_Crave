@@ -6,7 +6,7 @@ import com.foodordering.dto.ProfileResponse;
 import com.foodordering.dto.ProfileUpdateRequest;
 import com.foodordering.enums.AccountType;
 import com.foodordering.service.AccountService;
-import com.foodordering.servlet.AccountPageServlet;
+import com.foodordering.servlet.page.AccountPageServlet;
 import jakarta.servlet.RequestDispatcher;
 import jakarta.servlet.ServletConfig;
 import jakarta.servlet.ServletContext;

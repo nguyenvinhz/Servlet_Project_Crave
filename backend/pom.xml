@@ -112,7 +112,6 @@
                 <version>3.4.0</version>
                 <configuration>
                     <warSourceDirectory>${project.basedir}/../frontend</warSourceDirectory>
-                    <warSourceExcludes>tests/**,preview-*.html</warSourceExcludes>
                     <failOnMissingWebXml>false</failOnMissingWebXml>
                 </configuration>
             </plugin>

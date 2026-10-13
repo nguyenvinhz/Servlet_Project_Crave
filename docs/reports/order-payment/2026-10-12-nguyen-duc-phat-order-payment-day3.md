@@ -119,7 +119,7 @@ Hoàn thành toàn diện các nhiệm vụ Ngày 3 theo bản phân công nghi�
 - `frontend/assets/js/orders.js`
 - `frontend/assets/js/order-detail.js`
 - `frontend/assets/js/admin-orders.js`
-- `docs/reports/2026-10-12/01-nguyen-duc-phat-order-payment-day3.md`
+- `docs/reports/order-payment/2026-10-12-nguyen-duc-phat-order-payment-day3.md`
 - `docs/reports/README.md`
 
 ---

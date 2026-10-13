@@ -1,4 +1,4 @@
-package com.foodordering.servlet;
+package com.foodordering.servlet.page;
 
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
@@ -8,13 +8,13 @@ import jakarta.servlet.http.HttpServletResponse;
 
 import java.io.IOException;
 
-@WebServlet(name = "cartPageServlet", urlPatterns = {"/cart", "/cart/"})
-public class CartPageServlet extends HttpServlet {
+@WebServlet(name = "promotionPageServlet", urlPatterns = {"/promotions", "/promotions/"})
+public class PromotionPageServlet extends HttpServlet {
 
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        request.setAttribute("pageTitle", "Giỏ hàng của bạn");
-        request.getRequestDispatcher("/WEB-INF/views/cart/index.jsp").forward(request, response);
+        request.setAttribute("pageTitle", "Ưu đãi & Khuyến mãi");
+        request.getRequestDispatcher("/WEB-INF/views/promotions/index.jsp").forward(request, response);
     }
 }

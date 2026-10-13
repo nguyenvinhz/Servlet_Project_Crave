@@ -94,7 +94,7 @@ jobs:
           node --check tests/runtime/http-smoke.cjs
 
       - name: Verify deployment and rollback script
-        run: bash scripts/tests/deploy-ec2-test.sh
+        run: bash tests/scripts/deploy-ec2-test.sh
 
       - name: Run browser smoke tests
         run: |
