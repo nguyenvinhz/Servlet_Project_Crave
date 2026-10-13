@@ -344,14 +344,22 @@ a:hover {
 }
 
 .search-input-field input {
-    border: 0;
-    outline: none;
+    border: 0 !important;
+    outline: none !important;
+    box-shadow: none !important;
     padding: 0.5rem 0;
     font-size: 0.95rem;
     width: 100%;
     background: transparent;
     color: var(--ink);
     font-family: inherit;
+}
+
+.search-input-field input:focus,
+.search-input-field input:focus-visible {
+    border: 0 !important;
+    outline: none !important;
+    box-shadow: none !important;
 }
 
 .search-input-field input::placeholder {
@@ -1331,6 +1339,17 @@ label {
     font-family: inherit;
 }
 
+.filter-group select {
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%234a4036' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+    padding-right: 36px;
+    cursor: pointer;
+}
+
 .link-btn {
     background: transparent;
     border: 0;
@@ -2113,8 +2132,9 @@ label {
 .crave-body .hero-heading { color: #202a36; font-family: 'Nunito', sans-serif; }
 .crave-body .hero-subtext { color: #667486; }
 .crave-body .hero-search-pill { background: #2d211b; border-radius: 18px; box-shadow: none; max-width: 100%; }
-.crave-body .search-input-field { min-width: 0; }
-.crave-body .search-input-field input { color: #fffaf6; min-width: 0; }
+.crave-body .search-input-field input { color: #fffaf6; min-width: 0; border: 0 !important; outline: none !important; box-shadow: none !important; }
+.crave-body .search-input-field input:focus,
+.crave-body .search-input-field input:focus-visible { border: 0 !important; outline: none !important; box-shadow: none !important; }
 .crave-body .search-input-field input::placeholder { color: #d2c5bc; }
 .crave-body .hero-photo-wrapper { aspect-ratio: 1.18; border: 0; box-shadow: none; }
 .crave-body .craving-tile {
@@ -2338,9 +2358,9 @@ label {
 .crave-body .product-media-badges { flex-wrap: wrap; gap: 8px; }
 .crave-body .button.outline, .crave-body .address-action { background: var(--surface); color: var(--ink); }
 .crave-body .site-footer { background: #202b3a; color: #c6ccd5; }
-.crave-body .footer-copy { color: #b3bdc9; }
 .crave-body .button.primary:hover, .crave-body .hero-order-btn:hover { background: #dd491e; color: #fff; }
-.crave-body :focus-visible { outline: 3px solid var(--accent); outline-offset: 4px; }
+.crave-body :focus,
+.crave-body :focus-visible { outline: none !important; }
 .crave-body button:disabled { cursor: not-allowed; opacity: .65; }
 .skip-link { display: none !important; }
 .search-results-label { color: var(--muted); }

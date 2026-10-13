@@ -204,7 +204,7 @@ async function loadOrderDetail() {
                         <div style="font-weight: 700; font-size: 1rem;">${item.quantity}x ${escapeHtml(item.foodName || item.foodNameSnapshot)}</div>
                         ${item.options && item.options.length > 0 ? `
                             <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.2rem;">
-                                ${item.options.map(opt => `+ ${escapeHtml(opt.optionName)} (${Number(opt.extraPrice).toLocaleString('vi-VN')} đ)`).join(', ')}
+                                ${item.options.map(opt => `+ ${escapeHtml(opt.optionName)} (${Number(opt.extraPrice).toLocaleString('vi-VN')}\u00A0đ)`).join(', ')}
                             </div>
                         ` : ''}
                         ${item.note ? `<div style="font-size: 0.85rem; color: var(--accent); font-style: italic; margin-top: 0.2rem;">Ghi chú: ${escapeHtml(item.note)}</div>` : ''}
@@ -214,7 +214,7 @@ async function loadOrderDetail() {
                     right.style.fontWeight = '700';
                     right.style.fontSize = '1rem';
                     const lineTotal = Number(item.lineTotal) || (Number(item.unitPrice) * Number(item.quantity)) || 0;
-                    right.textContent = lineTotal.toLocaleString('vi-VN') + ' đ';
+                    right.textContent = lineTotal.toLocaleString('vi-VN') + '\u00A0đ';
                     
                     row.append(left, right);
                     itemCard.appendChild(row);
@@ -238,21 +238,21 @@ async function loadOrderDetail() {
                 <h3 style="margin-top: 0; margin-bottom: 1rem; font-size: 1.1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem;">🧾 Tổng kết thanh toán</h3>
                 <div style="display: flex; justify-content: space-between; padding: 0.35rem 0;">
                     <span style="color: var(--text-muted);">Tạm tính món ăn:</span>
-                    <span>${subtotal.toLocaleString('vi-VN')} đ</span>
+                    <span>${subtotal.toLocaleString('vi-VN')}\u00A0đ</span>
                 </div>
                 <div style="display: flex; justify-content: space-between; padding: 0.35rem 0;">
                     <span style="color: var(--text-muted);">Phí vận chuyển:</span>
-                    <span>${deliveryFee.toLocaleString('vi-VN')} đ</span>
+                    <span>${deliveryFee.toLocaleString('vi-VN')}\u00A0đ</span>
                 </div>
                 ${discount > 0 ? `
                     <div style="display: flex; justify-content: space-between; padding: 0.35rem 0; color: #4ade80;">
                         <span>Mã khuyến mãi:</span>
-                        <span>-${discount.toLocaleString('vi-VN')} đ</span>
+                        <span>-${discount.toLocaleString('vi-VN')}\u00A0đ</span>
                     </div>
                 ` : ''}
                 <div style="display: flex; justify-content: space-between; padding-top: 1rem; margin-top: 0.5rem; border-top: 1px solid var(--border); font-size: 1.25rem; font-weight: 800; color: var(--accent);">
                     <span>Tổng cộng:</span>
-                    <span>${total.toLocaleString('vi-VN')} đ</span>
+                    <span>${total.toLocaleString('vi-VN')}\u00A0đ</span>
                 </div>
             `;
             container.appendChild(summaryCard);

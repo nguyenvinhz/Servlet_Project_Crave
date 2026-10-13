@@ -62,7 +62,7 @@ async function loadOrders() {
                 
                 const priceDiv = document.createElement('div');
                 priceDiv.className = 'price';
-                priceDiv.textContent = (Number(o.totalAmount) || 0).toLocaleString('vi-VN') + ' đ';
+                priceDiv.textContent = (Number(o.totalAmount) || 0).toLocaleString('vi-VN') + '\u00A0đ';
                 
                 const badge = document.createElement('span');
                 badge.className = 'order-status-badge ' + getBadgeClass(o.status);

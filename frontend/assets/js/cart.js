@@ -718,7 +718,7 @@
 
     function formatPrice(amount) {
         const num = parseFloat(amount || 0);
-        return new Intl.NumberFormat('vi-VN').format(num) + ' đ';
+        return new Intl.NumberFormat('vi-VN').format(num) + '\u00A0đ';
     }
 
     function formatOptionsText(options) {

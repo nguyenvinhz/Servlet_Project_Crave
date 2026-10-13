@@ -83,9 +83,8 @@
                     <option value="UNAVAILABLE" ${currentStatus == 'UNAVAILABLE' ? 'selected' : ''}>Tạm hết món</option>
                 </select>
             </div>
-            <button type="submit" class="button outline">Lọc dữ liệu</button>
             <c:if test="${not empty keyword or not empty currentCategoryId or not empty currentStatus}">
-                <a href="<c:url value='/admin/menu'/>" class="button link-btn">Đặt lại</a>
+                <a href="<c:url value='/admin/menu'/>" class="button link-btn" title="Xóa bộ lọc">✕ Đặt lại</a>
             </c:if>
         </form>
     </section>

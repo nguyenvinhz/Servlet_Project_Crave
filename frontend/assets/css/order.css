@@ -82,7 +82,8 @@
 .order-page textarea:focus,
 .order-page select:focus {
     border-color: var(--border-focus);
-    outline: 3px solid rgba(239, 91, 53, 0.2);
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(239, 91, 53, 0.2);
 }
 
 .order-page label {
