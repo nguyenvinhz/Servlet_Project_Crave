@@ -213,14 +213,18 @@ document.addEventListener("DOMContentLoaded", () => {
         link.href = `${url.pathname}${url.search}`;
     });
     function accountDestination(user) {
-        if (user?.accountType !== "EMPLOYEE") return localUrl("/customer/profile");
-        return localUrl({ADMIN: "/admin", MENU_MANAGER: "/admin/menu", ORDER_STAFF: "/admin/orders", PROMOTION_MANAGER: "/admin/promotions", HR_MANAGER: "/admin/employees"}[user.role] || "/customer/profile");
+        if (user?.accountType !== "EMPLOYEE") return localUrl("/menu");
+        return localUrl({ADMIN: "/admin", MENU_MANAGER: "/admin/menu", ORDER_STAFF: "/admin/orders", PROMOTION_MANAGER: "/admin/promotions", HR_MANAGER: "/admin/employees"}[user.role] || "/menu");
     }
 
     function compatibleReturnTo(value, user) {
         if (!value) return null;
         const route = new URL(value, window.location.origin).pathname.substring(contextPath.length);
-        if (user?.accountType !== "EMPLOYEE") return /^\/admin(?:[;/]|$)/.test(route) ? null : value;
+        if (user?.accountType !== "EMPLOYEE") {
+            if (/^\/admin(?:[;/]|$)/.test(route)) return null;
+            if (/^\/customer\/profile(?:[;/]|$)/.test(route)) return localUrl("/menu");
+            return value;
+        }
         if (/^\/(?:cart|checkout|orders|customer\/addresses)(?:[;/]|$)/.test(route)) return null;
         if (!/^\/admin(?:[;/]|$)/.test(route) || user.role === "ADMIN") return value;
         const allowed = {MENU_MANAGER: /^\/admin\/(?:menu|categories)(?:[;/]|$)/, ORDER_STAFF: /^\/admin\/orders(?:[;/]|$)/, PROMOTION_MANAGER: /^\/admin\/promotions(?:[;/]|$)/, HR_MANAGER: /^\/admin\/(?:customers|employees)(?:[;/]|$)/};

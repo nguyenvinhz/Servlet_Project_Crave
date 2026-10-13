@@ -515,6 +515,15 @@ a:hover {
     border-bottom: 1px solid var(--line);
     padding-bottom: 0.75rem;
     overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.catalog-tabs-bar::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
 }
 
 .catalog-tab-link {
@@ -541,7 +550,7 @@ a:hover {
 .catalog-tab-link.active::after {
     content: '';
     position: absolute;
-    bottom: -0.85rem;
+    bottom: 0;
     left: 0;
     right: 0;
     height: 2px;
@@ -2180,8 +2189,19 @@ label {
 .craving-tile:hover .category-art:has(.category-carousel-img)::after {
     opacity: 0.25;
 }
-.crave-body .catalog-main-title { font-size: clamp(1.8rem, 3.5vw, 2.8rem); }
-.crave-body .catalog-tabs-bar { border: 0; gap: 1.25rem; }
+.crave-body .catalog-tabs-bar {
+    border: 0;
+    gap: 1.25rem;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+.crave-body .catalog-tabs-bar::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+}
 .crave-body .catalog-tab-link { color: var(--muted); }
 .crave-body .catalog-tab-link.active { color: var(--accent); }
 .crave-body .clean-food-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 20px; }
