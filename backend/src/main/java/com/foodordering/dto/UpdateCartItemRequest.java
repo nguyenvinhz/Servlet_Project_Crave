@@ -1,9 +1,13 @@
 package com.foodordering.dto;
 
+import java.util.List;
+
 public class UpdateCartItemRequest {
     private String cartItemId;
     private int quantity;
     private String note;
+    // null preserves current options; an empty list removes all options.
+    private List<String> optionIds;
 
     public UpdateCartItemRequest() {
     }
@@ -36,5 +40,13 @@ public class UpdateCartItemRequest {
 
     public void setNote(String note) {
         this.note = note;
+    }
+
+    public List<String> getOptionIds() {
+        return optionIds;
+    }
+
+    public void setOptionIds(List<String> optionIds) {
+        this.optionIds = optionIds;
     }
 }

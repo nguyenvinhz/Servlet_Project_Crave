@@ -60,6 +60,14 @@ public class CartValidator {
         if (request.getNote() != null && request.getNote().length() > 255) {
             throw new BadRequestException(ErrorCode.BAD_REQUEST, "Ghi chú món không được vượt quá 255 ký tự");
         }
+        validateOptionIds(request.getOptionIds());
+    }
+
+    private static void validateOptionIds(java.util.List<String> optionIds) {
+        if (optionIds != null && (optionIds.stream().anyMatch(id -> id == null || id.isBlank())
+                || new HashSet<>(optionIds).size() != optionIds.size())) {
+            throw new BadRequestException(ErrorCode.INVALID_OPTION, "Tùy chọn món không được để trống hoặc trùng lặp");
+        }
     }
 
     public static void validateCartItemId(String cartItemId) {

@@ -38,6 +38,10 @@ jobs:
       EMAIL_SMTP_USERNAME: ${{ vars.EMAIL_SMTP_USERNAME || 'craveshopvn@gmail.com' }}
       EMAIL_FROM: ${{ vars.EMAIL_FROM || 'craveshopvn@gmail.com' }}
       EMAIL_SMTP_STARTTLS: 'true'
+      CRAVE_STORE_ADDRESS: ${{ vars.CRAVE_STORE_ADDRESS }}
+      CRAVE_STORE_LATITUDE: ${{ vars.CRAVE_STORE_LATITUDE }}
+      CRAVE_STORE_LONGITUDE: ${{ vars.CRAVE_STORE_LONGITUDE }}
+      CRAVE_GEOCODER_URL: ${{ vars.CRAVE_GEOCODER_URL }}
 
     steps:
       - name: Kiểm tra runner production

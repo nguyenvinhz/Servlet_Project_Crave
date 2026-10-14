@@ -41,6 +41,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.math.BigDecimal;
@@ -72,7 +73,8 @@ class CartCheckoutIntegrationTest {
     private final CartService carts = new CartService();
     private final PromotionService promotions = new PromotionService();
     private final CustomerOrderService orders = new CustomerOrderServiceImpl(
-            new CustomerOrderRepositoryImpl(), new PaymentRepositoryImpl());
+            new CustomerOrderRepositoryImpl(), new PaymentRepositoryImpl(), null,
+            new DeliveryFeeService(new DeliveryFeeService.Store("Fixture store", 10.89, 106.76)));
     private ProfileResponse owner;
 
     @BeforeAll
@@ -144,8 +146,8 @@ class CartCheckoutIntegrationTest {
         assertEquals(OrderStatus.PENDING_CONFIRMATION, order.getStatus());
         assertMoney("150000", order.getSubtotal());
         assertMoney("20000", order.getDiscountAmount());
-        String expectedFee = fulfillment == FulfillmentType.DELIVERY ? "15000" : "0";
-        String expectedTotal = fulfillment == FulfillmentType.DELIVERY ? "145000" : "130000";
+        String expectedFee = fulfillment == FulfillmentType.DELIVERY ? "4000" : "0";
+        String expectedTotal = fulfillment == FulfillmentType.DELIVERY ? "134000" : "130000";
         assertMoney(expectedFee, order.getDeliveryFee());
         assertMoney(expectedTotal, order.getTotalAmount());
         assertEquals(1, order.getItems().size());
@@ -181,6 +183,44 @@ class CartCheckoutIntegrationTest {
             assertMoney("150000", (BigDecimal) stored[2]);
             assertEquals(optionId, stored[3]);
             assertMoney("10000", (BigDecimal) stored[4]);
+        }
+    }
+
+    @Test
+    void freeDeliveryUsesPersistedFoodSubtotalBeforeVoucherAndMatchesPayment() {
+        CartDto cart = addCart();
+        carts.updateItem(owner.id(), new com.foodordering.dto.UpdateCartItemRequest(cart.getItems().get(0).getCartItemId(), 4, null));
+        OrderResponse order = orders.createOrder(owner.id(), checkout(FulfillmentType.DELIVERY));
+        assertMoney("200000", order.getSubtotal());
+        assertMoney("20000", order.getDiscountAmount());
+        assertMoney("0", order.getDeliveryFee());
+        assertMoney("180000", order.getTotalAmount());
+        assertMoney("180000", order.getPayment().getAmount());
+        assertTrue(carts.getOrCreateCart(owner.id()).getItems().isEmpty());
+    }
+
+    @ParameterizedTest
+    @CsvSource({"10.94,106.76,8399", "10.96,106.76,14351", "10.8905,106.76,0"})
+    void checkoutUsesAndPersistsChosenCoordinatesInsteadOfResolvingTextAgain(double latitude, double longitude, String fee) {
+        addCart();
+        OrderRequest request = checkout(FulfillmentType.DELIVERY);
+        request.setDeliveryLatitude(latitude);
+        request.setDeliveryLongitude(longitude);
+        request.setDeliveryAddress(String.format(java.util.Locale.ROOT, "%.6f, %.6f", latitude, longitude));
+        OrderResponse order = orders.createOrder(owner.id(), request);
+        assertMoney(fee, order.getDeliveryFee());
+        assertMoney("150000", order.getSubtotal());
+        assertMoney("20000", order.getDiscountAmount());
+        assertEquals(0, money("130000").add(money(fee)).compareTo(order.getTotalAmount()));
+        assertEquals(latitude, order.getDeliveryLatitude());
+        assertEquals(longitude, order.getDeliveryLongitude());
+        assertEquals(order.getTotalAmount(), order.getPayment().getAmount());
+        try (EntityManager em = emf.createEntityManager()) {
+            CustomerOrder saved = em.find(CustomerOrder.class, order.getOrderId());
+            assertEquals(latitude, saved.getDeliveryLatitude());
+            assertEquals(longitude, saved.getDeliveryLongitude());
+            assertEquals(request.getDeliveryAddress(), saved.getDeliveryAddress());
+            assertMoney(fee, saved.getDeliveryFee());
         }
     }
 
@@ -437,6 +477,11 @@ class CartCheckoutIntegrationTest {
         request.setReceiverName(fixtureName);
         request.setReceiverPhone(owner.phone());
         request.setDeliveryAddress(fulfillment == FulfillmentType.DELIVERY ? "Checkout fixture address" : null);
+        if (fulfillment == FulfillmentType.DELIVERY) {
+            // About 2.22 km from the fixed fixture origin: the 1–3 km band.
+            request.setDeliveryLatitude(10.91);
+            request.setDeliveryLongitude(106.76);
+        }
         request.setPaymentMethod(PaymentMethod.CASH);
         request.setPromotionId(promotionId);
         return request;

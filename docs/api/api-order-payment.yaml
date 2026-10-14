@@ -9,6 +9,105 @@ servers:
   - url: /crave/api
 
 paths:
+  /delivery/search:
+    post:
+      summary: Tìm gợi ý từ tên đường, địa điểm, địa chỉ hoặc tọa độ
+      description: Trả danh sách vị trí để khách chọn. Kết quả approximate cần kiểm tra và xác nhận ghim; tọa độ thập phân được nhận trực tiếp mà không gọi dịch vụ tìm địa chỉ.
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [address]
+              properties:
+                address: { type: string, minLength: 3, maxLength: 255 }
+      responses:
+        '200':
+          description: data là danh sách {latitude, longitude, label, approximate}; nhiều kết quả không tự chọn kết quả đầu tiên
+        '400':
+          description: Không tìm được gợi ý hoặc tọa độ nhập không hợp lệ
+        '401':
+          description: Chưa đăng nhập khách hàng
+  /delivery/reverse:
+    post:
+      summary: Tìm mô tả địa chỉ gần ghim đã chọn
+      description: Giữ nguyên latitude và longitude đầu vào. Khi không tìm được địa chỉ hoặc nhà cung cấp lỗi, label là tọa độ và khách vẫn có thể đặt hàng.
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [latitude, longitude]
+              properties:
+                latitude: { type: number, minimum: -90, maximum: 90 }
+                longitude: { type: number, minimum: -180, maximum: 180 }
+      responses:
+        '200':
+          description: latitude, longitude, label, approximate trong data; địa chỉ chỉ mô tả gần điểm ghim, không thay thế tọa độ chính xác
+        '400':
+          description: Tọa độ không hợp lệ
+        '401':
+          description: Chưa đăng nhập khách hàng
+  /delivery/policy:
+    get:
+      summary: Thông tin cửa hàng phục vụ chọn điểm nhận
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: store và configured trong data; không gửi bảng phí hoặc cách tính cho khách hàng
+        '401':
+          description: Chưa đăng nhập tài khoản khách hàng
+  /delivery/resolve:
+    post:
+      summary: Xác định vị trí từ địa chỉ nhận hàng
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [address]
+              properties:
+                address: { type: string, minLength: 3, maxLength: 255 }
+      responses:
+        '200':
+          description: latitude, longitude, label, approximate trong data; vị trí gợi ý, khách có thể kéo ghim và xác nhận điểm khác. approximate=true cần xác nhận trước khi tính phí.
+        '400':
+          description: Không xác định được vị trí; hướng dẫn ghim thủ công
+        '401':
+          description: Chưa đăng nhập
+  /delivery/quote:
+    post:
+      summary: Tính phí từ điểm nhận hàng và giỏ của khách đang đăng nhập
+      description: Miễn phí khi tiền món trước giảm giá lớn hơn 150000; không áp dụng cho khu vực ngoài phạm vi giao hàng.
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [latitude, longitude]
+              properties:
+                latitude: { type: number, minimum: -90, maximum: 90 }
+                longitude: { type: number, minimum: -180, maximum: 180 }
+      responses:
+        '200':
+          description: deliveryFee, deliverable, message trong data; khu vực không hỗ trợ trả deliverable=false và deliveryFee=null
+        '400':
+          description: DELIVERY_LOCATION_REQUIRED hoặc DELIVERY_NOT_CONFIGURED
+        '401':
+          description: Chưa đăng nhập tài khoản khách hàng
   /orders:
     post:
       summary: Tạo đơn hàng mới từ giỏ hàng hiện tại (Checkout)
@@ -18,6 +117,8 @@ paths:
         tại thời điểm tạo đơn. Client chỉ gửi promotionId, không gửi tổng tiền hoặc
         số tiền giảm. Giỏ được xóa sau khi tạo đơn thành công; request lặp trên giỏ
         đã checkout trả CART_EMPTY và không tạo thêm đơn.
+        DELIVERY yêu cầu tọa độ điểm nhận; server tính lại phí theo bán kính và chặn
+        trên 10 km. PICKUP có phí 0 và xóa địa chỉ/tọa độ giao hàng.
       security:
         - sessionCookie: []
       requestBody:
@@ -38,6 +139,7 @@ paths:
             Dữ liệu không hợp lệ; CART_EMPTY, FOOD_NOT_AVAILABLE, INVALID_OPTION;
             PROMOTION_NOT_FOUND, PROMOTION_INACTIVE, PROMOTION_NOT_STARTED,
             PROMOTION_EXPIRED hoặc PROMOTION_MIN_ORDER_NOT_MET.
+            DELIVERY_LOCATION_REQUIRED, DELIVERY_NOT_CONFIGURED hoặc DELIVERY_OUT_OF_RANGE.
           content:
             application/json:
               schema:
@@ -203,6 +305,18 @@ components:
         deliveryAddress:
           type: string
           description: "Bắt buộc nếu fulfillmentType là DELIVERY"
+        deliveryLatitude:
+          type: number
+          nullable: true
+          minimum: -90
+          maximum: 90
+          description: "Vĩ độ điểm nhận khách xác nhận trên bản đồ; bắt buộc nếu DELIVERY. Server dùng trực tiếp và lưu vào đơn, không tra lại từ chuỗi địa chỉ."
+        deliveryLongitude:
+          type: number
+          nullable: true
+          minimum: -180
+          maximum: 180
+          description: "Kinh độ điểm nhận; bắt buộc nếu DELIVERY"
         customerNote:
           type: string
         promotionId:
@@ -292,6 +406,9 @@ components:
         receiverName: { type: string }
         receiverPhone: { type: string }
         deliveryAddress: { type: string }
+        deliveryLatitude: { type: number, nullable: true }
+        deliveryLongitude: { type: number, nullable: true }
+        deliveryDistanceKm: { type: number, nullable: true, description: "Khoảng cách theo bán kính lúc tạo đơn" }
         customerNote: { type: string }
         subtotal: { type: number }
         discountAmount: { type: number }

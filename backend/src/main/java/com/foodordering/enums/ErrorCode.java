@@ -17,6 +17,9 @@ public enum ErrorCode {
     INVALID_QUANTITY("INVALID_QUANTITY", "Số lượng món không hợp lệ (phải lớn hơn 0)"),
     FOOD_NOT_AVAILABLE("FOOD_NOT_AVAILABLE", "Món ăn tạm ngưng phục vụ hoặc không tồn tại"),
     INVALID_OPTION("INVALID_OPTION", "Tùy chọn món ăn không hợp lệ hoặc đã ngừng áp dụng"),
+    DELIVERY_LOCATION_REQUIRED("DELIVERY_LOCATION_REQUIRED", "Vui lòng chọn vị trí nhận hàng trên bản đồ"),
+    DELIVERY_OUT_OF_RANGE("DELIVERY_OUT_OF_RANGE", "Khu vực này hiện chưa được hỗ trợ giao hàng"),
+    DELIVERY_NOT_CONFIGURED("DELIVERY_NOT_CONFIGURED", "Cửa hàng chưa thiết lập vị trí giao hàng"),
 
     // Domain Promotion
     PROMOTION_NOT_FOUND("PROMOTION_NOT_FOUND", "Mã khuyến mãi không tồn tại"),

@@ -27,7 +27,7 @@ unzip -tq "$artifact" >/dev/null || fail 'The WAR artifact is not a valid ZIP ar
 script_file=$(realpath -e -- "${BASH_SOURCE[0]}")
 source_root=$(dirname -- "$(dirname -- "$script_file")")
 migration_files=()
-for migration_name in 2026-10-13-payos-payment.sql 2026-10-13-email-verification.sql; do
+for migration_name in 2026-10-13-payos-payment.sql 2026-10-13-email-verification.sql 2026-10-15-delivery-location.sql; do
   migration_input=$source_root/database/migrations/$migration_name
   [[ -f $migration_input && -s $migration_input && ! -L $migration_input ]] || fail 'A release migration is missing or invalid.'
   migration_file=$(realpath -e -- "$migration_input")
@@ -234,6 +234,31 @@ for name in ("EMAIL_SMTP_USERNAME", "EMAIL_FROM"):
 if len(environment["EMAIL_OTP_SECRET"]) < 32 or any(char.isspace() for char in environment["EMAIL_OTP_SECRET"]):
     fail("EMAIL_OTP_SECRET must contain at least 32 non-whitespace characters.")
 
+if bool(os.environ.get("CRAVE_STORE_LATITUDE", "").strip()) != bool(os.environ.get("CRAVE_STORE_LONGITUDE", "").strip()):
+    fail("Store latitude and longitude must be configured together.")
+for name in ("CRAVE_STORE_ADDRESS", "CRAVE_STORE_LATITUDE", "CRAVE_STORE_LONGITUDE", "CRAVE_GEOCODER_URL"):
+    value = os.environ.get(name, "").strip()
+    if value:
+        if name == "CRAVE_STORE_ADDRESS":
+            if len(value) > 255 or any(ord(char) < 32 for char in value):
+                fail("CRAVE_STORE_ADDRESS is invalid.")
+        elif name == "CRAVE_GEOCODER_URL":
+            try:
+                endpoint = urlsplit(value)
+                if endpoint.scheme not in ("http", "https") or not endpoint.hostname or endpoint.username is not None or endpoint.password is not None or endpoint.fragment:
+                    fail("CRAVE_GEOCODER_URL is invalid.")
+            except ValueError:
+                fail("CRAVE_GEOCODER_URL is invalid.")
+        else:
+            try:
+                coordinate = float(value)
+                limit = 90 if name == "CRAVE_STORE_LATITUDE" else 180
+                if not -limit <= coordinate <= limit:
+                    fail("Store coordinates are invalid.")
+            except ValueError:
+                fail("Store coordinates must be numeric.")
+        environment[name] = value
+
 escaped = {name: value.replace("$", "$$") for name, value in environment.items()}
 try:
     with open(sys.argv[2], "w", encoding="utf-8") as output:
@@ -274,7 +299,7 @@ except (ValueError, KeyError, TypeError, AttributeError, OSError):
 
 # The old WAR keeps serving while this idempotent, additive migration runs.
 # The password is read inside the existing DB container, not passed in argv or runner logs.
-log 'Applying additive payment and email-verification migrations to the existing database service.'
+log 'Applying additive payment, email-verification, and delivery-location migrations to the existing database service.'
 migration_status=0
 cat -- "${migration_files[@]}" | "${base_compose[@]}" exec -T "$db_service" sh -c \
   'test -n "${MYSQL_ROOT_PASSWORD:-}" || { printf "%s\n" "Database migration credentials are unavailable." >&2; exit 1; }; MYSQL_PWD="$MYSQL_ROOT_PASSWORD" exec mysql --user=root --default-character-set=utf8mb4 --database=crave' \

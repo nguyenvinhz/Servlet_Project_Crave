@@ -8,6 +8,8 @@ public class OrderRequest {
     private String receiverName;
     private String receiverPhone;
     private String deliveryAddress;
+    private Double deliveryLatitude;
+    private Double deliveryLongitude;
     private String customerNote;
     private String promotionId;
     private PaymentMethod paymentMethod;
@@ -22,6 +24,10 @@ public class OrderRequest {
     public void setReceiverPhone(String receiverPhone) { this.receiverPhone = receiverPhone; }
     public String getDeliveryAddress() { return deliveryAddress; }
     public void setDeliveryAddress(String deliveryAddress) { this.deliveryAddress = deliveryAddress; }
+    public Double getDeliveryLatitude() { return deliveryLatitude; }
+    public void setDeliveryLatitude(Double deliveryLatitude) { this.deliveryLatitude = deliveryLatitude; }
+    public Double getDeliveryLongitude() { return deliveryLongitude; }
+    public void setDeliveryLongitude(Double deliveryLongitude) { this.deliveryLongitude = deliveryLongitude; }
     public String getCustomerNote() { return customerNote; }
     public void setCustomerNote(String customerNote) { this.customerNote = customerNote; }
     public String getPromotionId() { return promotionId; }

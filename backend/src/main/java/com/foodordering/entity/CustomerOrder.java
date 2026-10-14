@@ -51,6 +51,22 @@ public class CustomerOrder {
     @Column(name = "delivery_address", length = 255)
     private String deliveryAddress;
 
+    @Column(name = "delivery_latitude")
+    private Double deliveryLatitude;
+
+    @Column(name = "delivery_longitude")
+    private Double deliveryLongitude;
+
+    @Column(name = "delivery_distance_km", precision = 8, scale = 3)
+    private BigDecimal deliveryDistanceKm;
+
+    public Double getDeliveryLatitude() { return deliveryLatitude; }
+    public void setDeliveryLatitude(Double value) { deliveryLatitude = value; }
+    public Double getDeliveryLongitude() { return deliveryLongitude; }
+    public void setDeliveryLongitude(Double value) { deliveryLongitude = value; }
+    public BigDecimal getDeliveryDistanceKm() { return deliveryDistanceKm; }
+    public void setDeliveryDistanceKm(BigDecimal value) { deliveryDistanceKm = value; }
+
     @Column(name = "customer_note", length = 255)
     private String customerNote;
 

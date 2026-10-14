@@ -11,7 +11,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Nunito:wght@600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="<c:url value='/assets/css/styles.css?v=20261013-palette2'/>">
     <c:if test="${not empty pageStyle}">
-        <link rel="stylesheet" href="<c:url value='/assets/css/${pageStyle}.css?v=20261013-auth1'/>">
+        <link rel="stylesheet" href="<c:url value='/assets/css/${pageStyle}.css?v=20261015-order1'/>">
     </c:if>
     <script>window.CONTEXT_PATH = '${pageContext.request.contextPath}';</script>
     <style>

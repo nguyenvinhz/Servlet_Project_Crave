@@ -125,8 +125,8 @@
 
                     <!-- Delivery Fee Row -->
                     <div class="summary-row">
-                        <span>Phí giao hàng dự kiến</span>
-                        <span id="summaryDeliveryFee" style="font-weight: 600; color: var(--crave-text);">15.000 đ</span>
+                        <span>Phí giao hàng</span>
+                        <span id="summaryDeliveryFee" style="font-weight: 600; color: var(--crave-text);">Tính khi thanh toán</span>
                     </div>
 
                     <!-- Discount Row (Shown when voucher applied) -->
@@ -139,11 +139,12 @@
 
                     <!-- Total Row (Matching Screenshot: "Total $12.82") -->
                     <div class="summary-total-row">
-                        <span class="summary-total-label">Tổng cộng</span>
+                        <span class="summary-total-label">Tiền món sau giảm</span>
                         <span class="summary-total-value" id="summaryTotal">0 đ</span>
                     </div>
 
                     <!-- Voucher / Promotion Area (Khu vực nhập voucher) -->
+                    <p class="cart-shipping-hint">Phí giao hàng được cập nhật sau khi chọn điểm nhận ở bước thanh toán.</p>
                     <div class="voucher-section">
                         <div class="voucher-section-title">
                             <span>Mã khuyến mãi</span>
@@ -201,6 +202,30 @@
     </div>
 </div>
 
-<script src="<c:url value='/assets/js/cart.js'/>"></script>
+<dialog id="cartItemEditor" class="cart-editor" aria-labelledby="cartEditorTitle">
+    <form id="cartItemEditorForm">
+        <div class="promo-modal-header">
+            <h3 id="cartEditorTitle" class="promo-modal-title">Chỉnh sửa món</h3>
+            <button type="button" id="cartEditorClose" class="promo-modal-close" aria-label="Đóng">&times;</button>
+        </div>
+        <p id="cartEditorStatus" role="status" aria-live="polite"></p>
+        <div id="cartEditorFields" hidden>
+            <div id="cartEditorOptions"></div>
+            <label class="cart-editor-field" for="cartEditorQuantity">Số lượng
+                <input id="cartEditorQuantity" type="number" min="1" max="100" step="1" required>
+            </label>
+            <label class="cart-editor-field" for="cartEditorNote">Ghi chú cho món
+                <textarea id="cartEditorNote" maxlength="255" rows="2" placeholder="Ví dụ: ít cay, không hành"></textarea>
+            </label>
+            <div class="summary-total-row"><span>Thành tiền</span><strong id="cartEditorTotal"></strong></div>
+        </div>
+        <div class="cart-editor-actions">
+            <button type="button" id="cartEditorCancel" class="voucher-apply-btn">Hủy</button>
+            <button type="submit" id="cartEditorSave" class="btn-checkout" disabled>Lưu thay đổi</button>
+        </div>
+    </form>
+</dialog>
+
+<script src="<c:url value='/assets/js/cart.js?v=20261015-order1'/>"></script>
 
 <%@ include file="/WEB-INF/views/components/footer.jspf" %>

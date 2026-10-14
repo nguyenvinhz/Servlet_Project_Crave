@@ -359,7 +359,22 @@ class CartApiServletTest {
         assertNotNull(cartService.lastUpdateReq);
         assertEquals("CTGH01", cartService.lastUpdateReq.getCartItemId());
         assertEquals(3, cartService.lastUpdateReq.getQuantity());
+        assertNull(cartService.lastUpdateReq.getOptionIds(), "Quantity-only updates must preserve options");
         verify(resp).setStatus(HttpServletResponse.SC_OK);
+    }
+
+    @Test
+    void updateRouteAcceptsNewAndEmptyOptionSelections() throws Exception {
+        for (String options : new String[]{"[\"TC01\",\"TC02\"]", "[]"}) {
+            HttpServletRequest req = mockRequest("/items/update", "KH01",
+                    "{\"cartItemId\":\"CTGH01\",\"quantity\":2,\"optionIds\":" + options + "}");
+            HttpServletResponse resp = mock(HttpServletResponse.class);
+            when(resp.getWriter()).thenReturn(new PrintWriter(new StringWriter()));
+            invokeServletMethod("doPost", req, resp);
+            assertEquals(options.equals("[]") ? java.util.List.of() : java.util.List.of("TC01", "TC02"),
+                    cartService.lastUpdateReq.getOptionIds());
+            verify(resp).setStatus(HttpServletResponse.SC_OK);
+        }
     }
 
     @Test

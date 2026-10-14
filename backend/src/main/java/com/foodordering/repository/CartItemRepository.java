@@ -7,6 +7,10 @@ import com.foodordering.entity.CartItemOption;
 import com.foodordering.entity.Food;
 import com.foodordering.entity.FoodOption;
 import com.foodordering.enums.FoodStatus;
+import com.foodordering.enums.ErrorCode;
+import com.foodordering.enums.OptionStatus;
+import com.foodordering.exception.BadRequestException;
+import com.foodordering.exception.ResourceNotFoundException;
 import com.foodordering.validator.OptionSelectionValidator;
 import com.foodordering.exception.ApiException;
 import com.foodordering.utils.IdGenerator;
@@ -86,7 +90,10 @@ public class CartItemRepository {
         EntityManager em = DatabaseConfig.getEntityManager();
         if (em == null) return null;
         try {
-            return em.find(CartItem.class, cartItemId);
+            // Service validation reads food/cart after this EntityManager closes.
+            return em.createQuery("SELECT ci FROM CartItem ci JOIN FETCH ci.food JOIN FETCH ci.cart WHERE ci.cartItemId = :id", CartItem.class)
+                    .setParameter("id", cartItemId)
+                    .getResultStream().findFirst().orElse(null);
         } catch (Exception e) {
             throw new RuntimeException("Lỗi JPA khi tìm cart item: " + e.getMessage(), e);
         } finally {
@@ -234,6 +241,54 @@ public class CartItemRepository {
         } catch (Exception e) {
             if (tx.isActive()) tx.rollback();
             throw new RuntimeException("Lỗi JPA khi cập nhật số lượng món: " + e.getMessage(), e);
+        } finally {
+            em.close();
+        }
+    }
+
+    /** Save the complete customization atomically, preserving unchanged option rows. */
+    public void updateItemWithOptions(String cartItemId, String cartId, int quantity, String note, List<String> optionIds) {
+        EntityManager em = DatabaseConfig.getEntityManager();
+        EntityTransaction tx = em.getTransaction();
+        try {
+            tx.begin();
+            // Checkout locks the cart first; use the same order to serialize option edits with checkout.
+            Cart ownerCart = em.find(Cart.class, cartId, jakarta.persistence.LockModeType.PESSIMISTIC_WRITE);
+            if (ownerCart == null) {
+                throw new ResourceNotFoundException(ErrorCode.CART_NOT_FOUND, "Không tìm thấy giỏ hàng của bạn");
+            }
+            CartItem item = em.find(CartItem.class, cartItemId, jakarta.persistence.LockModeType.PESSIMISTIC_WRITE);
+            if (item == null || !cartId.equals(item.getCartId())) {
+                throw new ResourceNotFoundException(ErrorCode.CART_ITEM_NOT_FOUND, "Món không tồn tại trong giỏ hàng của bạn");
+            }
+            if (item.getFood().getStatus() != FoodStatus.AVAILABLE) {
+                throw new BadRequestException(ErrorCode.FOOD_NOT_AVAILABLE, "Món ăn hiện không khả dụng hoặc đã ngừng phục vụ");
+            }
+            List<FoodOption> options = optionIds.isEmpty() ? Collections.emptyList()
+                    : em.createQuery("SELECT fo FROM FoodOption fo WHERE fo.food.id = :foodId AND fo.status = :status AND fo.id IN (:ids)", FoodOption.class)
+                    .setParameter("foodId", item.getFoodId()).setParameter("status", OptionStatus.ACTIVE)
+                    .setParameter("ids", optionIds).getResultList();
+            if (options.size() != optionIds.size()) {
+                throw new BadRequestException(ErrorCode.INVALID_OPTION, "Một số tùy chọn món không hợp lệ hoặc đã ngừng áp dụng");
+            }
+            OptionSelectionValidator.validate(options.stream().map(FoodOption::getOptionType).toList());
+            Set<String> selected = new HashSet<>(optionIds);
+            item.getItemOptions().removeIf(option -> !selected.contains(option.getOptionId()));
+            Set<String> existing = new HashSet<>();
+            item.getItemOptions().forEach(option -> existing.add(option.getOptionId()));
+            for (FoodOption option : options) {
+                if (!existing.contains(option.getId())) {
+                    CartItemOption added = new CartItemOption(item, option);
+                    item.getItemOptions().add(added);
+                    em.persist(added);
+                }
+            }
+            item.setQuantity(quantity);
+            if (note != null) item.setNote(note);
+            tx.commit();
+        } catch (RuntimeException e) {
+            if (tx.isActive()) tx.rollback();
+            throw e;
         } finally {
             em.close();
         }

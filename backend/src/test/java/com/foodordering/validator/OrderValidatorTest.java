@@ -24,6 +24,8 @@ class OrderValidatorTest {
         OrderValidator.validate(request);
 
         assertNull(request.getDeliveryAddress());
+        assertNull(request.getDeliveryLatitude());
+        assertNull(request.getDeliveryLongitude());
         assertEquals("Nguyễn Văn A", request.getReceiverName());
         assertEquals("0987654321", request.getReceiverPhone());
         assertEquals("Không cay", request.getCustomerNote());
@@ -71,6 +73,20 @@ class OrderValidatorTest {
         request.setReceiverName("Nguyễn Văn A");
         request.setReceiverPhone("0987654321");
         request.setDeliveryAddress("123 Nguyễn Huệ");
+        request.setDeliveryLatitude(10.8925871);
+        request.setDeliveryLongitude(106.7637161);
         return request;
+    }
+
+    @Test
+    void deliveryRequiresFiniteValidCoordinates() {
+        OrderRequest request = validRequest();
+        for (Double latitude : new Double[]{null, Double.NaN, Double.POSITIVE_INFINITY, 91.0}) {
+            request.setDeliveryLatitude(latitude);
+            assertThrows(BadRequestException.class, () -> OrderValidator.validate(request));
+        }
+        request.setDeliveryLatitude(10.89);
+        request.setDeliveryLongitude(-181.0);
+        assertThrows(BadRequestException.class, () -> OrderValidator.validate(request));
     }
 }

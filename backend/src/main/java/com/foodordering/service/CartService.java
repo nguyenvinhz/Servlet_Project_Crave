@@ -124,6 +124,16 @@ public class CartService {
 
         if (request.getQuantity() == 0) {
             cartItemRepository.deleteItem(item.getCartItemId());
+        } else if (request.getOptionIds() != null) {
+            if (!cartItemRepository.isFoodAvailable(item.getFoodId())) {
+                throw new BadRequestException(ErrorCode.FOOD_NOT_AVAILABLE, "Món ăn hiện không khả dụng hoặc đã ngừng phục vụ");
+            }
+            List<String> validOptions = cartItemRepository.getValidOptionIdsForFood(item.getFoodId(), request.getOptionIds());
+            if (validOptions.size() != request.getOptionIds().size()) {
+                throw new BadRequestException(ErrorCode.INVALID_OPTION, "Một số tùy chọn món không hợp lệ hoặc đã ngừng áp dụng");
+            }
+            cartItemRepository.updateItemWithOptions(item.getCartItemId(), cart.getCartId(), request.getQuantity(),
+                    request.getNote() == null ? null : request.getNote().trim(), request.getOptionIds());
         } else {
             cartItemRepository.updateQuantity(item.getCartItemId(), request.getQuantity());
             if (request.getNote() != null) {

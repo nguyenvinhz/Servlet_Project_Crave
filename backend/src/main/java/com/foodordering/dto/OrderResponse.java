@@ -14,6 +14,16 @@ public class OrderResponse {
     private String receiverName;
     private String receiverPhone;
     private String deliveryAddress;
+    private Double deliveryLatitude;
+    private Double deliveryLongitude;
+    private BigDecimal deliveryDistanceKm;
+
+    public Double getDeliveryLatitude() { return deliveryLatitude; }
+    public void setDeliveryLatitude(Double value) { deliveryLatitude = value; }
+    public Double getDeliveryLongitude() { return deliveryLongitude; }
+    public void setDeliveryLongitude(Double value) { deliveryLongitude = value; }
+    public BigDecimal getDeliveryDistanceKm() { return deliveryDistanceKm; }
+    public void setDeliveryDistanceKm(BigDecimal value) { deliveryDistanceKm = value; }
     private String customerNote;
     private BigDecimal subtotal;
     private BigDecimal discountAmount;

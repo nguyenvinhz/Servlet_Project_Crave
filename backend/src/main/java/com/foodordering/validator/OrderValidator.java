@@ -31,6 +31,10 @@ public final class OrderValidator {
                 throw new BadRequestException("Địa chỉ giao hàng không được để trống khi chọn giao tận nơi");
             }
             address = required(request.getDeliveryAddress(), 255, "Địa chỉ giao hàng");
+            com.foodordering.service.DeliveryFeeService.validateCoordinates(request.getDeliveryLatitude(), request.getDeliveryLongitude());
+        } else {
+            request.setDeliveryLatitude(null);
+            request.setDeliveryLongitude(null);
         }
         String note = optional(request.getCustomerNote(), 255, "Ghi chú đơn hàng");
         String promotionId = optional(request.getPromotionId(), 10, "Mã khuyến mãi");

@@ -64,6 +64,24 @@ class CustomerOrderServiceTest {
     }
 
     @Test
+    void outsideRadiusCannotCreateAnOrderEvenWithoutCallingQuoteApi() {
+        CustomerOrderServiceImpl service = new CustomerOrderServiceImpl(orderRepository, paymentRepository, emf,
+                new DeliveryFeeService(new DeliveryFeeService.Store("Fixture store", 10.89, 106.76)));
+        OrderRequest request = new OrderRequest();
+        request.setReceiverName("Customer");
+        request.setReceiverPhone("0901234567");
+        request.setFulfillmentType(FulfillmentType.DELIVERY);
+        request.setPaymentMethod(PaymentMethod.CASH);
+        request.setDeliveryAddress("Outside the delivery radius");
+        request.setDeliveryLatitude(11.1);
+        request.setDeliveryLongitude(106.76);
+        BadRequestException failure = assertThrows(BadRequestException.class, () -> service.createOrder("KH01", request));
+        assertEquals(com.foodordering.enums.ErrorCode.DELIVERY_OUT_OF_RANGE, failure.getErrorCode());
+        verify(emf, never()).createEntityManager();
+        verify(em, never()).persist(any());
+    }
+
+    @Test
     @DisplayName("Tạo đơn hàng thất bại khi thiếu số điện thoại người nhận")
     void createOrderFailsWhenReceiverPhoneIsEmpty() {
         OrderRequest request = new OrderRequest();

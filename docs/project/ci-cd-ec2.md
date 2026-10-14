@@ -39,8 +39,8 @@ Merge PR / push main ──> CI thành công ──> artifact crave-war
   `crave-ec2` trước khi checkout code từ commit mới trên `main`.
 - CD chỉ recreate service ứng dụng. `.env` và compose gốc trên EC2 được giữ nguyên;
   cấu hình payOS được bổ sung qua `.payos.compose.json` có quyền đọc hạn chế.
-  Trước khi thay WAR, CD chạy migration bổ sung bảng payOS trong service MySQL
-  hiện có; không chạy lại schema/seed hoặc recreate database.
+  Trước khi thay WAR, CD chạy migration bổ sung payOS, email verification và tọa độ
+  giao hàng trong service MySQL hiện có; không chạy lại schema/seed hoặc recreate database.
 - Các lần deploy được tuần tự hóa và có khóa trên server. Lần đang deploy được
   chạy đến hết; GitHub có thể thay lần đang chờ bằng push mới nhất.
 
@@ -171,6 +171,13 @@ WAR, command line hoặc log. Xem [email xác thực](email-verification.md).
 Đặt **Environment variable** `PAYOS_PUBLIC_BASE_URL` thành
 `http://15.134.39.86:8080/crave`. Giá trị mặc định trong workflow hiện cũng dùng
 đúng URL này. Nếu thay đổi server, cập nhật các variables:
+
+Các variables `CRAVE_STORE_ADDRESS`, `CRAVE_STORE_LATITUDE`, `CRAVE_STORE_LONGITUDE`
+và `CRAVE_GEOCODER_URL` là tùy chọn cho giao hàng. Nếu không cấu hình, ứng dụng dùng
+địa chỉ/ghim demo và Photon mặc định đã mô tả trong
+[thiết kế giao hàng](../architecture/delivery-and-cart-editing.md). Khi đổi ghim
+cửa hàng, phải đặt cả latitude và longitude. Workflow truyền các giá trị này vào
+container ứng dụng; không thay cấu hình payOS hoặc database hiện có.
 
 | Variable | Mặc định | Ý nghĩa |
 |---|---|---|
