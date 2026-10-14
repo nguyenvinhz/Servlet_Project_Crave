@@ -9,7 +9,7 @@ import java.util.List;
 
 /** One shared store origin; distances are geographic radii, not driving routes. */
 public class DeliveryFeeService {
-    public record Band(double fromKm, double toKm, BigDecimal fee) {}
+    public record Band(double fromKm, double toKm, BigDecimal baseFee, BigDecimal ratePerKm) {}
     public record Store(String address, Double latitude, Double longitude) {
         public boolean configured() {
             return address != null && !address.isBlank() && validCoordinates(latitude, longitude);
@@ -18,11 +18,11 @@ public class DeliveryFeeService {
     public record Policy(Store store, boolean configured, double maxDistanceKm, List<Band> bands, String distanceMethod) {}
     public record Quote(BigDecimal distanceKm, BigDecimal deliveryFee, boolean deliverable, String message) {}
     private static final List<Band> BANDS = List.of(
-            new Band(0, 1, BigDecimal.ZERO),
-            new Band(1, 3, new BigDecimal("4000")),
-            new Band(3, 5, new BigDecimal("7000")),
-            new Band(5, 7, new BigDecimal("12000")),
-            new Band(7, 10, new BigDecimal("15000")));
+            new Band(0, 1, BigDecimal.ZERO, BigDecimal.ZERO),
+            new Band(1, 3, new BigDecimal("4000"), BigDecimal.ZERO),
+            new Band(3, 5, new BigDecimal("7000"), BigDecimal.ZERO),
+            new Band(5, 7, new BigDecimal("7000"), new BigDecimal("2500")),
+            new Band(7, 10, new BigDecimal("12000"), new BigDecimal("3000")));
     private final Store store;
 
     public DeliveryFeeService() {
@@ -69,7 +69,11 @@ public class DeliveryFeeService {
         if (!Double.isFinite(distance) || distance < 0) throw new IllegalArgumentException("Invalid distance");
         // [0,1), [1,3), [3,5), [5,7), [7,10]. Compare before display rounding.
         for (Band band : BANDS) {
-            if (distance < band.toKm() || (band.toKm() == 10 && distance <= 10)) return band.fee();
+            if (distance < band.toKm() || (band.toKm() == 10 && distance <= 10)) {
+                // Accumulate from the band's base fare using only the distance beyond its lower bound.
+                return BigDecimal.valueOf(distance).subtract(BigDecimal.valueOf(band.fromKm()))
+                        .multiply(band.ratePerKm()).add(band.baseFee()).setScale(0, RoundingMode.HALF_UP);
+            }
         }
         return null;
     }

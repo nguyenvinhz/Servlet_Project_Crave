@@ -200,7 +200,7 @@ class CartCheckoutIntegrationTest {
     }
 
     @ParameterizedTest
-    @CsvSource({"10.94,106.76,12000", "10.8905,106.76,0"})
+    @CsvSource({"10.94,106.76,8399", "10.96,106.76,14351", "10.8905,106.76,0"})
     void checkoutUsesAndPersistsChosenCoordinatesInsteadOfResolvingTextAgain(double latitude, double longitude, String fee) {
         addCart();
         OrderRequest request = checkout(FulfillmentType.DELIVERY);
@@ -209,6 +209,9 @@ class CartCheckoutIntegrationTest {
         request.setDeliveryAddress(String.format(java.util.Locale.ROOT, "%.6f, %.6f", latitude, longitude));
         OrderResponse order = orders.createOrder(owner.id(), request);
         assertMoney(fee, order.getDeliveryFee());
+        assertMoney("150000", order.getSubtotal());
+        assertMoney("20000", order.getDiscountAmount());
+        assertEquals(0, money("130000").add(money(fee)).compareTo(order.getTotalAmount()));
         assertEquals(latitude, order.getDeliveryLatitude());
         assertEquals(longitude, order.getDeliveryLongitude());
         assertEquals(order.getTotalAmount(), order.getPayment().getAmount());

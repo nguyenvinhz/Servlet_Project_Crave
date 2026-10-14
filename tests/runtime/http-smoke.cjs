@@ -191,6 +191,14 @@ class Client {
     assert.equal(deliveryQuote.deliverable, true);
     assert.equal(Number(deliveryQuote.deliveryFee), 4000);
     assert.equal('distanceKm' in deliveryQuote, false);
+    for (const [km, fee] of [[6, 9500], [8, 15000], [9, 18000]]) {
+        const perKmQuote = await customer.request('/api/delivery/quote', {method: 'POST',
+            body: {latitude: deliveryPolicy.store.latitude + km / 6371.0088 * 180 / Math.PI,
+                longitude: destination.longitude}});
+        assert.equal(perKmQuote.deliverable, true);
+        assert.equal(Number(perKmQuote.deliveryFee), fee);
+        assert.equal('bands' in perKmQuote, false);
+    }
     const coordinates = await customer.request('/api/delivery/search', {method: 'POST',
         body: {address: `${destination.latitude}, ${destination.longitude}`}});
     assert.equal(coordinates[0].latitude, destination.latitude);

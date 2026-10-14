@@ -22,7 +22,7 @@ class DeliveryFeeServiceTest {
     @Test
     void everyBoundaryHasOneUnambiguousBandAndTenKmIsIncluded() {
         double[] distances = {0, 0.999999, 1, 2.999999, 3, 4.999999, 5, 6.999999, 7, 9.999999, 10};
-        int[] expected = {0, 0, 4000, 4000, 7000, 7000, 12000, 12000, 15000, 15000, 15000};
+        int[] expected = {0, 0, 4000, 4000, 7000, 7000, 7000, 12000, 12000, 21000, 21000};
         for (int i = 0; i < distances.length; i++) {
             assertEquals(0, BigDecimal.valueOf(expected[i]).compareTo(DeliveryFeeService.feeForDistance(distances[i])));
         }
@@ -31,6 +31,20 @@ class DeliveryFeeServiceTest {
         for (double invalid : new double[]{-1, Double.NaN, Double.POSITIVE_INFINITY}) {
             assertThrows(IllegalArgumentException.class, () -> DeliveryFeeService.feeForDistance(invalid));
         }
+    }
+
+    @Test
+    void perKmRateAccumulatesBeyondFiveAndSevenKmAndRoundsOnlyFinalDongAmount() {
+        assertEquals(new BigDecimal("9500"), DeliveryFeeService.feeForDistance(6));
+        assertEquals(new BigDecimal("15000"), DeliveryFeeService.feeForDistance(8));
+        assertEquals(new BigDecimal("18000"), DeliveryFeeService.feeForDistance(9));
+        assertEquals(new BigDecimal("9809"), DeliveryFeeService.feeForDistance(6.123456));
+        assertEquals(new BigDecimal("13630"), DeliveryFeeService.feeForDistance(7.54321));
+        double latitude = 10.89 + Math.toDegrees(6.123456 / 6371.0088);
+        var quote = fees.quote(latitude, 106.76, new BigDecimal("150000"));
+        assertEquals(new BigDecimal("6.123"), quote.distanceKm());
+        assertEquals(new BigDecimal("9809"), quote.deliveryFee(), "Do not multiply the rounded display distance");
+        assertEquals(BigDecimal.ZERO, fees.quote(latitude, 106.76, new BigDecimal("150001")).deliveryFee());
     }
 
     @Test

@@ -13,14 +13,14 @@ The demo address is **99 Đường Số 9, Dĩ An, Hồ Chí Minh 825030, Việt
 | 0 ≤ distance < 1 km | Free |
 | 1 ≤ distance < 3 km | 4,000 VND |
 | 3 ≤ distance < 5 km | 7,000 VND |
-| 5 ≤ distance < 7 km | 12,000 VND |
-| 7 ≤ distance ≤ 10 km | 15,000 VND |
+| 5 ≤ distance < 7 km | 7,000 + (distance − 5) × 2,500 VND |
+| 7 ≤ distance ≤ 10 km | 12,000 + (distance − 7) × 3,000 VND |
 | distance > 10 km | Delivery rejected |
 | Pickup | 0 VND |
 
 Food subtotal strictly greater than 150,000 VND qualifies for free shipping before voucher discounts, provided the destination is within the delivery area. Exactly 150,000 VND keeps the normal distance fee. The quote API reads the authenticated customer's verified cart subtotal; order creation recalculates from the locked persisted cart. Large orders do not bypass the delivery-radius limit.
 
-`DeliveryFeeService` uses Haversine distance. It compares the unrounded distance with the band/radius limits, then rounds to 0.001 km for the internal quote/order snapshot. This is a geographic radius, not a motorcycle driving route. Motorcycle routing is feasible with a suitable provider/API credential or a hosted routing engine; it is not configured in this release. A car route must not be presented as a motorcycle route.
+`DeliveryFeeService` uses Haversine distance. It compares the unrounded distance with the band/radius limits. Beyond 5 km, the fare accumulates from 7,000 VND: add 2,500 VND per km between 5 and 7 km, then 3,000 VND per km beyond 7 km. Use the unrounded distance and round only the final fee to the nearest VND (HALF_UP). For example, 6 km costs 9,500 VND and 9 km costs 18,000 VND. Exactly 5 km costs 7,000 VND, exactly 7 km costs 12,000 VND, and exactly 10 km costs 21,000 VND. The internal quote/order distance snapshot is separately rounded to 0.001 km. This is a geographic radius, not a motorcycle driving route. Motorcycle routing is feasible with a suitable provider/API credential or a hosted routing engine; it is not configured in this release. A car route must not be presented as a motorcycle route.
 
 The table and formula above are developer documentation. Customer pages do not show fee bands, distance calculations, distance thresholds, or a service-radius circle. Customer delivery APIs return store location/configuration and the final fee/eligibility message, without the pricing table, distance method, maximum radius, or computed quote distance.
 
