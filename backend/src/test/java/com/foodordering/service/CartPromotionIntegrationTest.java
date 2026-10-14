@@ -174,6 +174,63 @@ class CartPromotionIntegrationTest {
         return profile;
     }
 
+    @Test
+    void editOptionsRecalculatesTotalsAndPersistsAcrossReloads() {
+        CartDto cart = carts.addItem(owner.id(), new AddToCartRequest(foodId, 2, "old note", List.of()));
+        String itemId = cart.getItems().get(0).getCartItemId();
+        UpdateCartItemRequest update = new UpdateCartItemRequest(itemId, 3, " updated note ");
+        update.setOptionIds(List.of(optionId));
+        cart = carts.updateItem(owner.id(), update);
+        assertEquals(itemId, cart.getItems().get(0).getCartItemId());
+        assertMoney("150000", cart.getSubtotal());
+        assertEquals("updated note", cart.getItems().get(0).getNote());
+        assertEquals(optionId, cart.getItems().get(0).getOptions().get(0).getOptionId());
+        assertTrue(validate("0").isValid());
+
+        // Re-saving the same option must not violate the unique item/option constraint.
+        carts.updateItem(owner.id(), update);
+        cart = carts.updateItem(owner.id(), new UpdateCartItemRequest(itemId, 2, null));
+        assertMoney("100000", cart.getSubtotal());
+        assertEquals(1, cart.getItems().get(0).getOptions().size());
+
+        update.setQuantity(2);
+        update.setNote(null);
+        update.setOptionIds(List.of());
+        carts.updateItem(owner.id(), update);
+        cart = carts.getOrCreateCart(owner.id());
+        assertMoney("80000", cart.getSubtotal());
+        assertEquals("updated note", cart.getItems().get(0).getNote());
+        assertTrue(cart.getItems().get(0).getOptions().isEmpty());
+        assertFalse(validate("150000").isValid());
+    }
+
+    @Test
+    void invalidOptionEditsDoNotPartiallyChangeCart() {
+        CartDto cart = carts.addItem(owner.id(), add(2));
+        String itemId = cart.getItems().get(0).getCartItemId();
+        UpdateCartItemRequest update = new UpdateCartItemRequest(itemId, 3, "must not persist");
+        update.setOptionIds(List.of("missing"));
+        assertThrows(com.foodordering.exception.BadRequestException.class, () -> carts.updateItem(owner.id(), update));
+        cart = carts.getOrCreateCart(owner.id());
+        assertMoney("100000", cart.getSubtotal());
+        assertEquals(2, cart.getItems().get(0).getQuantity());
+        assertEquals("integration note", cart.getItems().get(0).getNote());
+        assertEquals(optionId, cart.getItems().get(0).getOptions().get(0).getOptionId());
+
+        carts.getOrCreateCart(other.id());
+        update.setOptionIds(List.of(optionId));
+        assertThrows(ResourceNotFoundException.class, () -> carts.updateItem(other.id(), update));
+        assertMoney("100000", carts.getVerifiedSubtotal(owner.id()));
+
+        try (EntityManager em = emf.createEntityManager()) {
+            em.getTransaction().begin();
+            em.find(FoodOption.class, optionId).setStatus(com.foodordering.enums.OptionStatus.INACTIVE);
+            em.getTransaction().commit();
+        }
+        assertThrows(com.foodordering.exception.BadRequestException.class, () -> carts.updateItem(owner.id(), update));
+        assertEquals(2, carts.getOrCreateCart(owner.id()).getItems().get(0).getQuantity());
+    }
+
     private AddToCartRequest add(int quantity) {
         return new AddToCartRequest(foodId, quantity, "integration note", List.of(optionId));
     }

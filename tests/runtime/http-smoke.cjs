@@ -183,11 +183,37 @@ class Client {
     assert.equal(completed.payment.status, 'SUCCESS');
     await admin.request(`/api/admin/payments/${order.payment.paymentId}/status`, {method: 'PATCH', status: 400, body: {status: 'PENDING'}});
     await customer.request('/api/cart/items', {method: 'POST', body: {foodId: food.id, quantity: 1, optionIds: [], note: ''}});
-    const delivery = await customer.request('/api/orders', {method: 'POST', status: 201,
+    const deliveryPolicy = await customer.request('/api/delivery/policy');
+    assert.equal(deliveryPolicy.configured, true);
+    assert.equal('bands' in deliveryPolicy, false);
+    const destination = {latitude: deliveryPolicy.store.latitude + 0.02, longitude: deliveryPolicy.store.longitude};
+    const deliveryQuote = await customer.request('/api/delivery/quote', {method: 'POST', body: destination});
+    assert.equal(deliveryQuote.deliverable, true);
+    assert.equal(Number(deliveryQuote.deliveryFee), 4000);
+    assert.equal('distanceKm' in deliveryQuote, false);
+    const coordinates = await customer.request('/api/delivery/search', {method: 'POST',
+        body: {address: `${destination.latitude}, ${destination.longitude}`}});
+    assert.equal(coordinates[0].latitude, destination.latitude);
+    assert.equal(coordinates[0].longitude, destination.longitude);
+    await customer.request('/api/orders', {method: 'POST', status: 400,
         body: {fulfillmentType: 'DELIVERY', receiverName: account.fullName, receiverPhone: account.phone,
             deliveryAddress: updated.addressLine, paymentMethod: 'BANK_TRANSFER'}});
-    assert.equal(Number(delivery.deliveryFee), 15000);
-    assert.equal(Number(delivery.totalAmount), 40000);
+    const outsideQuote = await customer.request('/api/delivery/quote', {method: 'POST',
+        body: {latitude: deliveryPolicy.store.latitude + 0.2, longitude: destination.longitude}});
+    assert.equal(outsideQuote.deliverable, false);
+    await customer.request('/api/orders', {method: 'POST', status: 400,
+        body: {fulfillmentType: 'DELIVERY', receiverName: account.fullName, receiverPhone: account.phone,
+            deliveryLatitude: deliveryPolicy.store.latitude + 0.2, deliveryLongitude: destination.longitude,
+            deliveryAddress: updated.addressLine, paymentMethod: 'BANK_TRANSFER'}});
+    const delivery = await customer.request('/api/orders', {method: 'POST', status: 201,
+        body: {fulfillmentType: 'DELIVERY', receiverName: account.fullName, receiverPhone: account.phone,
+            deliveryAddress: updated.addressLine, deliveryLatitude: destination.latitude,
+            deliveryLongitude: destination.longitude, paymentMethod: 'BANK_TRANSFER'}});
+    assert.equal(Number(delivery.deliveryFee), 4000);
+    assert.equal(Number(delivery.totalAmount), 29000);
+    assert.equal(delivery.deliveryLatitude, destination.latitude);
+    assert.equal(delivery.deliveryLongitude, destination.longitude);
+    assert.equal(Number(delivery.payment.amount), 29000);
     for (const status of ['PREPARING', 'DELIVERING', 'COMPLETED']) await admin.request(`/api/admin/orders/${delivery.orderId}/status`,
         {method: 'PATCH', body: {status, note: 'Kiểm thử giao tận nơi'}});
     await admin.request(`/api/admin/payments/${delivery.payment.paymentId}/status`,

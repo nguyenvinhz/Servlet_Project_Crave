@@ -668,3 +668,10 @@
     }
 }
 
+.delivery-map { height: 300px; border: 1px solid var(--line); border-radius: 12px; z-index: 0; }
+.delivery-map-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+.delivery-map-actions .button { font-size: 0.85rem; padding: 8px 12px; }
+.delivery-pin { border-radius: 50%; background: #c94b24; border: 3px solid white; box-shadow: 0 1px 6px #333; }
+.delivery-store-pin { background: #18794e; }
+.delivery-search-results { display: grid; gap: 8px; max-height: 240px; overflow-y: auto; margin: 8px 0; }
+.delivery-search-result { width: 100%; text-align: left; white-space: normal; overflow-wrap: anywhere; }

@@ -37,15 +37,22 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
     private final CustomerOrderRepository orderRepository;
     private final PaymentRepository paymentRepository;
     private final EntityManagerFactory emf;
+    private final DeliveryFeeService deliveryFees;
 
     public CustomerOrderServiceImpl(CustomerOrderRepository orderRepository, PaymentRepository paymentRepository) {
         this(orderRepository, paymentRepository, null);
     }
 
     public CustomerOrderServiceImpl(CustomerOrderRepository orderRepository, PaymentRepository paymentRepository, EntityManagerFactory emf) {
+        this(orderRepository, paymentRepository, emf, new DeliveryFeeService());
+    }
+
+    public CustomerOrderServiceImpl(CustomerOrderRepository orderRepository, PaymentRepository paymentRepository,
+                                    EntityManagerFactory emf, DeliveryFeeService deliveryFees) {
         this.orderRepository = orderRepository;
         this.paymentRepository = paymentRepository;
         this.emf = emf;
+        this.deliveryFees = deliveryFees;
     }
 
     private EntityManager getEntityManager() {
@@ -59,6 +66,8 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
     @Override
     public OrderResponse createOrder(String customerId, OrderRequest request) {
         OrderValidator.validate(request);
+        DeliveryFeeService.Quote deliveryQuote = request.getFulfillmentType() == FulfillmentType.DELIVERY
+                ? deliveryFees.requireDeliverable(request.getDeliveryLatitude(), request.getDeliveryLongitude()) : null;
 
         EntityManager em = getEntityManager();
         EntityTransaction tx = em.getTransaction();
@@ -87,6 +96,9 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
             if (subtotal == null || subtotal.compareTo(BigDecimal.ZERO) <= 0) {
                 throw new BadRequestException(ErrorCode.CART_EMPTY);
             }
+            if (deliveryQuote != null) {
+                deliveryQuote = deliveryFees.requireDeliverable(request.getDeliveryLatitude(), request.getDeliveryLongitude(), subtotal);
+            }
 
             CustomerOrder order = new CustomerOrder();
             order.setId(generateId(10));
@@ -105,9 +117,10 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
             }
             
             order.setSubtotal(subtotal);
-            BigDecimal fee = com.foodordering.enums.FulfillmentType.DELIVERY.equals(request.getFulfillmentType()) 
-                    ? new BigDecimal("15000") : BigDecimal.ZERO;
-            order.setDeliveryFee(fee);
+            order.setDeliveryFee(deliveryQuote != null ? deliveryQuote.deliveryFee() : BigDecimal.ZERO);
+            order.setDeliveryLatitude(request.getDeliveryLatitude());
+            order.setDeliveryLongitude(request.getDeliveryLongitude());
+            order.setDeliveryDistanceKm(deliveryQuote != null ? deliveryQuote.distanceKm() : null);
 
             em.persist(order);
 
@@ -431,6 +444,9 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
         res.setSubtotal(order.getSubtotal());
         res.setDiscountAmount(order.getDiscountAmount());
         res.setDeliveryFee(order.getDeliveryFee());
+        res.setDeliveryLatitude(order.getDeliveryLatitude());
+        res.setDeliveryLongitude(order.getDeliveryLongitude());
+        res.setDeliveryDistanceKm(order.getDeliveryDistanceKm());
         res.setTotalAmount(order.getTotalAmount() != null ? order.getTotalAmount() : order.getSubtotal().add(order.getDeliveryFee()).subtract(order.getDiscountAmount()));
         res.setStatus(order.getStatus());
 

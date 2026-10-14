@@ -92,6 +92,7 @@ jobs:
           node --check tests/frontend/admin-management-browser-smoke.cjs
           node --check tests/frontend/admin-orders-dashboard-browser-smoke.cjs
           node --check tests/frontend/payos-payment-browser-smoke.cjs
+          node --check tests/frontend/cart-checkout-browser-smoke.cjs
           node --check tests/runtime/http-smoke.cjs
           node --check tests/runtime/smtp-fixture.cjs
 
@@ -108,6 +109,7 @@ jobs:
           node tests/frontend/admin-management-browser-smoke.cjs
           node tests/frontend/admin-orders-dashboard-browser-smoke.cjs
           node tests/frontend/payos-payment-browser-smoke.cjs
+          node tests/frontend/cart-checkout-browser-smoke.cjs
 
       - name: Run packaged WAR HTTP smoke tests
         env:

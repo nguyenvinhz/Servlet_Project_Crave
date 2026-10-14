@@ -247,7 +247,11 @@ public class CartApiServlet extends BaseApiServlet {
         }
 
         String note = req.getParameter("note") != null ? req.getParameter("note") : (dto != null ? dto.getNote() : null);
-        return new UpdateCartItemRequest(cartItemId, quantity, note);
+        UpdateCartItemRequest update = new UpdateCartItemRequest(cartItemId, quantity, note);
+        update.setOptionIds(req.getParameterValues("optionIds") != null
+                ? List.of(req.getParameterValues("optionIds"))
+                : (dto != null ? dto.getOptionIds() : null));
+        return update;
     }
 
     private String extractCartItemId(HttpServletRequest req, String pathInfo) throws IOException {

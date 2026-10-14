@@ -16,6 +16,20 @@ import static org.junit.jupiter.api.Assertions.*;
 class CartValidatorTest {
 
     @Test
+    void updateRejectsMalformedOptionsButAllowsPreservingOrClearingThem() {
+        UpdateCartItemRequest request = new UpdateCartItemRequest("CTGH01", 1, null);
+        assertDoesNotThrow(() -> CartValidator.validateUpdateCartItem(request));
+        request.setOptionIds(List.of());
+        assertDoesNotThrow(() -> CartValidator.validateUpdateCartItem(request));
+        for (List<String> options : List.of(List.of("TC01", "TC01"), List.of(" "), Arrays.asList((String) null))) {
+            request.setOptionIds(options);
+            BadRequestException failure = assertThrows(BadRequestException.class,
+                    () -> CartValidator.validateUpdateCartItem(request));
+            assertEquals(ErrorCode.INVALID_OPTION, failure.getErrorCode());
+        }
+    }
+
+    @Test
     void addToCartRejectsDuplicateAndBlankOptionIds() {
         for (List<String> options : List.of(List.of("TC01", "TC01"), List.of(""), Arrays.asList((String) null))) {
             AddToCartRequest request = new AddToCartRequest("MA01", 1, null, options);

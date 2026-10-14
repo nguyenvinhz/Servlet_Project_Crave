@@ -6,6 +6,7 @@ script_directory=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 deploy_script=$(realpath -- "$script_directory/../../scripts/deploy-ec2.sh")
 test_payos_migration=$(realpath -- "$script_directory/../../database/migrations/2026-10-13-payos-payment.sql")
 test_email_migration=$(realpath -- "$script_directory/../../database/migrations/2026-10-13-email-verification.sql")
+test_delivery_migration=$(realpath -- "$script_directory/../../database/migrations/2026-10-15-delivery-location.sql")
 for dependency in bash python3 cmp mktemp install sha256sum unzip; do
   command -v "$dependency" >/dev/null || { printf 'Missing test dependency: %s\n' "$dependency" >&2; exit 1; }
 done
@@ -14,7 +15,7 @@ temp_directory=$(realpath -- "${TMPDIR:-/tmp}")
 test_root=$(mktemp -d "$temp_directory/crave-deploy-test.XXXXXX")
 [[ $test_root == "$temp_directory/"crave-deploy-test.* ]] || exit 1
 test_migration=$test_root/release-migrations.sql
-cat -- "$test_payos_migration" "$test_email_migration" > "$test_migration"
+cat -- "$test_payos_migration" "$test_email_migration" "$test_delivery_migration" > "$test_migration"
 cleanup() {
   local status=$?
   if [[ $status -ne 0 && -n ${case_directory:-} ]]; then
@@ -126,6 +127,9 @@ case "$1" in
     cmp -s -- "$TEST_MIGRATION" "$TEST_CASE_DIRECTORY/migration.sql" || exit 100
     grep -Fq 'CREATE TABLE IF NOT EXISTS payos_payment_link' "$TEST_CASE_DIRECTORY/migration.sql" || exit 101
     grep -Fq 'CREATE TABLE IF NOT EXISTS email_verification_challenges' "$TEST_CASE_DIRECTORY/migration.sql" || exit 101
+    grep -Fq 'ADD COLUMN delivery_latitude' "$TEST_CASE_DIRECTORY/migration.sql" || exit 101
+    grep -Fq 'ADD COLUMN delivery_longitude' "$TEST_CASE_DIRECTORY/migration.sql" || exit 101
+    grep -Fq 'ADD COLUMN delivery_distance_km' "$TEST_CASE_DIRECTORY/migration.sql" || exit 101
     cmp -s -- "$TEST_CASE_DIRECTORY/reference/old.war" "$TEST_DEPLOY_DIRECTORY/backend/target/crave.war" || exit 102
     [[ ! -e $TEST_CASE_DIRECTORY/recreate.count ]] || exit 103
     printf 'migration\n' >> "$TEST_CASE_DIRECTORY/operations.log"
@@ -255,6 +259,7 @@ PY
   export EMAIL_SMTP_USERNAME=fixture-mail@example.com EMAIL_FROM=fixture-mail@example.com
   export EMAIL_SMTP_PASSWORD=fixture-mail-password EMAIL_OTP_SECRET=fixture-otp-secret-at-least-32-characters
   export TEST_EXPECTED_PUBLIC_BASE_URL=''
+  unset CRAVE_STORE_ADDRESS CRAVE_STORE_LATITUDE CRAVE_STORE_LONGITUDE CRAVE_GEOCODER_URL
   export PAYOS_EXPAND=incorrect-compose-interpolation PAYOS_BAD=incorrect-compose-fallback
   export HEALTH_URL=http://127.0.0.1:8080/crave/api/health HEALTH_TIMEOUT_SECONDS=1 HEALTH_INTERVAL_SECONDS=1
   export GITHUB_WORKSPACE="$test_root/workspace"
@@ -322,11 +327,12 @@ with open(sys.argv[2], encoding="utf-8") as source:
 with open(sys.argv[3], encoding="utf-8") as source:
     original = json.load(source)
 keys = {"PAYOS_CLIENT_ID", "PAYOS_API_KEY", "PAYOS_CHECKSUM_KEY", "PAYOS_PUBLIC_BASE_URL", "EMAIL_SMTP_HOST", "EMAIL_SMTP_PORT", "EMAIL_SMTP_USERNAME", "EMAIL_SMTP_PASSWORD", "EMAIL_FROM", "EMAIL_SMTP_STARTTLS", "EMAIL_OTP_SECRET"}
+keys |= {name for name in ("CRAVE_STORE_ADDRESS", "CRAVE_STORE_LATITUDE", "CRAVE_STORE_LONGITUDE", "CRAVE_GEOCODER_URL") if os.environ.get(name, "").strip()}
 assert set(overlay) == {"services"}
 assert set(overlay["services"]) == {"app"}, "Override must target only the app service"
 assert set(overlay["services"]["app"]) == {"environment"}, "Override must not change mounts/images"
 environment = overlay["services"]["app"]["environment"]
-assert set(environment) == keys, "Override must contain only payment and email settings"
+assert set(environment) == keys, "Override must contain only payment, email, and configured delivery settings"
 actual = resolved["services"]["app"]["environment"]
 for key in keys:
     expected = (os.environ.get("TEST_EXPECTED_PUBLIC_BASE_URL") or os.environ[key]) if key == "PAYOS_PUBLIC_BASE_URL" else os.environ[key]
@@ -385,6 +391,28 @@ contains_log 'Deployment succeeded.'
 assert_migration_before_recreation
 assert_payos_overlay
 pass_case
+
+new_case configured-delivery-origin
+export CRAVE_STORE_ADDRESS='Configured demo store' CRAVE_STORE_LATITUDE=10.89 CRAVE_STORE_LONGITUDE=106.76
+export CRAVE_GEOCODER_URL='https://photon.komoot.io/api/'
+run_deploy 0
+assert_migration_before_recreation
+assert_payos_overlay
+pass_case
+
+for invalid_setting in missing-longitude nonfinite-latitude invalid-geocoder; do
+  new_case "delivery-$invalid_setting"
+  case "$invalid_setting" in
+    missing-longitude) export CRAVE_STORE_LATITUDE=10.89 ;;
+    nonfinite-latitude) export CRAVE_STORE_LATITUDE=NaN CRAVE_STORE_LONGITUDE=106.76 ;;
+    invalid-geocoder) export CRAVE_GEOCODER_URL='not-a-url' ;;
+  esac
+  run_deploy 1
+  assert_old_war
+  assert_recreates 0
+  [[ ! -e $case_directory/migration.applied ]] || fail 'Invalid delivery configuration reached the migration.'
+  pass_case
+done
 
 for health in malformed database-down application-down failure-body http-failure; do
   new_case "rollback-$health"

@@ -18,7 +18,11 @@
         voucherRequest: 0,
         sessionExpired: false,
         activePromotions: [],
-        deliveryFee: 15000 // Delivery estimate; pickup is selected at checkout.
+        editorItem: null,
+        editorFood: null,
+        editorLoading: false,
+        editorSaving: false,
+        editorRequest: 0
     };
 
     // DOM Elements
@@ -26,6 +30,7 @@
 
     const API_BASE = document.body.dataset.contextPath || '';
     let modalReturnFocus;
+    let editorReturnFocus;
 
     function apiErrorMessage(data, fallback) {
         return data?.error?.message || data?.message || fallback;
@@ -39,6 +44,7 @@
             headers: { 'Accept': 'application/json', ...options.headers }
         });
         if (response.status === 401) {
+            closeItemEditor(true);
             state.sessionExpired = true;
             state.voucherRequest++;
             state.voucherPending = false;
@@ -94,11 +100,38 @@
             promosModalClose: document.getElementById('promosModalClose'),
             checkoutBtn: document.getElementById('proceedCheckoutBtn'),
             clearCartBtn: document.getElementById('clearCartBtn'),
-            retryBtn: document.getElementById('retryFetchCartBtn')
+            retryBtn: document.getElementById('retryFetchCartBtn'),
+            editor: document.getElementById('cartItemEditor'),
+            editorForm: document.getElementById('cartItemEditorForm'),
+            editorTitle: document.getElementById('cartEditorTitle'),
+            editorStatus: document.getElementById('cartEditorStatus'),
+            editorFields: document.getElementById('cartEditorFields'),
+            editorOptions: document.getElementById('cartEditorOptions'),
+            editorQuantity: document.getElementById('cartEditorQuantity'),
+            editorNote: document.getElementById('cartEditorNote'),
+            editorTotal: document.getElementById('cartEditorTotal'),
+            editorSave: document.getElementById('cartEditorSave'),
+            editorClose: document.getElementById('cartEditorClose'),
+            editorCancel: document.getElementById('cartEditorCancel')
         };
     }
 
     function setupEventListeners() {
+        if (elements.editor) {
+            elements.editorForm.addEventListener('submit', saveItemEditor);
+            elements.editorForm.addEventListener('input', updateEditorTotal);
+            elements.editorClose.addEventListener('click', () => closeItemEditor());
+            elements.editorCancel.addEventListener('click', () => closeItemEditor());
+            elements.editor.addEventListener('cancel', event => {
+                event.preventDefault();
+                closeItemEditor();
+            });
+            elements.editor.addEventListener('click', event => {
+                const rect = elements.editor.getBoundingClientRect();
+                if (event.target === elements.editor && (event.clientX < rect.left || event.clientX > rect.right
+                        || event.clientY < rect.top || event.clientY > rect.bottom)) closeItemEditor();
+            });
+        }
         if (elements.voucherApplyBtn) {
             elements.voucherApplyBtn.addEventListener('click', handleApplyVoucher);
         }
@@ -186,6 +219,122 @@
         if (code && elements.voucherInput) {
             elements.voucherInput.value = code.trim();
             handleApplyVoucher();
+        }
+    }
+
+    async function openItemEditor(cartItemId) {
+        if (cartBusy() || !elements.editor) return;
+        const item = state.cart?.items?.find(item => item.cartItemId === cartItemId);
+        if (!item) return;
+        editorReturnFocus = document.activeElement;
+        const requestId = ++state.editorRequest;
+        state.editorItem = item;
+        state.editorFood = null;
+        state.editorLoading = true;
+        elements.editorTitle.textContent = `Chỉnh sửa ${item.foodName || 'món ăn'}`;
+        elements.editorStatus.textContent = 'Đang tải tùy chọn món...';
+        elements.editorFields.hidden = true;
+        elements.editorOptions.replaceChildren();
+        elements.editorQuantity.value = item.quantity;
+        elements.editorNote.value = item.note || '';
+        elements.editor.showModal();
+        updateControls();
+        try {
+            const data = await requestApi(`/api/foods/${encodeURIComponent(item.foodId)}`);
+            if (!data || requestId !== state.editorRequest) return;
+            if (!data.success || !data.data) throw new Error(apiErrorMessage(data, 'Không thể tải tùy chọn món.'));
+            if (data.data.status !== 'AVAILABLE') throw new Error('Món ăn hiện đã ngừng phục vụ. Vui lòng chọn món khác.');
+            state.editorFood = data.data;
+            renderEditorOptions(item, data.data.options || []);
+            elements.editorFields.hidden = false;
+            updateEditorTotal();
+        } catch (error) {
+            if (requestId === state.editorRequest) elements.editorStatus.textContent = error.message || 'Không thể tải tùy chọn món. Vui lòng thử lại.';
+        } finally {
+            if (requestId === state.editorRequest) {
+                state.editorLoading = false;
+                updateControls();
+            }
+        }
+    }
+
+    function renderEditorOptions(item, options) {
+        const selected = new Set((item.options || []).map(option => option.optionId));
+        const available = options.filter(option => !option.status || option.status === 'ACTIVE');
+        const missing = [...selected].some(id => !available.some(option => option.id === id));
+        elements.editorStatus.textContent = missing
+            ? 'Một số tùy chọn cũ đã ngừng áp dụng. Vui lòng kiểm tra các lựa chọn trước khi lưu.'
+            : (available.length ? 'Chọn món thêm hoặc thay đổi tùy chọn cho món này.' : 'Món này không có tùy chọn thêm.');
+        const labels = { SIZE: 'Kích cỡ', TOPPING: 'Món thêm', SUGAR_LEVEL: 'Mức đường', ICE_LEVEL: 'Mức đá', OTHER: 'Tùy chọn khác' };
+        const groups = new Map();
+        available.forEach(option => {
+            const type = option.optionType || 'OTHER';
+            if (!groups.has(type)) groups.set(type, []);
+            groups.get(type).push(option);
+        });
+        elements.editorOptions.innerHTML = [...groups].map(([type, choices]) => {
+            const single = ['SIZE', 'SUGAR_LEVEL', 'ICE_LEVEL'].includes(type);
+            const hasSelection = choices.some(option => selected.has(option.id));
+            const emptyChoice = single ? `<label class="cart-editor-option"><input type="radio" name="edit_${escapeHtml(type)}" value="" data-extra="0" ${!hasSelection ? 'checked' : ''}><span>${type === 'SIZE' ? 'Tiêu chuẩn' : 'Không chọn'}</span><span>+0 đ</span></label>` : '';
+            return `<fieldset class="cart-editor-group"><legend>${escapeHtml(labels[type] || 'Tùy chọn khác')}</legend>${emptyChoice}${choices.map(option =>
+                `<label class="cart-editor-option"><input type="${single ? 'radio' : 'checkbox'}" name="edit_${escapeHtml(type)}" value="${escapeHtml(option.id)}" data-extra="${Number(option.extraPrice) || 0}" ${selected.has(option.id) ? 'checked' : ''}><span>${escapeHtml(option.name)}</span><span>+${formatPrice(option.extraPrice)}</span></label>`
+            ).join('')}</fieldset>`;
+        }).join('');
+    }
+
+    function updateEditorTotal() {
+        if (!state.editorFood) return;
+        let unitPrice = Number(state.editorFood.price) || 0;
+        elements.editorOptions.querySelectorAll('input:checked').forEach(option => unitPrice += Number(option.dataset.extra) || 0);
+        const quantity = Number(elements.editorQuantity.value);
+        elements.editorTotal.textContent = formatPrice(unitPrice * (Number.isInteger(quantity) && quantity >= 1 && quantity <= 100 ? quantity : 0));
+    }
+
+    function closeItemEditor(force = false) {
+        if (state.editorSaving && !force) return;
+        state.editorRequest++;
+        state.editorItem = null;
+        state.editorFood = null;
+        state.editorLoading = false;
+        state.editorSaving = false;
+        if (elements.editor?.open) elements.editor.close();
+        updateControls();
+        if (editorReturnFocus?.isConnected && !editorReturnFocus.disabled) editorReturnFocus.focus();
+        else elements.itemsContainer?.querySelector('.btn-edit')?.focus();
+    }
+
+    async function saveItemEditor(event) {
+        event.preventDefault();
+        if (!state.editorItem || !state.editorFood || state.editorLoading || state.editorSaving || state.sessionExpired) return;
+        if (!elements.editorForm.reportValidity()) return;
+        const payload = {
+            cartItemId: state.editorItem.cartItemId,
+            quantity: Number(elements.editorQuantity.value),
+            note: elements.editorNote.value.trim(),
+            optionIds: [...elements.editorOptions.querySelectorAll('input:checked')].map(option => option.value).filter(Boolean)
+        };
+        state.editorSaving = true;
+        state.cartMutation = true;
+        elements.editorStatus.textContent = 'Đang lưu thay đổi...';
+        updateControls();
+        try {
+            const data = await requestApi('/api/cart/items/update', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+            });
+            if (!data) return;
+            if (!data.success || !data.data) throw new Error(apiErrorMessage(data, 'Không thể cập nhật món.'));
+            state.cart = data.data;
+            renderCart();
+            await revalidateAppliedVoucher();
+            closeItemEditor(true);
+            showToast('Đã cập nhật tùy chọn món', 'success');
+        } catch (error) {
+            if (!state.sessionExpired) elements.editorStatus.textContent = error.message || 'Lỗi kết nối khi cập nhật món. Vui lòng thử lại.';
+        } finally {
+            state.editorSaving = false;
+            state.cartMutation = false;
+            updateControls();
+            if (!state.editorItem) elements.itemsContainer?.querySelector('.btn-edit')?.focus();
         }
     }
 
@@ -595,10 +744,11 @@
                              onerror="this.onerror=null;this.src='${API_BASE}/assets/images/food-placeholder.svg'">
                     </div>
                     <div class="cart-item-info">
-                        <h3 class="cart-item-title">${escapeHtml(item.foodName || 'Món ăn')}</h3>
+                        <h3 class="cart-item-title"><button type="button" class="cart-item-title-button btn-edit" data-id="${escapeHtml(item.cartItemId)}">${escapeHtml(item.foodName || 'Món ăn')}</button></h3>
                         ${optionsText ? `<p class="cart-item-options">${escapeHtml(optionsText)}</p>` : ''}
                         ${item.note ? `<p class="cart-item-note">💬 "${escapeHtml(item.note)}"</p>` : ''}
                         <div class="cart-item-actions">
+                            <button type="button" class="cart-item-edit-btn btn-edit" data-id="${escapeHtml(item.cartItemId)}">Chỉnh sửa món</button>
                             <div class="cart-stepper">
                                 <button type="button" class="cart-stepper-btn btn-dec" data-id="${escapeHtml(item.cartItemId)}" data-qty="${item.quantity - 1}" aria-label="Giảm số lượng">−</button>
                                 <span class="cart-stepper-val">${item.quantity}</span>
@@ -618,6 +768,15 @@
                 </div>
             `;
         }).join('');
+
+        elements.itemsContainer.querySelectorAll('.btn-edit').forEach(btn => {
+            btn.addEventListener('click', () => openItemEditor(btn.dataset.id));
+        });
+        elements.itemsContainer.querySelectorAll('.cart-item-card').forEach(card => {
+            card.addEventListener('click', event => {
+                if (!event.target.closest('button')) openItemEditor(card.dataset.id);
+            });
+        });
 
         // Attach stepper events
         elements.itemsContainer.querySelectorAll('.btn-dec').forEach(btn => {
@@ -646,13 +805,12 @@
 
     function renderSummary() {
         const subtotal = state.cart ? parseFloat(state.cart.subtotal || 0) : 0;
-        const deliveryFee = subtotal > 0 ? state.deliveryFee : 0;
         const discount = state.appliedVoucher ? parseFloat(state.appliedVoucher.discountAmount || 0) : 0;
-        const total = Math.max(0, subtotal + deliveryFee - discount);
+        const total = Math.max(0, subtotal - discount);
 
         if (elements.subtotalEl) elements.subtotalEl.textContent = formatPrice(subtotal);
         if (elements.deliveryFeeEl) {
-            elements.deliveryFeeEl.textContent = formatPrice(deliveryFee);
+            elements.deliveryFeeEl.textContent = subtotal > 0 ? 'Tính khi thanh toán' : formatPrice(0);
         }
 
         // Discount row
@@ -698,11 +856,19 @@
     }
 
     function cartBusy() {
-        return state.loading || state.cartMutation || state.voucherPending || state.sessionExpired || Boolean(state.error);
+        return state.loading || state.cartMutation || state.voucherPending || state.sessionExpired || Boolean(state.error) || Boolean(state.editorItem);
     }
 
     function updateControls() {
         const busy = cartBusy();
+        if (elements.editor) {
+            const editorBusy = state.editorLoading || state.editorSaving;
+            elements.editorSave.disabled = editorBusy || !state.editorFood || state.sessionExpired;
+            elements.editorClose.disabled = state.editorSaving;
+            elements.editorCancel.disabled = state.editorSaving;
+            elements.editorFields.querySelectorAll('input, textarea').forEach(control => control.disabled = editorBusy);
+            elements.editorForm.setAttribute('aria-busy', String(editorBusy));
+        }
         if (elements.checkoutBtn) elements.checkoutBtn.disabled = busy || !state.cart?.items?.length;
         if (elements.clearCartBtn) elements.clearCartBtn.disabled = busy;
         if (elements.voucherApplyBtn) elements.voucherApplyBtn.disabled = busy;

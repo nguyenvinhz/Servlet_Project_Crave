@@ -83,6 +83,7 @@ public class AuthenticationFilter implements Filter {
                 || path.equals("/api/profile") || under(path, "/api/addresses")
                 || under(path, "/api/orders") || under(path, "/api/payments")
                 || under(path, "/api/payos/orders")
+                || under(path, "/api/delivery")
                 || under(path, "/api/cart") || under(path, "/cart")
                 || (under(path, "/api/promotions") && !READ_METHODS.contains(method))
                 || under(path, "/checkout") || under(path, "/orders");
