@@ -506,6 +506,9 @@ const checkoutFixture = `
  const withCheckoutAccount = fixture => async request => {
    if(request.method==='GET'&&request.url.endsWith('/api/profile'))return reply(200,profile);
    if(request.method==='GET'&&request.url.endsWith('/api/addresses'))return reply(200,[{id:'DC01',addressLine:'123 Street',note:null,isDefault:true}]);
+   if(request.method==='GET'&&request.url.endsWith('/api/delivery/policy'))return reply(200,{configured:true,store:{address:'Fixture store',latitude:10.8925871,longitude:106.7637161}});
+   if(request.method==='POST'&&request.url.endsWith('/api/delivery/search'))return reply(200,[{label:'123 Street',latitude:10.91,longitude:106.76,approximate:false}]);
+   if(request.method==='POST'&&request.url.endsWith('/api/delivery/quote'))return reply(200,{deliveryFee:4000,deliverable:true,message:'Đã xác nhận điểm nhận hàng.'});
    return fixture(request);
  };
  const checkoutCalls = endpoint => calls.filter(request=>request.url.endsWith('/api/'+endpoint));
@@ -538,8 +541,8 @@ cases.push(
  document.getElementById('proceedCheckoutBtn').click();
  releaseValidate();await waitFor(()=>!document.getElementById('proceedCheckoutBtn').disabled);
  assert(calls.at(-1).body.subtotal===250000,'Revalidation used old subtotal');
- assert(document.getElementById('summaryTotal').textContent==='240.000 đ','New total or fixed delivery fee incorrect');
- assert(document.getElementById('summaryDeliveryFee').textContent==='15.000 đ','Cart invented free delivery above 200k');
+ assert(document.getElementById('summaryTotal').textContent==='225.000 đ','Revalidated cart total incorrect');
+ assert(document.getElementById('summaryDeliveryFee').textContent==='Tính khi thanh toán','Cart charged delivery without a confirmed location');
  `},
  {name:'cart-remove-during-revalidation-ignores-stale-response',page:'cart/index',route:'cart',setup:cartFixture+voucherFixture+`
  let release,validations=0;const fixtureFetch=async request=>{
@@ -550,7 +553,7 @@ cases.push(
  sessionStorage.setItem('crave_applied_voucher','old voucher');document.querySelector('.btn-inc').click();await waitFor(()=>release);
  document.getElementById('voucherRemoveBtn').click();release();await waitFor(()=>!document.getElementById('proceedCheckoutBtn').disabled);
  assert(document.getElementById('voucherAppliedChip').style.display==='none','Delayed validation restored removed voucher');
- assert(document.getElementById('summaryTotal').textContent==='215.000 đ','Removed voucher left stale discount');
+ assert(document.getElementById('summaryTotal').textContent==='200.000 đ','Removed voucher left stale discount');
  assert(sessionStorage.getItem('crave_applied_voucher')===null,'Removed voucher persisted for checkout');
  `},
  ...['network','minimum'].map(kind=>({name:'cart-revalidation-'+kind+'-clears-discount',page:'cart/index',route:'cart',setup:cartFixture+voucherFixture+`
@@ -561,7 +564,7 @@ cases.push(
  ${kind==='network'?"throw new Error('offline');":"return reply(400,null,{code:'PROMOTION_MIN_ORDER_NOT_MET',message:'Minimum not met'});"}};`,run:cartReady+applyCartVoucher+`
  saveVoucher();document.querySelector('.btn-inc').click();await waitFor(()=>!document.getElementById('proceedCheckoutBtn').disabled);
  assert(document.getElementById('voucherAppliedChip').style.display==='none','Failed validation kept voucher');
- assert(document.getElementById('summaryTotal').textContent==='65.000 đ','Failed validation kept old amount');
+ assert(document.getElementById('summaryTotal').textContent==='50.000 đ','Failed validation kept old amount');
  assert(sessionStorage.getItem('crave_applied_voucher')===null,'Failed validation left checkout voucher');
  `})),
  {name:'cart-storage-unavailable-handoff-uses-code-query',page:'cart/index',route:'cart',context:'/cart-shop',setup:cartFixture+voucherFixture+`
@@ -579,7 +582,7 @@ cases.push(
  assert(checkoutCalls('profile').length===1&&checkoutCalls('addresses').length===1,'Checkout did not load recipient/address data');
  assert(document.getElementById('receiverName').value===profile.fullName&&document.getElementById('receiverPhone').value===profile.phone,'Checkout did not populate recipient');
  assert(document.getElementById('deliveryAddress').value==='123 Street','Checkout did not populate saved default address');
- assert(document.getElementById('summaryTotal').textContent==='150.000 đ','Checkout trusted saved discount');
+ assert(document.getElementById('summaryTotal').textContent==='139.000 đ','Checkout ignored the verified voucher or location quote');
  assert(!document.getElementById('summaryDiscountRow').hidden,'Validated discount missing');
  document.getElementById('fulfillmentType').value='PICKUP';document.getElementById('fulfillmentType').dispatchEvent(new Event('change'));
  assert(document.getElementById('summaryTotal').textContent==='135.000 đ'&&!document.getElementById('deliveryAddress').required,'Pickup fee/address incorrect');
@@ -613,13 +616,13 @@ cases.push(
  assert(document.getElementById('placeOrderBtn').disabled&&sessionStorage.getItem('crave_applied_voucher'),'Validation failure allowed order or lost voucher intent');
  assert(document.getElementById('checkoutAlert').textContent==='Validation unavailable','Validation failure missing');
  document.getElementById('retryCheckoutBtn').click();await waitFor(()=>!document.getElementById('placeOrderBtn').disabled);
- assert(document.getElementById('summaryTotal').textContent==='105.000 đ','Validation retry failed');
+ assert(document.getElementById('summaryTotal').textContent==='94.000 đ','Validation retry failed');
  `},
  {name:'checkout-expired-handoff-clears-voucher',page:'order/checkout',route:'checkout',setup:cartFixture+voucherFixture+checkoutFixture+`
  saveVoucher();const fixtureFetch=withCheckoutAccount(async request=>request.method==='GET'?reply(200,cart):reply(400,null,{code:'PROMOTION_EXPIRED',message:'Voucher expired'}));`,run:`
  await waitFor(()=>!document.getElementById('placeOrderBtn').disabled);
  assert(document.getElementById('checkoutAlert').textContent==='Voucher expired','Expired voucher was silently dropped');
- assert(document.getElementById('summaryTotal').textContent==='115.000 đ'&&document.getElementById('summaryDiscountRow').hidden,'Expired voucher left discounted total');
+ assert(document.getElementById('summaryTotal').textContent==='104.000 đ'&&document.getElementById('summaryDiscountRow').hidden,'Expired voucher left discounted total');
  assert(sessionStorage.getItem('crave_applied_voucher')===null,'Expired handoff retained');
  `},
  {name:'checkout-order-expiry-updates-total-before-retry',page:'order/checkout',route:'checkout',setup:cartFixture+voucherFixture+checkoutFixture+`
@@ -631,7 +634,7 @@ cases.push(
  await waitFor(()=>document.getElementById('checkoutAlert').textContent==='Expired while ordering');
  assert(calls.filter(c=>c.url.endsWith('/api/orders')).length===1,'Expired voucher silently retried full-price order');
  await waitFor(()=>!document.getElementById('placeOrderBtn').disabled);
- assert(document.getElementById('summaryTotal').textContent==='115.000 đ'&&sessionStorage.getItem('crave_applied_voucher')===null,'Order expiry retained discount');
+ assert(document.getElementById('summaryTotal').textContent==='104.000 đ'&&sessionStorage.getItem('crave_applied_voucher')===null,'Order expiry retained discount');
  submit('checkoutForm');await waitFor(()=>calls.filter(c=>c.url.endsWith('/api/orders')).length===2);
  assert(calls.at(-1).body.promotionId===null,'Explicit retry sent expired promotion');
  `},
@@ -646,7 +649,7 @@ cases.push(
  await waitFor(()=>releaseReload);submit('checkoutForm');
  assert(calls.filter(c=>c.url.endsWith('/api/orders')).length===1&&document.getElementById('placeOrderBtn').disabled,'Stale cart allowed another order');
  releaseReload();await waitFor(()=>!document.getElementById('placeOrderBtn').disabled);
- assert(document.getElementById('summarySubtotal').textContent==='80.000 đ'&&document.getElementById('summaryTotal').textContent==='95.000 đ','Rejected order kept obsolete cart subtotal');
+ assert(document.getElementById('summarySubtotal').textContent==='80.000 đ'&&document.getElementById('summaryTotal').textContent==='84.000 đ','Rejected order kept obsolete cart subtotal');
  assert(document.getElementById('checkoutAlert').textContent==='Current cart is below minimum','Cart refresh swallowed rejection warning');
  `},
  ...['FOOD_NOT_AVAILABLE','INVALID_OPTION'].map(code=>({name:'checkout-'+code.toLowerCase()+'-retains-cart-recovery',page:'order/checkout',route:'checkout',setup:cartFixture+checkoutFixture+`
@@ -664,7 +667,7 @@ cases.push(
  await waitFor(()=>!document.getElementById('placeOrderBtn').disabled);
  const validation=checkoutCalls('promotions/validate');
  assert(calls[0].url==='/api/cart'&&validation.length===1&&validation[0].url==='/api/promotions/validate'&&validation[0].body.code==='SAVE10','Root context/query voucher was ignored');
- assert(document.getElementById('summaryTotal').textContent==='105.000 đ','Root-context validated voucher total incorrect');
+ assert(document.getElementById('summaryTotal').textContent==='94.000 đ','Root-context validated voucher total incorrect');
  assert(document.querySelector('a[href="/cart"]'),'Root-context cart link incorrect');
  `},
  {name:'checkout-empty-cart-cannot-submit',page:'order/checkout',route:'checkout',setup:cartFixture+voucherFixture+checkoutFixture+`
@@ -856,6 +859,8 @@ function footerMarkup() {
 const server=http.createServer((req,res)=>{
  const context=current.context??'/crave';
  const assetPath=new URL(req.url,'http://127.0.0.1').pathname;
+ const leaflet=/\/assets\/vendor\/leaflet\/(leaflet\.(?:js|css))$/.exec(assetPath);
+ if(leaflet){res.setHeader('Content-Type',leaflet[1].endsWith('.js')?'text/javascript':'text/css');res.end(fs.readFileSync(path.join(project,'frontend/assets/vendor/leaflet',leaflet[1])));return;}
  const script=/\/assets\/js\/(account|cart|checkout|orders|order-detail)\.js$/.exec(assetPath);
  if(script){res.setHeader('Content-Type','text/javascript; charset=utf-8');res.end(fs.readFileSync(path.join(project,'frontend/assets/js',script[1]+'.js')));return;}
  const stylesheet=/\/assets\/css\/(styles|account|cart|order)\.css$/.exec(assetPath);
@@ -876,7 +881,7 @@ const server=http.createServer((req,res)=>{
 });
 async function browser(url,index){
  const profileDirectory=path.join(work,'profile-'+index);
- const child=spawn(chrome,['--headless=new','--no-sandbox','--disable-gpu','--disable-background-networking','--disable-extensions','--no-first-run','--no-default-browser-check','--window-size='+(current.viewport||1280)+',900','--user-data-dir='+profileDirectory,'--remote-debugging-port=0',url],{windowsHide:true});
+ const child=spawn(chrome,['--headless=new','--no-sandbox','--disable-gpu','--disable-background-networking','--disable-extensions','--no-first-run','--no-default-browser-check','--host-resolver-rules=MAP *.tile.openstreetmap.org ~NOTFOUND','--window-size='+(current.viewport||1280)+',900','--user-data-dir='+profileDirectory,'--remote-debugging-port=0',url],{windowsHide:true});
  child.stdout.resume();child.stderr.resume();
  let startupError,socket,sequence=0;
  child.on('error',error=>startupError=error);
