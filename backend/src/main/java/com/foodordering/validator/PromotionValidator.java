@@ -1,7 +1,7 @@
 package com.foodordering.validator;
 
-import com.foodordering.entity.CustomerOrder;
-import com.foodordering.entity.Promotion;
+import com.foodordering.model.CustomerOrder;
+import com.foodordering.model.Promotion;
 import com.foodordering.enums.ErrorCode;
 import com.foodordering.enums.PromotionStatus;
 import com.foodordering.exception.BadRequestException;

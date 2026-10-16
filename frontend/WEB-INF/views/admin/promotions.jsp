@@ -1,51 +1,16 @@
 <%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
-<%@ taglib prefix="c" uri="jakarta.tags.core" %>
-<c:set var="adminPage" value="promotions" />
-<c:set var="pageTitle" value="Quản lý khuyến mãi" />
+<%@ taglib prefix="c" uri="jakarta.tags.core" %><%@ taglib prefix="fmt" uri="jakarta.tags.fmt" %>
+<fmt:setLocale value="vi_VN"/><c:set var="adminPage" value="promotions"/><c:set var="pageTitle" value="Quản lý khuyến mãi"/>
 <%@ include file="/WEB-INF/views/admin/components/begin.jspf" %>
-<link rel="stylesheet" href="<c:url value='/assets/css/admin-management.css?v=20261013-palette2' />">
-<main class="admin-content">
-    <header class="management-heading"><div><p class="management-eyebrow">Ưu đãi</p><h1>Quản lý khuyến mãi</h1>
-        <p>Tạo chương trình giảm giá và theo dõi thời gian áp dụng cho khách hàng.</p></div>
-        <div class="management-actions"><button type="button" class="button outline" id="managementRefresh">Tải lại</button>
-            <button type="button" class="button primary" id="promotionCreate">＋ Thêm khuyến mãi</button></div></header>
-    <div id="managementFeedback" class="management-feedback" role="status" aria-live="polite" hidden></div>
-    <div class="admin-toolbar management-toolbar"><label class="management-search"><span class="sr-only">Tìm khuyến mãi</span>
-        <input id="managementSearch" type="search" placeholder="Tìm theo tên hoặc mã khuyến mãi…" autocomplete="off"></label>
-        <label><span class="sr-only">Lọc trạng thái</span><select id="managementStatus"><option value="">Mọi trạng thái</option>
-            <option value="CURRENT">Đang áp dụng</option><option value="UPCOMING">Sắp diễn ra</option><option value="EXPIRED">Hết hạn</option>
-            <option value="INACTIVE">Đã tắt</option></select></label><span id="managementCount" class="management-count" aria-live="polite"></span></div>
-    <section id="managementPromotionList" class="management-promotion-list" aria-label="Danh sách khuyến mãi">
-        <div class="admin-card management-empty">Đang tải khuyến mãi…</div></section>
-    <dialog id="promotionDialog" class="modal-dialog admin-management-dialog" aria-labelledby="promotionDialogTitle">
-        <form id="promotionForm"><div class="modal-header"><h2 id="promotionDialogTitle">Thêm khuyến mãi</h2>
-            <button type="button" class="management-close" data-close-dialog aria-label="Đóng">×</button></div>
-            <div class="modal-body management-form"><div class="form-row"><div class="form-group"><label for="promotionCode">Mã khuyến mãi</label>
-                <input id="promotionCode" name="code" required maxlength="30" pattern="[A-Za-z0-9_-]+" placeholder="WELCOME10"></div>
-                <div class="form-group"><label for="promotionStatus">Trạng thái</label><select id="promotionStatus" name="status">
-                    <option value="ACTIVE">Bật áp dụng</option><option value="INACTIVE">Tắt áp dụng</option></select></div></div>
-                <div class="form-group"><label for="promotionName">Tên chương trình</label><input id="promotionName" name="name" required maxlength="150"></div>
-                <div class="form-row"><div class="form-group"><label for="promotionType">Loại giảm giá</label><select id="promotionType" name="discountType">
-                    <option value="PERCENT">Theo phần trăm</option><option value="FIXED_AMOUNT">Theo số tiền</option></select></div>
-                    <div class="form-group"><label for="promotionValue" id="promotionValueLabel">Giảm giá (%)</label>
-                        <input id="promotionValue" name="discountValue" type="number" min="1" max="100" step="1" required></div></div>
-                <div class="form-row"><div class="form-group"><label for="promotionMinimum">Đơn tối thiểu (đ)</label>
-                    <input id="promotionMinimum" name="minimumOrderValue" type="number" min="0" max="999999999999" step="1" value="0" required></div>
-                    <div class="form-group"><label for="promotionMaximum">Giảm tối đa (đ)</label>
-                        <input id="promotionMaximum" name="maximumDiscount" type="number" min="1" max="999999999999" step="1" placeholder="Không giới hạn"></div></div>
-                <div class="form-row"><div class="form-group"><label for="promotionStart">Bắt đầu</label>
-                    <input id="promotionStart" name="startAt" type="datetime-local" step="60" required></div>
-                    <div class="form-group"><label for="promotionEnd">Kết thúc</label><input id="promotionEnd" name="endAt" type="datetime-local" step="60" required></div></div>
-                <small>Thời gian áp dụng theo múi giờ Việt Nam.</small><p id="promotionFormError" class="management-form-error" role="alert" hidden></p></div>
-            <div class="modal-footer"><button type="button" class="button outline" data-close-dialog>Hủy</button><button type="submit" class="button primary">Lưu khuyến mãi</button></div></form>
-    </dialog>
-    <dialog id="managementConfirm" class="modal-dialog admin-management-dialog" aria-labelledby="managementConfirmTitle">
-        <form id="managementConfirmForm"><div class="modal-header"><h2 id="managementConfirmTitle">Cập nhật khuyến mãi</h2>
-            <button type="button" class="management-close" data-close-dialog aria-label="Đóng">×</button></div>
-            <div class="modal-body"><p id="managementConfirmMessage"></p></div>
-            <div class="modal-footer"><button type="button" class="button outline" data-close-dialog>Hủy</button>
-                <button type="submit" class="button primary" id="managementConfirmSubmit">Xác nhận</button></div></form>
-    </dialog>
-</main>
-<script src="<c:url value='/assets/js/admin-management.js' />" defer></script>
+
+<main class="admin-content"><header class="management-heading"><div><p class="management-eyebrow">Ưu đãi</p><h1>Quản lý khuyến mãi</h1><p>Tạo chương trình giảm giá và theo dõi thời gian áp dụng.</p></div><a class="button primary" href="#promotion-form">＋ Thêm khuyến mãi</a></header>
+<%@ include file="/WEB-INF/views/admin/components/feedback.jspf" %>
+<form method="get" action="<c:url value='/admin/promotions'/>" class="admin-toolbar management-toolbar"><input type="search" name="keyword" value="<c:out value='${param.keyword}'/>" placeholder="Tên hoặc mã khuyến mãi" aria-label="Tìm khuyến mãi"><select name="status" aria-label="Trạng thái"><option value="">Mọi trạng thái</option><option value="CURRENT" ${param.status == 'CURRENT' ? 'selected' : ''}>Đang áp dụng</option><option value="UPCOMING" ${param.status == 'UPCOMING' ? 'selected' : ''}>Sắp diễn ra</option><option value="EXPIRED" ${param.status == 'EXPIRED' ? 'selected' : ''}>Hết hạn</option><option value="INACTIVE" ${param.status == 'INACTIVE' ? 'selected' : ''}>Đã tắt</option></select><button class="button primary">Lọc</button></form>
+<section class="management-promotion-list"><c:forEach var="promotion" items="${promotions}"><article class="admin-card"><div class="card-header"><h2><c:out value="${promotion.name}"/></h2><strong><c:out value="${promotion.code}"/></strong></div><div class="card-body"><p>Giảm <fmt:formatNumber value="${promotion.discountValue}"/> ${promotion.discountType == 'PERCENT' ? '%' : '₫'} · Đơn từ <fmt:formatNumber value="${promotion.minimumOrderValue}"/> ₫<c:if test="${not empty promotion.maximumDiscount}"> · Tối đa <fmt:formatNumber value="${promotion.maximumDiscount}"/> ₫</c:if></p><p><c:out value="${promotion.startAt}"/> — <c:out value="${promotion.endAt}"/></p><p><c:choose><c:when test="${promotion.status == 'INACTIVE'}">Đã tắt</c:when><c:when test="${now.isBefore(promotion.startAt)}">Sắp diễn ra</c:when><c:when test="${now.isAfter(promotion.endAt)}">Hết hạn</c:when><c:otherwise>Đang áp dụng</c:otherwise></c:choose></p><div class="row-actions"><a class="button outline" href="<c:url value='/admin/promotions'><c:param name='edit' value='${promotion.promotionId}'/></c:url>#promotion-form">Sửa</a><form method="post" action="<c:url value='/admin/promotions'/>"><input type="hidden" name="action" value="status"><input type="hidden" name="id" value="<c:out value='${promotion.promotionId}'/>"><input type="hidden" name="status" value="${promotion.status == 'ACTIVE' ? 'INACTIVE' : 'ACTIVE'}"><button class="button outline">${promotion.status == 'ACTIVE' ? 'Tắt áp dụng' : 'Bật áp dụng'}</button></form></div></div></article></c:forEach><c:if test="${empty promotions}"><div class="admin-card management-empty">Không tìm thấy khuyến mãi.</div></c:if></section>
+<section class="admin-card" id="promotion-form"><div class="card-header"><h2>${empty editingPromotion ? 'Thêm khuyến mãi' : 'Sửa khuyến mãi'}</h2></div><form method="post" action="<c:url value='/admin/promotions'/>" class="card-body management-form"><input type="hidden" name="action" value="${empty editingPromotion ? 'create' : 'update'}"><input type="hidden" name="id" value="<c:out value='${editingPromotion.promotionId}'/>">
+<div class="form-row"><div class="form-group"><label for="promotion-code">Mã khuyến mãi</label><input id="promotion-code" name="code" required maxlength="30" pattern="[A-Za-z0-9_-]+" value="<c:out value='${editingPromotion.code}'/>"></div><div class="form-group"><label for="promotion-status">Trạng thái</label><select id="promotion-status" name="status"><option value="ACTIVE" ${editingPromotion.status == 'ACTIVE' ? 'selected' : ''}>Bật áp dụng</option><option value="INACTIVE" ${editingPromotion.status == 'INACTIVE' ? 'selected' : ''}>Tắt áp dụng</option></select></div></div>
+<div class="form-group"><label for="promotion-name">Tên chương trình</label><input id="promotion-name" name="name" maxlength="150" required value="<c:out value='${editingPromotion.name}'/>"></div>
+<div class="form-row"><div class="form-group"><label for="promotion-type">Loại giảm giá</label><select id="promotion-type" name="discountType"><option value="PERCENT" ${editingPromotion.discountType == 'PERCENT' ? 'selected' : ''}>Theo phần trăm</option><option value="FIXED_AMOUNT" ${editingPromotion.discountType == 'FIXED_AMOUNT' ? 'selected' : ''}>Theo số tiền</option></select></div><div class="form-group"><label for="promotion-value">Giá trị giảm</label><input id="promotion-value" name="discountValue" type="number" min="1" max="999999999999" step="1" required value="<c:out value='${editingPromotion.discountValue}'/>"></div></div>
+<div class="form-row"><div class="form-group"><label for="promotion-minimum">Đơn tối thiểu (đ)</label><input id="promotion-minimum" name="minimumOrderValue" type="number" min="0" max="999999999999" step="1" required value="<c:out value='${empty editingPromotion ? 0 : editingPromotion.minimumOrderValue}'/>"></div><div class="form-group"><label for="promotion-maximum">Giảm tối đa (đ)</label><input id="promotion-maximum" name="maximumDiscount" type="number" min="1" max="999999999999" step="1" placeholder="Không giới hạn" value="<c:out value='${editingPromotion.maximumDiscount}'/>"></div></div>
+<div class="form-row"><div class="form-group"><label for="promotion-start">Bắt đầu</label><input id="promotion-start" name="startAt" type="datetime-local" step="1" required value="<c:out value='${editingPromotion.startAt}'/>"></div><div class="form-group"><label for="promotion-end">Kết thúc</label><input id="promotion-end" name="endAt" type="datetime-local" step="1" required value="<c:out value='${editingPromotion.endAt}'/>"></div></div><p>Thời gian áp dụng theo múi giờ Việt Nam.</p><button class="button primary">Lưu khuyến mãi</button><c:if test="${not empty editingPromotion}"><a class="button outline" href="<c:url value='/admin/promotions'/>">Hủy sửa</a></c:if></form></section></main>
 <%@ include file="/WEB-INF/views/admin/components/end.jspf" %>

@@ -3,15 +3,15 @@ package com.foodordering.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.foodordering.config.DatabaseConfig;
 import com.foodordering.config.PayosConfig;
-import com.foodordering.entity.CustomerOrder;
-import com.foodordering.entity.Payment;
-import com.foodordering.entity.PayosPaymentLink;
+import com.foodordering.model.CustomerOrder;
+import com.foodordering.model.Payment;
+import com.foodordering.model.PayosPaymentLink;
 import com.foodordering.enums.OrderStatus;
 import com.foodordering.enums.PaymentMethod;
 import com.foodordering.enums.PaymentStatus;
 import com.foodordering.exception.AccountException;
-import com.foodordering.gateway.PayosClient;
-import com.foodordering.gateway.PayosException;
+import com.foodordering.integration.PayosClient;
+import com.foodordering.integration.PayosException;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import jakarta.persistence.EntityTransaction;
@@ -43,11 +43,11 @@ public class PayosPaymentService {
         this.factory = factory;
     }
 
-    public record PaymentLinkResponse(String orderId, String paymentId, long orderCode, long amount,
+    public record PaymentLinkBean(String orderId, String paymentId, long orderCode, long amount,
             String currency, String status, String paymentStatus, String checkoutUrl, String qrCode,
             String accountNumber, String accountName, String description, String bin) { }
 
-    public PaymentLinkResponse create(String orderId, String customerId) {
+    public PaymentLinkBean create(String orderId, String customerId) {
         requireConfigured();
         Snapshot reservation = transaction(em -> {
             CustomerOrder order = ownedOrder(em, orderId, customerId, true);
@@ -110,7 +110,7 @@ public class PayosPaymentService {
         return response(updated);
     }
 
-    public PaymentLinkResponse status(String orderId, String customerId) {
+    public PaymentLinkBean status(String orderId, String customerId) {
         requireConfigured();
         Snapshot stored = transaction(em -> {
             CustomerOrder order = ownedOrder(em, orderId, customerId, false);
@@ -324,12 +324,12 @@ public class PayosPaymentService {
                 link.getAccountName(), link.getBin(), order.getStatus(), payment.getStatus());
     }
 
-    private static PaymentLinkResponse response(Snapshot stored) {
+    private static PaymentLinkBean response(Snapshot stored) {
         String status = stored.paymentStatus == PaymentStatus.REFUNDED ? "REFUNDED"
                 : stored.paymentStatus == PaymentStatus.SUCCESS ? "PAID"
                 : stored.orderStatus == OrderStatus.CANCELLED ? "CANCELLED" : stored.status;
         boolean payable = Set.of("PENDING", "PROCESSING").contains(status);
-        return new PaymentLinkResponse(stored.orderId, stored.paymentId, stored.orderCode, stored.amount, "VND", status,
+        return new PaymentLinkBean(stored.orderId, stored.paymentId, stored.orderCode, stored.amount, "VND", status,
                 stored.paymentStatus.name(), payable ? stored.checkoutUrl : null, payable ? stored.qrCode : null,
                 stored.accountNumber, stored.accountName, stored.transferDescription, stored.bin);
     }

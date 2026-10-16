@@ -5,6 +5,8 @@
 <%@ include file="/WEB-INF/views/components/header.jspf" %>
 
 <main class="page-container home-menu-page" id="main-content">
+    <c:if test="${not empty flashError}"><p class="form-error" role="alert"><c:out value="${flashError}"/></p></c:if>
+    <c:if test="${not empty flashMessage}"><p class="form-success" role="status"><c:out value="${flashMessage}"/></p></c:if>
     <section class="crave-hero-banner" aria-labelledby="hero-title">
         <div class="hero-text-col">
             <span class="hero-eyebrow">Bữa ngon tiếp theo của bạn</span>
@@ -102,14 +104,16 @@
                                     </button>
                                 </c:when>
                                 <c:otherwise>
-                                    <button type="button" 
-                                            class="food-card-action" 
-                                            data-quick-add="<c:out value='${food.id}'/>" 
-                                            data-food-name="<c:out value='${food.name}'/>" 
-                                            aria-label="Thêm nhanh <c:out value='${food.name}'/> vào giỏ hàng"
-                                            title="Thêm nhanh vào giỏ hàng">
-                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-                                    </button>
+                                    <c:url var="returnMenu" value="/menu"><c:param name="categoryId" value="${currentCategoryId}"/><c:param name="keyword" value="${keyword}"/></c:url>
+                                    <form method="post" action="<c:url value='/cart/items'/>">
+                                        <input type="hidden" name="foodId" value="<c:out value='${food.id}'/>">
+                                        <input type="hidden" name="quantity" value="1">
+                                        <input type="hidden" name="action" value="add">
+                                        <input type="hidden" name="returnTo" value="<c:out value='${returnMenu}'/>">
+                                        <button type="submit" class="food-card-action" aria-label="Thêm nhanh <c:out value='${food.name}'/> vào giỏ hàng" title="Thêm nhanh vào giỏ hàng">
+                                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+                                        </button>
+                                    </form>
                                 </c:otherwise>
                             </c:choose>
                         </div>

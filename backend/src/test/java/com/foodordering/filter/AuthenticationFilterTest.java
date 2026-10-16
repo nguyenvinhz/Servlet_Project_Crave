@@ -1,14 +1,14 @@
 package com.foodordering.filter;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.foodordering.config.SessionConfigurationListener;
-import com.foodordering.dto.ProfileResponse;
+
+import com.foodordering.listener.SessionConfigurationListener;
+import com.foodordering.bean.ProfileBean;
 import com.foodordering.enums.AccountType;
 import com.foodordering.enums.EmployeeRole;
 import com.foodordering.exception.AccountException;
 import com.foodordering.security.SessionAuth;
 import com.foodordering.service.AccountService;
-import com.foodordering.utils.JsonProvider;
+
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletContext;
 import jakarta.servlet.ServletContextEvent;
@@ -39,7 +39,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 class AuthenticationFilterTest {
-    private static final ProfileResponse CUSTOMER = new ProfileResponse("KH01", AccountType.CUSTOMER,
+    private static final ProfileBean CUSTOMER = new ProfileBean("KH01", AccountType.CUSTOMER,
             "Vinh", "vinh@example.com", "0901234567", null);
     private AccountService accounts;
     private AuthenticationFilter filter;
@@ -54,7 +54,7 @@ class AuthenticationFilterTest {
     void publicPagesCatalogAndHealthDoNotRequireSessionOrDatabase() throws Exception {
         for (String path : new String[]{"/", "/auth/login", "/auth/register", "/auth/forgot-password", "/menu", "/menu/detail",
                 "/api/foods", "/api/categories", "/api/health", "/assets/css/styles.css",
-                "/promotions", "/api/promotions", "/api/promotions/active"}) {
+                "/promotions"}) {
             Exchange exchange = request("GET", path, null);
             exchange.send();
             verify(exchange.chain).doFilter(exchange.request, exchange.response);
@@ -65,9 +65,9 @@ class AuthenticationFilterTest {
 
     @Test
     void promotionMutationsRequireAuthenticationEvenWithPrefixMappingAndMatrixParameters() throws Exception {
-        for (String path : new String[]{"/api/promotions", "/api/promotions/validate", "/api/promotions;ignored/validate"}) {
+        for (String path : new String[]{"/cart/promotion", "/cart/promotion/validate", "/cart/promotion;ignored/validate"}) {
             Exchange exchange = request("POST", path, null);
-            when(exchange.request.getServletPath()).thenReturn(path.contains(";") ? "/api/promotions;ignored" : "/api/promotions");
+            when(exchange.request.getServletPath()).thenReturn(path.contains(";") ? "/cart/promotion;ignored" : "/cart/promotion");
             when(exchange.request.getPathInfo()).thenReturn(path.endsWith("validate") ? "/validate" : null);
             exchange.send();
             exchange.assertError(401, "UNAUTHORIZED");
@@ -91,9 +91,9 @@ class AuthenticationFilterTest {
 
     @Test
     void employeeCannotValidateCustomerVoucher() throws Exception {
-        ProfileResponse employee = employee(EmployeeRole.ADMIN);
+        ProfileBean employee = employee(EmployeeRole.ADMIN);
         when(accounts.getProfile("NV01")).thenReturn(employee);
-        Exchange exchange = request("POST", "/api/promotions/validate", employee);
+        Exchange exchange = request("POST", "/cart/promotion/validate", employee);
 
         exchange.send();
 
@@ -104,7 +104,7 @@ class AuthenticationFilterTest {
     @Test
     void customerVoucherValidationRefreshesAccountBeforeProceeding() throws Exception {
         when(accounts.getProfile("KH01")).thenReturn(CUSTOMER);
-        Exchange exchange = request("POST", "/api/promotions/validate", CUSTOMER);
+        Exchange exchange = request("POST", "/cart/promotion/validate", CUSTOMER);
 
         exchange.send();
 
@@ -115,10 +115,10 @@ class AuthenticationFilterTest {
     }
 
     @Test
-    void protectedApisRejectAnonymousRequestsWith401Json() throws Exception {
-        for (String path : new String[]{"/api/profile", "/api/addresses", "/api/addresses/DC01",
-                "/api/orders", "/api/orders/DH01", "/api/cart", "/api/payments/TT01", "/api/admin/foods",
-                "/api/payos/orders/DH01", "/api/payos/orders/DH01/qr"}) {
+    void protectedRoutesRedirectAnonymousRequestsToLogin() throws Exception {
+        for (String path : new String[]{"/customer/profile", "/customer/addresses", "/customer/addresses/DC01",
+                "/orders", "/orders/DH01", "/cart", "/payments/TT01", "/admin/foods",
+                "/payments/payos/DH01", "/payments/payos/DH01/qr"}) {
             Exchange exchange = request("GET", path, null);
             exchange.send();
             exchange.assertError(401, "UNAUTHORIZED");
@@ -129,8 +129,8 @@ class AuthenticationFilterTest {
 
     @Test
     void servletMatrixParametersCannotBypassAuthentication() throws Exception {
-        for (String path : new String[]{"/api/admin;ignored/foods", "/api;ignored/admin/foods", "/api/profile;ignored",
-                "/api/addresses;ignored/DC01", "/api/orders;jsessionid=attacker/DH01"}) {
+        for (String path : new String[]{"/admin;ignored/foods", "/admin;ignored/foods", "/customer/profile;ignored",
+                "/customer/addresses;ignored/DC01", "/orders;jsessionid=attacker/DH01"}) {
             Exchange exchange = request("GET", path, null);
             exchange.send();
             exchange.assertError(401, "UNAUTHORIZED");
@@ -149,7 +149,7 @@ class AuthenticationFilterTest {
         verifyNoInteractions(accounts);
         verify(webhook.request, never()).getSession(false);
 
-        Exchange browser = request("POST", "/api/payos/orders/DH01", CUSTOMER);
+        Exchange browser = request("POST", "/payments/payos/DH01", CUSTOMER);
         when(browser.request.getHeader("Origin")).thenReturn("https://attacker.invalid");
         browser.send();
         browser.assertError(403, "FORBIDDEN");
@@ -159,14 +159,14 @@ class AuthenticationFilterTest {
     @Test
     void servletMatrixParametersCannotBypassAdminAuthorization() throws Exception {
         when(accounts.getProfile("KH01")).thenReturn(CUSTOMER);
-        Exchange customer = request("GET", "/api/admin;ignored/foods", CUSTOMER);
+        Exchange customer = request("GET", "/admin;ignored/foods", CUSTOMER);
         customer.send();
         customer.assertError(403, "FORBIDDEN");
         verifyNoInteractions(customer.chain);
 
-        ProfileResponse orderStaff = employee(EmployeeRole.ORDER_STAFF);
+        ProfileBean orderStaff = employee(EmployeeRole.ORDER_STAFF);
         when(accounts.getProfile("NV01")).thenReturn(orderStaff);
-        Exchange wrongRole = request("GET", "/api/admin;ignored/foods", orderStaff);
+        Exchange wrongRole = request("GET", "/admin;ignored/foods", orderStaff);
         wrongRole.send();
         wrongRole.assertError(403, "FORBIDDEN");
         verifyNoInteractions(wrongRole.chain);
@@ -174,8 +174,8 @@ class AuthenticationFilterTest {
 
     @Test
     void servletMappingCanonicalPathControlsAuthentication() throws Exception {
-        Exchange anonymous = request("GET", "/public/../api/admin/foods", null);
-        when(anonymous.request.getServletPath()).thenReturn("/api/admin/foods");
+        Exchange anonymous = request("GET", "/public/../admin/foods", null);
+        when(anonymous.request.getServletPath()).thenReturn("/admin/foods");
         anonymous.send();
         anonymous.assertError(401, "UNAUTHORIZED");
         verifyNoInteractions(anonymous.chain);
@@ -185,8 +185,8 @@ class AuthenticationFilterTest {
     @Test
     void prefixServletMappingIncludesPathInfoForAuthenticatedAddresses() throws Exception {
         when(accounts.getProfile("KH01")).thenReturn(CUSTOMER);
-        Exchange exchange = request("GET", "/api/addresses/DC01", CUSTOMER);
-        when(exchange.request.getServletPath()).thenReturn("/api/addresses");
+        Exchange exchange = request("GET", "/customer/addresses/DC01", CUSTOMER);
+        when(exchange.request.getServletPath()).thenReturn("/customer/addresses");
         when(exchange.request.getPathInfo()).thenReturn("/DC01");
         exchange.send();
         verify(accounts).getProfile("KH01");
@@ -206,10 +206,10 @@ class AuthenticationFilterTest {
 
     @Test
     void authenticatedCustomerRefreshesPrincipalBeforeProtectedRequest() throws Exception {
-        ProfileResponse fresh = new ProfileResponse("KH01", AccountType.CUSTOMER,
+        ProfileBean fresh = new ProfileBean("KH01", AccountType.CUSTOMER,
                 "Vinh Updated", "new@example.com", "0912345678", null);
         when(accounts.getProfile("KH01")).thenReturn(fresh);
-        Exchange exchange = request("GET", "/api/addresses", CUSTOMER);
+        Exchange exchange = request("GET", "/customer/addresses", CUSTOMER);
         exchange.send();
         verify(exchange.session).setAttribute("currentUser", fresh);
         verify(exchange.session).setAttribute("customerId", "KH01");
@@ -220,14 +220,14 @@ class AuthenticationFilterTest {
 
     @Test
     void employeeMayReadProfileButCannotAccessCustomerAddresses() throws Exception {
-        ProfileResponse employee = employee(EmployeeRole.ADMIN);
+        ProfileBean employee = employee(EmployeeRole.ADMIN);
         when(accounts.getProfile("NV01")).thenReturn(employee);
-        for (String path : new String[]{"/api/profile", "/customer/profile"}) {
+        for (String path : new String[]{"/customer/profile", "/customer/profile"}) {
             Exchange profile = request("GET", path, employee);
             profile.send();
             verify(profile.chain).doFilter(profile.request, profile.response);
         }
-        Exchange addresses = request("GET", "/api/addresses", employee);
+        Exchange addresses = request("GET", "/customer/addresses", employee);
         addresses.send();
         addresses.assertError(403, "FORBIDDEN");
         verifyNoInteractions(addresses.chain);
@@ -236,7 +236,7 @@ class AuthenticationFilterTest {
     @Test
     void customerCannotReachAdminApi() throws Exception {
         when(accounts.getProfile("KH01")).thenReturn(CUSTOMER);
-        Exchange exchange = request("GET", "/api/admin/orders", CUSTOMER);
+        Exchange exchange = request("GET", "/admin/orders", CUSTOMER);
         exchange.send();
         exchange.assertError(403, "FORBIDDEN");
         verifyNoInteractions(exchange.chain);
@@ -246,33 +246,33 @@ class AuthenticationFilterTest {
     void staffRolesOnlyAccessTheirAssignedAdminResources() throws Exception {
         Object[][] cases = {
                 {EmployeeRole.ORDER_STAFF, "/admin/orders", true},
-                {EmployeeRole.ORDER_STAFF, "/api/admin/orders", true},
-                {EmployeeRole.ORDER_STAFF, "/api/admin/payments/TT01", true},
-                {EmployeeRole.ORDER_STAFF, "/api/admin/foods", false},
-                {EmployeeRole.MENU_MANAGER, "/api/admin/foods/MA01", true},
-                {EmployeeRole.MENU_MANAGER, "/api/admin/categories", true},
-                {EmployeeRole.MENU_MANAGER, "/api/admin/options/TC01", true},
+                {EmployeeRole.ORDER_STAFF, "/admin/orders", true},
+                {EmployeeRole.ORDER_STAFF, "/admin/payments/TT01", true},
+                {EmployeeRole.ORDER_STAFF, "/admin/foods", false},
+                {EmployeeRole.MENU_MANAGER, "/admin/foods/MA01", true},
+                {EmployeeRole.MENU_MANAGER, "/admin/categories", true},
+                {EmployeeRole.MENU_MANAGER, "/admin/options/TC01", true},
                 {EmployeeRole.MENU_MANAGER, "/admin/menu", true},
                 {EmployeeRole.MENU_MANAGER, "/admin/categories", true},
-                {EmployeeRole.MENU_MANAGER, "/api/admin/orders", false},
-                {EmployeeRole.PROMOTION_MANAGER, "/api/admin/promotions", true},
+                {EmployeeRole.MENU_MANAGER, "/admin/orders", false},
                 {EmployeeRole.PROMOTION_MANAGER, "/admin/promotions", true},
-                {EmployeeRole.PROMOTION_MANAGER, "/api/admin/employees", false},
+                {EmployeeRole.PROMOTION_MANAGER, "/admin/promotions", true},
+                {EmployeeRole.PROMOTION_MANAGER, "/admin/employees", false},
                 {EmployeeRole.HR_MANAGER, "/admin", true},
                 {EmployeeRole.MENU_MANAGER, "/admin/", true},
                 {EmployeeRole.ORDER_STAFF, "/admin", true},
                 {EmployeeRole.HR_MANAGER, "/admin/customers", true},
                 {EmployeeRole.HR_MANAGER, "/admin/employees", true},
-                {EmployeeRole.HR_MANAGER, "/api/admin/customers/KH01/status", true},
-                {EmployeeRole.HR_MANAGER, "/api/admin/employees/NV01/role", true},
-                {EmployeeRole.ORDER_STAFF, "/api/admin/customers", false},
-                {EmployeeRole.MENU_MANAGER, "/api/admin/employees", false},
-                {EmployeeRole.HR_MANAGER, "/api/admin/foods", false},
-                {EmployeeRole.ADMIN, "/api/admin/orders", true},
-                {EmployeeRole.ADMIN, "/api/admin/foods", true}
+                {EmployeeRole.HR_MANAGER, "/admin/customers/KH01/status", true},
+                {EmployeeRole.HR_MANAGER, "/admin/employees/NV01/role", true},
+                {EmployeeRole.ORDER_STAFF, "/admin/customers", false},
+                {EmployeeRole.MENU_MANAGER, "/admin/employees", false},
+                {EmployeeRole.HR_MANAGER, "/admin/foods", false},
+                {EmployeeRole.ADMIN, "/admin/orders", true},
+                {EmployeeRole.ADMIN, "/admin/foods", true}
         };
         for (Object[] entry : cases) {
-            ProfileResponse employee = employee((EmployeeRole) entry[0]);
+            ProfileBean employee = employee((EmployeeRole) entry[0]);
             when(accounts.getProfile("NV01")).thenReturn(employee);
             Exchange exchange = request("GET", (String) entry[1], employee);
             exchange.send();
@@ -288,10 +288,10 @@ class AuthenticationFilterTest {
     @Test
     void employeesCannotUseCustomerCartCheckoutOrderOrPaymentRoutes() throws Exception {
         for (EmployeeRole role : EmployeeRole.values()) {
-            ProfileResponse employee = employee(role);
+            ProfileBean employee = employee(role);
             when(accounts.getProfile("NV01")).thenReturn(employee);
             for (String path : new String[]{"/cart", "/checkout", "/orders", "/orders/DH01",
-                    "/api/cart", "/api/orders/DH01", "/api/payments/TT01"}) {
+                    "/cart", "/orders/DH01", "/payments/TT01"}) {
                 Exchange exchange = request("GET", path, employee);
                 exchange.send();
                 if (path.startsWith("/api/")) {
@@ -306,9 +306,9 @@ class AuthenticationFilterTest {
 
     @Test
     void employeeWithoutAssignedRoleCannotAccessAdminPagesOrApis() throws Exception {
-        ProfileResponse employee = employee(null);
+        ProfileBean employee = employee(null);
         when(accounts.getProfile("NV01")).thenReturn(employee);
-        for (String path : new String[]{"/admin/orders", "/api/admin/orders", "/api/admin/foods"}) {
+        for (String path : new String[]{"/admin/orders", "/admin/orders", "/admin/foods"}) {
             Exchange exchange = request("GET", path, employee);
             exchange.send();
             if (path.startsWith("/api/")) {
@@ -323,7 +323,7 @@ class AuthenticationFilterTest {
     @Test
     void roleDemotionTakesEffectEvenWhenSessionStillContainsAdmin() throws Exception {
         when(accounts.getProfile("NV01")).thenReturn(employee(EmployeeRole.ORDER_STAFF));
-        Exchange exchange = request("GET", "/api/admin/foods", employee(EmployeeRole.ADMIN));
+        Exchange exchange = request("GET", "/admin/foods", employee(EmployeeRole.ADMIN));
         exchange.send();
         exchange.assertError(403, "FORBIDDEN");
         verifyNoInteractions(exchange.chain);
@@ -332,7 +332,7 @@ class AuthenticationFilterTest {
     @Test
     void inactiveAccountInvalidatesSessionAndRejectsRequest() throws Exception {
         when(accounts.getProfile("KH01")).thenThrow(new AccountException("ACCOUNT_INACTIVE", "Tài khoản bị khóa.", 401));
-        Exchange exchange = request("GET", "/api/addresses", CUSTOMER);
+        Exchange exchange = request("GET", "/customer/addresses", CUSTOMER);
         exchange.send();
         exchange.assertError(401, "ACCOUNT_INACTIVE");
         verify(exchange.session).invalidate();
@@ -341,8 +341,8 @@ class AuthenticationFilterTest {
 
     @Test
     void oldRefreshCannotReplaceAnotherAccountLoginAndDoesNotLockDatabaseWork() throws Exception {
-        Exchange exchange = request("GET", "/api/addresses", CUSTOMER);
-        ProfileResponse next = employee(EmployeeRole.ADMIN);
+        Exchange exchange = request("GET", "/customer/addresses", CUSTOMER);
+        ProfileBean next = employee(EmployeeRole.ADMIN);
         when(accounts.getProfile("KH01")).thenAnswer(call -> {
             CompletableFuture.runAsync(() -> SessionAuth.store(exchange.session, next)).get(2, TimeUnit.SECONDS);
             return CUSTOMER;
@@ -358,8 +358,8 @@ class AuthenticationFilterTest {
 
     @Test
     void failedOldRefreshCannotInvalidateAnotherLoginIncludingSameAccount() throws Exception {
-        for (ProfileResponse next : new ProfileResponse[]{CUSTOMER, employee(EmployeeRole.ADMIN)}) {
-            Exchange exchange = request("GET", "/api/addresses", CUSTOMER);
+        for (ProfileBean next : new ProfileBean[]{CUSTOMER, employee(EmployeeRole.ADMIN)}) {
+            Exchange exchange = request("GET", "/customer/addresses", CUSTOMER);
             doAnswer(call -> {
                 SessionAuth.store(exchange.session, next);
                 throw new AccountException("ACCOUNT_INACTIVE", "Tài khoản bị khóa.", 401);
@@ -376,7 +376,7 @@ class AuthenticationFilterTest {
 
     @Test
     void logoutDuringRefreshReturns401WithoutRestoringTheInvalidatedSession() throws Exception {
-        Exchange exchange = request("GET", "/api/addresses", CUSTOMER);
+        Exchange exchange = request("GET", "/customer/addresses", CUSTOMER);
         when(accounts.getProfile("KH01")).thenAnswer(call -> {
             SessionAuth.logout(exchange.request);
             return CUSTOMER;
@@ -392,7 +392,7 @@ class AuthenticationFilterTest {
 
     @Test
     void servletCannotAdoptAPrincipalChangedAfterFilterAuthorization() throws Exception {
-        Exchange exchange = request("GET", "/api/addresses", CUSTOMER);
+        Exchange exchange = request("GET", "/customer/addresses", CUSTOMER);
         when(accounts.getProfile("KH01")).thenReturn(CUSTOMER);
         doAnswer(call -> {
             SessionAuth.store(exchange.session, employee(EmployeeRole.ADMIN));
@@ -405,14 +405,14 @@ class AuthenticationFilterTest {
         exchange.send();
 
         verify(exchange.chain).doFilter(exchange.request, exchange.response);
-        assertEquals("NV01", ((ProfileResponse) exchange.session.getAttribute("currentUser")).id());
+        assertEquals("NV01", ((ProfileBean) exchange.session.getAttribute("currentUser")).id());
         verify(exchange.session, never()).invalidate();
     }
 
     @Test
     void accountDatabaseFailureReturns503WithoutLeakingDetails() throws Exception {
         when(accounts.getProfile("KH01")).thenThrow(new IllegalStateException("jdbc:mysql://private-host secret"));
-        Exchange exchange = request("GET", "/api/profile", CUSTOMER);
+        Exchange exchange = request("GET", "/customer/profile", CUSTOMER);
         exchange.send();
         exchange.assertError(503, "SERVICE_UNAVAILABLE");
         assertFalse(exchange.body.toString().contains("private-host"));
@@ -462,19 +462,19 @@ class AuthenticationFilterTest {
         verify(cookie).setAttribute("SameSite", "Lax");
     }
 
-    private static ProfileResponse employee(EmployeeRole role) {
-        return new ProfileResponse("NV01", AccountType.EMPLOYEE, "Admin", "admin@example.com", "0907654321", role);
+    private static ProfileBean employee(EmployeeRole role) {
+        return new ProfileBean("NV01", AccountType.EMPLOYEE, "Admin", "admin@example.com", "0907654321", role);
     }
 
     @Test
     void passwordChangeRoutesRequireSessionAndAllowEveryActiveAccountType() throws Exception {
-        for (String path : new String[]{"/auth/change-password", "/api/auth/password/change/code", "/api/auth/password/change"}) {
-            String method = path.startsWith("/api/") ? "POST" : "GET";
+        for (String path : new String[]{"/auth/change-password", "/auth/change-password", "/auth/change-password"}) {
+            String method = "POST";
             Exchange anonymous = request(method, path, null);
             anonymous.send();
             verifyNoInteractions(anonymous.chain);
-            for (ProfileResponse user : java.util.List.of(CUSTOMER,
-                    new ProfileResponse("NV01", AccountType.EMPLOYEE, "Admin", "admin@example.com",
+            for (ProfileBean user : java.util.List.of(CUSTOMER,
+                    new ProfileBean("NV01", AccountType.EMPLOYEE, "Admin", "admin@example.com",
                             "0907654321", EmployeeRole.ADMIN))) {
                 when(accounts.getProfile(user.id())).thenReturn(user);
                 Exchange signedIn = request(method, path, user);
@@ -486,7 +486,7 @@ class AuthenticationFilterTest {
 
     @Test
     void resetAndRegistrationCodeRequestsRemainPublicButRequireSameOrigin() throws Exception {
-        for (String path : new String[]{"/api/auth/register/code", "/api/auth/password/reset/code", "/api/auth/password/reset"}) {
+        for (String path : new String[]{"/auth/register", "/auth/forgot-password", "/auth/forgot-password"}) {
             Exchange sameOrigin = request("POST", path, null);
             sameOrigin.send();
             verify(sameOrigin.chain).doFilter(sameOrigin.request, sameOrigin.response);
@@ -498,7 +498,7 @@ class AuthenticationFilterTest {
         }
     }
 
-    private Exchange request(String method, String path, ProfileResponse principal) throws Exception {
+    private Exchange request(String method, String path, ProfileBean principal) throws Exception {
         HttpServletRequest request = mock(HttpServletRequest.class);
         HttpServletResponse response = mock(HttpServletResponse.class);
         HttpSession session = principal == null ? null : mock(HttpSession.class);
@@ -555,11 +555,9 @@ class AuthenticationFilterTest {
         }
 
         void assertError(int status, String code) throws Exception {
-            verify(response).setStatus(status);
-            JsonNode json = JsonProvider.objectMapper().readTree(body.toString());
-            assertFalse(json.path("success").asBoolean());
-            assertEquals(code, json.path("error").path("code").asText());
-            verify(response).setContentType("application/json");
+            if (status == 401) verify(response).sendRedirect(org.mockito.ArgumentMatchers.startsWith("/crave/auth/login?returnTo="));
+            else verify(response).sendError(org.mockito.ArgumentMatchers.eq(status), org.mockito.ArgumentMatchers.anyString());
+            verify(response, never()).setContentType("application/json");
         }
     }
 }

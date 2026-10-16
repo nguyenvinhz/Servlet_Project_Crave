@@ -1,7 +1,7 @@
 package com.foodordering.validator;
 
-import com.foodordering.dto.AddToCartRequest;
-import com.foodordering.dto.UpdateCartItemRequest;
+import com.foodordering.bean.AddToCartForm;
+import com.foodordering.bean.UpdateCartItemForm;
 import com.foodordering.enums.ErrorCode;
 import com.foodordering.exception.BadRequestException;
 import org.junit.jupiter.api.DisplayName;
@@ -17,7 +17,7 @@ class CartValidatorTest {
 
     @Test
     void updateRejectsMalformedOptionsButAllowsPreservingOrClearingThem() {
-        UpdateCartItemRequest request = new UpdateCartItemRequest("CTGH01", 1, null);
+        UpdateCartItemForm request = new UpdateCartItemForm("CTGH01", 1, null);
         assertDoesNotThrow(() -> CartValidator.validateUpdateCartItem(request));
         request.setOptionIds(List.of());
         assertDoesNotThrow(() -> CartValidator.validateUpdateCartItem(request));
@@ -32,7 +32,7 @@ class CartValidatorTest {
     @Test
     void addToCartRejectsDuplicateAndBlankOptionIds() {
         for (List<String> options : List.of(List.of("TC01", "TC01"), List.of(""), Arrays.asList((String) null))) {
-            AddToCartRequest request = new AddToCartRequest("MA01", 1, null, options);
+            AddToCartForm request = new AddToCartForm("MA01", 1, null, options);
             BadRequestException failure = assertThrows(BadRequestException.class,
                     () -> CartValidator.validateAddToCart(request));
             assertEquals(ErrorCode.INVALID_OPTION, failure.getErrorCode());
@@ -59,27 +59,27 @@ class CartValidatorTest {
         assertEquals(ErrorCode.BAD_REQUEST, exNull.getErrorCode());
 
         // FoodId rỗng
-        AddToCartRequest reqNoFood = new AddToCartRequest("", 1, null, Collections.emptyList());
+        AddToCartForm reqNoFood = new AddToCartForm("", 1, null, Collections.emptyList());
         BadRequestException exNoFood = assertThrows(BadRequestException.class, () -> CartValidator.validateAddToCart(reqNoFood));
         assertEquals(ErrorCode.BAD_REQUEST, exNoFood.getErrorCode());
 
         // Số lượng = 0
-        AddToCartRequest reqZero = new AddToCartRequest("FOOD01", 0, null, Collections.emptyList());
+        AddToCartForm reqZero = new AddToCartForm("FOOD01", 0, null, Collections.emptyList());
         BadRequestException exZero = assertThrows(BadRequestException.class, () -> CartValidator.validateAddToCart(reqZero));
         assertEquals(ErrorCode.INVALID_QUANTITY, exZero.getErrorCode());
 
         // Số lượng âm
-        AddToCartRequest reqNeg = new AddToCartRequest("FOOD01", -5, null, Collections.emptyList());
+        AddToCartForm reqNeg = new AddToCartForm("FOOD01", -5, null, Collections.emptyList());
         BadRequestException exNeg = assertThrows(BadRequestException.class, () -> CartValidator.validateAddToCart(reqNeg));
         assertEquals(ErrorCode.INVALID_QUANTITY, exNeg.getErrorCode());
 
         // Số lượng vượt quá 100
-        AddToCartRequest reqOver = new AddToCartRequest("FOOD01", 101, null, Collections.emptyList());
+        AddToCartForm reqOver = new AddToCartForm("FOOD01", 101, null, Collections.emptyList());
         BadRequestException exOver = assertThrows(BadRequestException.class, () -> CartValidator.validateAddToCart(reqOver));
         assertEquals(ErrorCode.INVALID_QUANTITY, exOver.getErrorCode());
 
         // Hợp lệ
-        AddToCartRequest reqValid = new AddToCartRequest("FOOD01", 5, "Không cay", Collections.emptyList());
+        AddToCartForm reqValid = new AddToCartForm("FOOD01", 5, "Không cay", Collections.emptyList());
         assertDoesNotThrow(() -> CartValidator.validateAddToCart(reqValid));
     }
 
@@ -91,26 +91,26 @@ class CartValidatorTest {
         assertEquals(ErrorCode.BAD_REQUEST, exNull.getErrorCode());
 
         // CartItemId rỗng
-        UpdateCartItemRequest reqNoId = new UpdateCartItemRequest("", 1, null);
+        UpdateCartItemForm reqNoId = new UpdateCartItemForm("", 1, null);
         BadRequestException exNoId = assertThrows(BadRequestException.class, () -> CartValidator.validateUpdateCartItem(reqNoId));
         assertEquals(ErrorCode.BAD_REQUEST, exNoId.getErrorCode());
 
         // Số lượng âm
-        UpdateCartItemRequest reqNeg = new UpdateCartItemRequest("CTGH01", -1, null);
+        UpdateCartItemForm reqNeg = new UpdateCartItemForm("CTGH01", -1, null);
         BadRequestException exNeg = assertThrows(BadRequestException.class, () -> CartValidator.validateUpdateCartItem(reqNeg));
         assertEquals(ErrorCode.INVALID_QUANTITY, exNeg.getErrorCode());
 
         // Số lượng = 0 (hợp lệ để xóa món)
-        UpdateCartItemRequest reqZero = new UpdateCartItemRequest("CTGH01", 0, null);
+        UpdateCartItemForm reqZero = new UpdateCartItemForm("CTGH01", 0, null);
         assertDoesNotThrow(() -> CartValidator.validateUpdateCartItem(reqZero));
 
         // Số lượng vượt quá 100
-        UpdateCartItemRequest reqOver = new UpdateCartItemRequest("CTGH01", 101, null);
+        UpdateCartItemForm reqOver = new UpdateCartItemForm("CTGH01", 101, null);
         BadRequestException exOver = assertThrows(BadRequestException.class, () -> CartValidator.validateUpdateCartItem(reqOver));
         assertEquals(ErrorCode.INVALID_QUANTITY, exOver.getErrorCode());
 
         // Hợp lệ
-        UpdateCartItemRequest reqValid = new UpdateCartItemRequest("CTGH01", 10, "Thêm đá");
+        UpdateCartItemForm reqValid = new UpdateCartItemForm("CTGH01", 10, "Thêm đá");
         assertDoesNotThrow(() -> CartValidator.validateUpdateCartItem(reqValid));
     }
 

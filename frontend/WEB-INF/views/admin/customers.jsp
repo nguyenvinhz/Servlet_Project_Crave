@@ -1,42 +1,13 @@
 <%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
-<%@ taglib prefix="c" uri="jakarta.tags.core" %>
-<c:set var="adminPage" value="customers" />
-<c:set var="pageTitle" value="Quản lý khách hàng" />
+<%@ taglib prefix="c" uri="jakarta.tags.core" %><%@ taglib prefix="fmt" uri="jakarta.tags.fmt" %>
+<fmt:setLocale value="vi_VN"/><c:set var="adminPage" value="customers"/><c:set var="pageTitle" value="Quản lý khách hàng"/>
 <%@ include file="/WEB-INF/views/admin/components/begin.jspf" %>
-<link rel="stylesheet" href="<c:url value='/assets/css/admin-management.css?v=20261013-palette2' />">
-<main class="admin-content">
-    <header class="management-heading">
-        <div><p class="management-eyebrow">Tài khoản</p><h1>Quản lý khách hàng</h1>
-            <p>Xem thông tin khách hàng, số đơn đã đặt và quản lý trạng thái tài khoản.</p></div>
-        <button type="button" class="button outline" id="managementRefresh">Tải lại</button>
-    </header>
-    <div id="managementFeedback" class="management-feedback" role="status" aria-live="polite" hidden></div>
-    <section class="admin-card management-summary" aria-label="Thống kê khách hàng">
-        <div><span>Tổng khách hàng</span><strong id="managementTotal">—</strong></div>
-        <div><span>Đang hoạt động</span><strong id="managementActive">—</strong></div>
-        <div><span>Đã khóa</span><strong id="managementInactive">—</strong></div>
-    </section>
-    <div class="admin-toolbar management-toolbar">
-        <label class="management-search"><span class="sr-only">Tìm khách hàng</span>
-            <input id="managementSearch" type="search" placeholder="Tìm theo tên, số điện thoại hoặc email…" autocomplete="off"></label>
-        <label><span class="sr-only">Lọc trạng thái</span><select id="managementStatus">
-            <option value="">Mọi trạng thái</option><option value="ACTIVE">Hoạt động</option><option value="LOCKED">Đã khóa</option>
-        </select></label>
-        <span id="managementCount" class="management-count" aria-live="polite"></span>
-    </div>
-    <section class="admin-card management-table-wrap">
-        <table class="admin-table"><thead><tr><th>Khách hàng</th><th>Số điện thoại</th><th>Email</th><th>Ngày đăng ký</th>
-            <th>Số đơn hàng</th><th>Đã chi tiêu</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
-            <tbody id="managementRows"><tr><td colspan="8" class="management-empty">Đang tải khách hàng…</td></tr></tbody>
-        </table>
-    </section>
-    <dialog id="managementConfirm" class="modal-dialog admin-management-dialog" aria-labelledby="managementConfirmTitle">
-        <form id="managementConfirmForm"><div class="modal-header"><h2 id="managementConfirmTitle">Cập nhật tài khoản</h2>
-            <button type="button" class="management-close" data-close-dialog aria-label="Đóng">×</button></div>
-            <div class="modal-body"><p id="managementConfirmMessage"></p></div>
-            <div class="modal-footer"><button type="button" class="button outline" data-close-dialog>Hủy</button>
-                <button type="submit" class="button primary" id="managementConfirmSubmit">Xác nhận</button></div></form>
-    </dialog>
-</main>
-<script src="<c:url value='/assets/js/admin-management.js' />" defer></script>
+
+<main class="admin-content"><header class="management-heading"><div><p class="management-eyebrow">Khách hàng</p><h1>Quản lý khách hàng</h1><p>Theo dõi tài khoản và lịch sử mua hàng.</p></div><a class="button outline" href="<c:url value='/admin/customers'/>">Tải lại</a></header>
+<%@ include file="/WEB-INF/views/admin/components/feedback.jspf" %>
+<section class="admin-card management-summary"><div><span>Tổng khách hàng</span><strong>${totalCount}</strong></div><div><span>Hoạt động</span><strong>${activeCount}</strong></div><div><span>Đã khóa</span><strong>${inactiveCount}</strong></div></section>
+<form class="admin-toolbar management-toolbar" method="get" action="<c:url value='/admin/customers'/>"><input name="keyword" type="search" aria-label="Tìm khách hàng" value="<c:out value='${param.keyword}'/>" placeholder="Tên, mã, email hoặc số điện thoại"><select name="status" aria-label="Trạng thái"><option value="">Mọi trạng thái</option><option value="ACTIVE" ${param.status == 'ACTIVE' ? 'selected' : ''}>Hoạt động</option><option value="LOCKED" ${param.status == 'LOCKED' ? 'selected' : ''}>Đã khóa</option></select><button class="button primary">Lọc</button></form>
+<section class="admin-card management-table-wrap"><table class="admin-table"><thead><tr><th>Khách hàng</th><th>Liên hệ</th><th>Ngày đăng ký</th><th>Số đơn</th><th>Tổng chi tiêu</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>
+<c:forEach var="customer" items="${customers}"><tr><td><strong><c:out value="${customer.fullName()}"/></strong><small class="text-muted"><c:out value="${customer.id()}"/></small></td><td><c:out value="${customer.email()}"/><br><c:out value="${customer.phone()}"/></td><td><c:out value="${customer.registeredAt()}"/></td><td>${customer.orderCount()}</td><td><fmt:formatNumber value="${customer.totalSpent()}"/> ₫</td><td><c:out value="${adminLabels[customer.status().toString()]}"/></td><td><form method="post" action="<c:url value='/admin/customers'/>" data-confirm="Cập nhật trạng thái khách hàng này?"><input type="hidden" name="action" value="status"><input type="hidden" name="id" value="<c:out value='${customer.id()}'/>"><input type="hidden" name="status" value="${customer.status() == 'ACTIVE' ? 'LOCKED' : 'ACTIVE'}"><button class="button outline">${customer.status() == 'ACTIVE' ? 'Khóa tài khoản' : 'Mở khóa'}</button></form></td></tr></c:forEach>
+<c:if test="${empty customers}"><tr><td colspan="7" class="management-empty">Không tìm thấy khách hàng.</td></tr></c:if></tbody></table></section></main>
 <%@ include file="/WEB-INF/views/admin/components/end.jspf" %>

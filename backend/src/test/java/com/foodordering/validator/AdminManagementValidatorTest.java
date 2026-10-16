@@ -1,7 +1,7 @@
 package com.foodordering.validator;
 
-import com.foodordering.dto.AdminPromotionRequest;
-import com.foodordering.dto.EmployeeCreateRequest;
+import com.foodordering.bean.AdminPromotionForm;
+import com.foodordering.bean.EmployeeCreateForm;
 import com.foodordering.enums.DiscountType;
 import com.foodordering.enums.EmployeeRole;
 import com.foodordering.enums.PromotionStatus;
@@ -27,7 +27,7 @@ class AdminManagementValidatorTest {
 
     @Test
     void promotionCodeAndDefaultsAreNormalized() {
-        AdminPromotionRequest validated = AdminPromotionValidator.validate(new AdminPromotionRequest(" welcome10 ", " Ưu đãi ",
+        AdminPromotionForm validated = AdminPromotionValidator.validate(new AdminPromotionForm(" welcome10 ", " Ưu đãi ",
                 DiscountType.PERCENT, BigDecimal.TEN, null, null, start, start.plusDays(1), null));
         assertEquals("WELCOME10", validated.code());
         assertEquals("Ưu đãi", validated.name());
@@ -45,7 +45,7 @@ class AdminManagementValidatorTest {
 
     @Test
     void employeeContactNormalizationPreservesPasswordText() {
-        EmployeeCreateRequest validated = AdminAccountValidator.validateEmployee(new EmployeeCreateRequest(" Nhân viên ",
+        EmployeeCreateForm validated = AdminAccountValidator.validateEmployee(new EmployeeCreateForm(" Nhân viên ",
                 " STAFF@EXAMPLE.COM ", " 0987654321 ", " Created#123 ", EmployeeRole.ORDER_STAFF, null, LocalDate.of(2026, 10, 1)));
         assertEquals("staff@example.com", validated.email());
         assertEquals("0987654321", validated.phone());
@@ -55,13 +55,13 @@ class AdminManagementValidatorTest {
     @Test
     void missingOrMalformedEmployeeDataIsRejected() {
         assertThrows(ValidationException.class, () -> AdminAccountValidator.validateEmployee(null));
-        assertThrows(ValidationException.class, () -> AdminAccountValidator.validateEmployee(new EmployeeCreateRequest("", "bad", "123", "tiny", null, null, null)));
-        assertThrows(ValidationException.class, () -> AdminAccountValidator.validateEmployee(new EmployeeCreateRequest("Nhân viên", "test@example.com", "0987654321", "bad\0password", EmployeeRole.ORDER_STAFF, null, LocalDate.now())));
-        assertThrows(ValidationException.class, () -> AdminAccountValidator.validateEmployee(new EmployeeCreateRequest("Nhân viên", "test@example.com", "0987654321", "Created#123", EmployeeRole.ORDER_STAFF, null, LocalDate.of(999, 1, 1))));
+        assertThrows(ValidationException.class, () -> AdminAccountValidator.validateEmployee(new EmployeeCreateForm("", "bad", "123", "tiny", null, null, null)));
+        assertThrows(ValidationException.class, () -> AdminAccountValidator.validateEmployee(new EmployeeCreateForm("Nhân viên", "test@example.com", "0987654321", "bad\0password", EmployeeRole.ORDER_STAFF, null, LocalDate.now())));
+        assertThrows(ValidationException.class, () -> AdminAccountValidator.validateEmployee(new EmployeeCreateForm("Nhân viên", "test@example.com", "0987654321", "Created#123", EmployeeRole.ORDER_STAFF, null, LocalDate.of(999, 1, 1))));
     }
 
-    private AdminPromotionRequest request(BigDecimal discount, LocalDateTime startAt, LocalDateTime endAt) {
-        return new AdminPromotionRequest("VALID", "Ưu đãi", DiscountType.PERCENT, discount, BigDecimal.ZERO, null,
+    private AdminPromotionForm request(BigDecimal discount, LocalDateTime startAt, LocalDateTime endAt) {
+        return new AdminPromotionForm("VALID", "Ưu đãi", DiscountType.PERCENT, discount, BigDecimal.ZERO, null,
                 startAt, endAt, PromotionStatus.ACTIVE);
     }
 }

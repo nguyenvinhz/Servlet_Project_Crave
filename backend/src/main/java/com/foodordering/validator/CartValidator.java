@@ -1,7 +1,7 @@
 package com.foodordering.validator;
 
-import com.foodordering.dto.AddToCartRequest;
-import com.foodordering.dto.UpdateCartItemRequest;
+import com.foodordering.bean.AddToCartForm;
+import com.foodordering.bean.UpdateCartItemForm;
 import com.foodordering.enums.ErrorCode;
 import com.foodordering.exception.BadRequestException;
 import java.util.HashSet;
@@ -20,7 +20,7 @@ public class CartValidator {
         }
     }
 
-    public static void validateAddToCart(AddToCartRequest request) {
+    public static void validateAddToCart(AddToCartForm request) {
         if (request == null) {
             throw new BadRequestException(ErrorCode.BAD_REQUEST, "Dữ liệu yêu cầu thêm món không được để trống");
         }
@@ -44,7 +44,7 @@ public class CartValidator {
         }
     }
 
-    public static void validateUpdateCartItem(UpdateCartItemRequest request) {
+    public static void validateUpdateCartItem(UpdateCartItemForm request) {
         if (request == null) {
             throw new BadRequestException(ErrorCode.BAD_REQUEST, "Dữ liệu yêu cầu cập nhật không được để trống");
         }

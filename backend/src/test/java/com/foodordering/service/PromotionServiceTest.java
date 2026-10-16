@@ -1,14 +1,14 @@
 package com.foodordering.service;
 
-import com.foodordering.dto.PromotionValidationResultDto;
-import com.foodordering.dto.ValidatePromotionRequest;
-import com.foodordering.entity.Customer;
-import com.foodordering.entity.CustomerOrder;
-import com.foodordering.entity.Promotion;
+import com.foodordering.bean.PromotionValidationResultBean;
+import com.foodordering.bean.ValidatePromotionForm;
+import com.foodordering.model.Customer;
+import com.foodordering.model.CustomerOrder;
+import com.foodordering.model.Promotion;
 import com.foodordering.enums.DiscountType;
 import com.foodordering.enums.ErrorCode;
 import com.foodordering.enums.PromotionStatus;
-import com.foodordering.repository.PromotionRepository;
+import com.foodordering.dao.PromotionDAO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -20,14 +20,14 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 class PromotionServiceTest {
-    private PromotionRepository repository;
+    private PromotionDAO repository;
     private CartService cartService;
     private PromotionService service;
     private Promotion promotion;
 
     @BeforeEach
     void setUp() {
-        repository = mock(PromotionRepository.class);
+        repository = mock(PromotionDAO.class);
         cartService = mock(CartService.class);
         service = new PromotionService(repository, cartService);
         promotion = new Promotion();
@@ -44,7 +44,7 @@ class PromotionServiceTest {
     void inflatedClientSubtotalCannotQualifyAnUnderMinimumCart() {
         when(cartService.getVerifiedSubtotal("KH01")).thenReturn(new BigDecimal("80000"));
 
-        PromotionValidationResultDto result = service.validatePromotion(request("800000"), "KH01");
+        PromotionValidationResultBean result = service.validatePromotion(request("800000"), "KH01");
 
         assertFalse(result.isValid());
         assertEquals(ErrorCode.PROMOTION_MIN_ORDER_NOT_MET.getCode(), result.getErrorCode());
@@ -55,7 +55,7 @@ class PromotionServiceTest {
     void authenticatedValidationUsesVerifiedCartForDiscountAndResponse() {
         when(cartService.getVerifiedSubtotal("KH01")).thenReturn(new BigDecimal("150000"));
 
-        PromotionValidationResultDto result = service.validatePromotion(request("999999"), "KH01");
+        PromotionValidationResultBean result = service.validatePromotion(request("999999"), "KH01");
 
         assertTrue(result.isValid());
         assertEquals(new BigDecimal("150000"), result.getOriginalSubtotal());
@@ -66,7 +66,7 @@ class PromotionServiceTest {
 
     @Test
     void requestWithoutCustomerCannotValidateUsingClientSubtotal() {
-        PromotionValidationResultDto result = service.validatePromotion(request("800000"), null);
+        PromotionValidationResultBean result = service.validatePromotion(request("800000"), null);
 
         assertFalse(result.isValid());
         verifyNoInteractions(cartService);
@@ -79,7 +79,7 @@ class PromotionServiceTest {
         promotion.setEndAt(orderTime.plusHours(1));
         CustomerOrder order = new CustomerOrder("DH01", new Customer("KH01"), new BigDecimal("150000"), orderTime);
 
-        PromotionValidationResultDto result = service.validatePromotionForOrder("SAVE20K", order);
+        PromotionValidationResultBean result = service.validatePromotionForOrder("SAVE20K", order);
 
         assertTrue(result.isValid());
         assertEquals(new BigDecimal("150000"), result.getOriginalSubtotal());
@@ -99,10 +99,10 @@ class PromotionServiceTest {
     void repeatedValidationRechecksTheCartInsteadOfReusingTheEarlierSubtotal() {
         when(cartService.getVerifiedSubtotal("KH01"))
                 .thenReturn(new BigDecimal("150000"), new BigDecimal("80000"));
-        ValidatePromotionRequest request = request("150000");
+        ValidatePromotionForm request = request("150000");
 
         assertTrue(service.validatePromotion(request, "KH01").isValid());
-        PromotionValidationResultDto result = service.validatePromotion(request, "KH01");
+        PromotionValidationResultBean result = service.validatePromotion(request, "KH01");
 
         assertFalse(result.isValid());
         assertEquals(ErrorCode.PROMOTION_MIN_ORDER_NOT_MET.getCode(), result.getErrorCode());
@@ -117,7 +117,7 @@ class PromotionServiceTest {
         assertTrue(service.validatePromotion(request("150000"), "KH01").isValid());
         promotion.setStatus(PromotionStatus.INACTIVE);
 
-        PromotionValidationResultDto result = service.validatePromotion(request("150000"), "KH01");
+        PromotionValidationResultBean result = service.validatePromotion(request("150000"), "KH01");
 
         assertFalse(result.isValid());
         assertEquals(ErrorCode.PROMOTION_INACTIVE.getCode(), result.getErrorCode());
@@ -133,7 +133,7 @@ class PromotionServiceTest {
         assertTrue(service.validatePromotion(request("150000"), "KH01").isValid());
         promotion.setEndAt(LocalDateTime.now().minusSeconds(1));
 
-        PromotionValidationResultDto result = service.validatePromotion(request("150000"), "KH01");
+        PromotionValidationResultBean result = service.validatePromotion(request("150000"), "KH01");
 
         assertFalse(result.isValid());
         assertEquals(ErrorCode.PROMOTION_EXPIRED.getCode(), result.getErrorCode());
@@ -165,7 +165,7 @@ class PromotionServiceTest {
     void missingOrderCannotQualifyForAVoucherWithNoMinimum() {
         promotion.setMinimumOrderValue(BigDecimal.ZERO);
 
-        PromotionValidationResultDto result = service.validatePromotionForOrder("SAVE20K", null);
+        PromotionValidationResultBean result = service.validatePromotionForOrder("SAVE20K", null);
 
         assertFalse(result.isValid());
         assertEquals(ErrorCode.BAD_REQUEST.getCode(), result.getErrorCode());
@@ -196,8 +196,8 @@ class PromotionServiceTest {
         assertEquals(new BigDecimal("10000"), service.calculateDiscount(promotion, new BigDecimal("10000"), null));
     }
 
-    private ValidatePromotionRequest request(String subtotal) {
-        ValidatePromotionRequest request = new ValidatePromotionRequest();
+    private ValidatePromotionForm request(String subtotal) {
+        ValidatePromotionForm request = new ValidatePromotionForm();
         request.setCode("SAVE20K");
         request.setSubtotal(new BigDecimal(subtotal));
         return request;

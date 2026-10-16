@@ -1,14 +1,13 @@
 package com.foodordering.service;
 
 import com.foodordering.config.DatabaseConfig;
-import com.foodordering.dto.AdminPromotionRequest;
-import com.foodordering.dto.PromotionDto;
-import com.foodordering.entity.Promotion;
+import com.foodordering.bean.AdminPromotionForm;
+import com.foodordering.bean.PromotionBean;
+import com.foodordering.model.Promotion;
 import com.foodordering.enums.PromotionStatus;
 import com.foodordering.exception.ConflictException;
 import com.foodordering.exception.ResourceNotFoundException;
 import com.foodordering.exception.ValidationException;
-import com.foodordering.mapper.PromotionMapper;
 import com.foodordering.validator.AdminPromotionValidator;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
@@ -21,7 +20,6 @@ import java.util.function.Function;
 
 public class AdminPromotionService {
     private final EntityManagerFactory emf;
-    private final PromotionMapper mapper = new PromotionMapper();
 
     public AdminPromotionService() {
         this(DatabaseConfig.getEntityManagerFactory());
@@ -31,15 +29,15 @@ public class AdminPromotionService {
         this.emf = emf;
     }
 
-    public List<PromotionDto> listPromotions() {
+    public List<PromotionBean> listPromotions() {
         try (EntityManager em = emf.createEntityManager()) {
-            return mapper.toDtoList(em.createQuery("SELECT p FROM Promotion p ORDER BY p.createdAt DESC, p.promotionId", Promotion.class)
-                    .getResultList());
+            return em.createQuery("SELECT p FROM Promotion p ORDER BY p.createdAt DESC, p.promotionId", Promotion.class)
+                    .getResultList().stream().map(PromotionBean::new).toList();
         }
     }
 
-    public PromotionDto createPromotion(AdminPromotionRequest request) {
-        AdminPromotionRequest validated = AdminPromotionValidator.validate(request);
+    public PromotionBean createPromotion(AdminPromotionForm request) {
+        AdminPromotionForm validated = AdminPromotionValidator.validate(request);
         return write(em -> {
             requireUniqueCode(em, validated.code(), null);
             Promotion promotion = new Promotion();
@@ -51,28 +49,28 @@ public class AdminPromotionService {
             apply(promotion, validated);
             em.persist(promotion);
             em.flush();
-            return mapper.toDto(promotion);
+            return new PromotionBean(promotion);
         });
     }
 
-    public PromotionDto updatePromotion(String id, AdminPromotionRequest request) {
-        AdminPromotionRequest validated = AdminPromotionValidator.validate(request);
+    public PromotionBean updatePromotion(String id, AdminPromotionForm request) {
+        AdminPromotionForm validated = AdminPromotionValidator.validate(request);
         return write(em -> {
             Promotion promotion = requirePromotion(em, id);
             requireUniqueCode(em, validated.code(), id);
             apply(promotion, validated);
             em.flush();
-            return mapper.toDto(promotion);
+            return new PromotionBean(promotion);
         });
     }
 
-    public PromotionDto updatePromotionStatus(String id, PromotionStatus status) {
+    public PromotionBean updatePromotionStatus(String id, PromotionStatus status) {
         if (status == null) throw new ValidationException("Vui lòng chọn trạng thái khuyến mãi.");
         return write(em -> {
             Promotion promotion = requirePromotion(em, id);
             promotion.setStatus(status);
             em.flush();
-            return mapper.toDto(promotion);
+            return new PromotionBean(promotion);
         });
     }
 
@@ -90,7 +88,7 @@ public class AdminPromotionService {
         if (query.getSingleResult() > 0) throw new ConflictException("Mã khuyến mãi đã tồn tại.");
     }
 
-    private static void apply(Promotion promotion, AdminPromotionRequest request) {
+    private static void apply(Promotion promotion, AdminPromotionForm request) {
         promotion.setCode(request.code());
         promotion.setName(request.name());
         promotion.setDiscountType(request.discountType());

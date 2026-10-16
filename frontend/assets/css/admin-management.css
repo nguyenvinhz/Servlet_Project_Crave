@@ -604,6 +604,15 @@
     min-width: 0;
 }
 
+.order-row-actions > summary {
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.order-row-actions[open] > form {
+    margin-top: 16px;
+}
+
 .management-form .form-row {
     display: grid;
     grid-template-columns: 1fr 1fr;

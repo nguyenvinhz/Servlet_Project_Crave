@@ -2,8 +2,10 @@
 
 Ứng dụng dùng Java 17, Jakarta Servlet và JSP. `PayosPaymentServlet` phục vụ
 tạo link, kiểm tra trạng thái và ảnh QR; `PayosWebhookServlet` nhận xác nhận từ
-payOS. Client gọi API bằng `java.net.http.HttpClient`, ảnh QR được tạo cục bộ
-bằng ZXing. Không gửi khóa API hoặc checksum key ra trình duyệt.
+payOS. `integration/PayosClient` gọi payOS bằng `java.net.http.HttpClient`, ảnh QR
+được tạo cục bộ bằng ZXing. Trình duyệt gửi form POST và nhận HTML/PNG; JSON chỉ
+dùng giữa máy chủ với payOS và trong webhook có chữ ký. Không gửi khóa API hoặc
+checksum key ra trình duyệt.
 
 ## Cấu hình và chạy local
 
@@ -33,10 +35,11 @@ ngân hàng** hoặc **Ví điện tử**; trang chi tiết đơn hiển thị Q
 tài khoản nhận và nội dung chuyển khoản. Dùng ứng dụng ngân hàng hoặc ví có
 hỗ trợ VietQR. Nút mở trang payOS thuận tiện khi thanh toán trên cùng điện thoại.
 
-Localhost không thể nhận callback trực tiếp từ Internet. Trong lúc chạy local,
-trang chi tiết đơn kiểm tra trạng thái qua server mỗi 5 giây khi đang mở và
-chưa thanh toán; server xác nhận lại với payOS. Đóng trang không làm mất link
-thanh toán, nhưng cần mở lại trang để đồng bộ nếu chưa cấu hình webhook public.
+Localhost không thể nhận callback trực tiếp từ Internet. Khi đã có link đang chờ
+thanh toán, trang chi tiết đơn tải lại HTML sau mỗi 5 giây để Servlet xác nhận với
+payOS. Việc tự tải lại tạm dừng khi trang bị ẩn hoặc người dùng đang nhập form;
+không gọi API JSON bằng JavaScript. Nút **Kiểm tra thanh toán** đồng bộ thủ công.
+Đóng trang không làm mất link; cần mở lại để đồng bộ nếu chưa có webhook public.
 
 ## Khi có URL public
 
@@ -61,14 +64,18 @@ Khi đổi IP hoặc tên miền, cập nhật GitHub variable `PAYOS_PUBLIC_BAS
 deploy lại qua `main`. Không cần đổi URL trong Java hoặc chép `.env` local lên AWS.
 Xem [hướng dẫn CI/CD EC2](ci-cd-ec2.md) về secrets, migration và rollback.
 
-## API của ứng dụng
+## Route Servlet
 
 | Endpoint | Hành vi |
 |---|---|
-| `POST /api/payos/orders/{orderId}` | Khách hàng tạo hoặc lấy lại link của đơn mình; không nhận số tiền từ client |
-| `GET /api/payos/orders/{orderId}` | Đồng bộ trạng thái từ payOS, trả thông tin link và thanh toán |
-| `GET /api/payos/orders/{orderId}/qr` | Ảnh PNG của dữ liệu QR đã lưu; yêu cầu đăng nhập và quyền sở hữu đơn |
+| `POST /payments/payos/{orderId}` | Form tạo/lấy lại link của đơn mình rồi redirect tới `/orders/{orderId}`; không nhận số tiền từ trình duyệt |
+| `GET /payments/payos/{orderId}` | Đồng bộ trạng thái từ payOS rồi redirect về chi tiết đơn |
+| `GET /payments/payos/{orderId}/qr` | Ảnh PNG của dữ liệu QR đã lưu; yêu cầu đăng nhập và quyền sở hữu đơn |
 | `POST /api/payos/webhook` | Callback có chữ ký, không yêu cầu session trình duyệt |
+
+`GET /orders/{orderId}` hiển thị thông tin thanh toán và đồng bộ link đã có.
+Khi chưa có link, người dùng bấm form **Tạo mã QR thanh toán**. Các route
+`/api/payos/orders/*` của thiết kế JSON trước đây đã được thay thế.
 
 Một thanh toán có một mã payOS được lưu bền vững trước khi gọi mạng. Request
 lặp hoặc timeout dùng lại mã đó. Đơn tiền mặt không tạo link. Link đã hủy/hết
@@ -85,12 +92,15 @@ thực nhận để nhà hàng xử lý hoàn tiền, đồng thời giữ đơn
 
 ```powershell
 mvn -f backend/pom.xml -Pdev verify
+# Sau HTTP smoke, nạp các biến trong backend/target/runtime-customer.env,
+# rồi chạy browser smoke với WAR/Tomcat và database test đang hoạt động:
 node tests/frontend/payos-payment-browser-smoke.cjs
 ```
 
-Gateway tests dùng HTTP fixture có chữ ký; service tests kiểm tra quyền, số tiền,
-request đồng thời, webhook và các trạng thái thanh toán. Không tự chuyển tiền
-thật trong kiểm thử.
+Integration tests dùng HTTP fixture có chữ ký; service tests kiểm tra quyền,
+số tiền, request đồng thời, webhook và các trạng thái thanh toán. Browser smoke
+mở các đơn thử của HTTP smoke để kiểm tra form POST, route PNG và quyền sở hữu;
+không bấm tạo link payOS hoặc chuyển tiền thật.
 
 Tham khảo [API payOS](https://payos.vn/docs/api/),
 [xác thực chữ ký](https://payos.vn/docs/tich-hop-webhook/kiem-tra-du-lieu-voi-signature/).

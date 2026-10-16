@@ -14,7 +14,7 @@ try {
         throw 'Cần cài JDK 17/21 và Maven, rồi thêm vào PATH.'
     }
     if (!$SkipBuild) {
-        & mvn -B -ntp -f backend/pom.xml -Pdev -DskipTests package
+        & mvn -B -ntp -f backend/pom.xml -Pdev -DskipTests clean package
         if ($LASTEXITCODE -ne 0) { throw 'Build WAR thất bại.' }
     }
     & mvn -B -ntp -f backend/pom.xml -Pdev org.apache.maven.plugins:maven-dependency-plugin:3.10.0:build-classpath '-DincludeScope=test' '-DincludeGroupIds=org.apache.tomcat.embed,org.apache.tomcat,org.eclipse.jdt' '-Dmdep.outputFile=target/dev-classpath.txt'

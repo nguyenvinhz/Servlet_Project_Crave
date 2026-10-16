@@ -1034,3 +1034,12 @@ body.crave-body {
 .cart-editor-actions { display: flex; align-items: center; gap: 12px; margin-top: 20px; }
 .cart-editor-actions .btn-checkout { margin: 0; flex: 1; width: auto; }
 .cart-editor-actions .voucher-apply-btn { height: auto; padding: 12px 20px; }
+
+.cart-item-editor {
+    position: static;
+    margin-bottom: 24px;
+    scroll-margin-top: 112px;
+}
+@media (max-width: 900px) {
+    .cart-item-editor { scroll-margin-top: 196px; }
+}

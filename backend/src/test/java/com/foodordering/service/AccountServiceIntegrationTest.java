@@ -1,23 +1,23 @@
 package com.foodordering.service;
 
 import com.foodordering.config.DatabaseConfig;
-import com.foodordering.dto.AddressResponse;
-import com.foodordering.dto.AddressWriteRequest;
-import com.foodordering.dto.LoginRequest;
-import com.foodordering.dto.ProfileResponse;
-import com.foodordering.dto.ProfileUpdateRequest;
-import com.foodordering.dto.RegisterRequest;
-import com.foodordering.entity.Customer;
-import com.foodordering.entity.CustomerOrder;
-import com.foodordering.entity.Address;
-import com.foodordering.entity.Employee;
+import com.foodordering.bean.AddressBean;
+import com.foodordering.bean.AddressWriteForm;
+import com.foodordering.bean.LoginForm;
+import com.foodordering.bean.ProfileBean;
+import com.foodordering.bean.ProfileUpdateForm;
+import com.foodordering.bean.RegisterForm;
+import com.foodordering.model.Customer;
+import com.foodordering.model.CustomerOrder;
+import com.foodordering.model.Address;
+import com.foodordering.model.Employee;
 import com.foodordering.enums.AccountType;
 import com.foodordering.enums.CustomerStatus;
 import com.foodordering.enums.EmployeeRole;
 import com.foodordering.enums.EmployeeStatus;
 import com.foodordering.enums.FulfillmentType;
 import com.foodordering.exception.AccountException;
-import com.foodordering.repository.JpaAccountRepository;
+import com.foodordering.dao.JpaAccountDAO;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import org.junit.jupiter.api.AfterAll;
@@ -92,23 +92,23 @@ class AccountServiceIntegrationTest {
 
     @Test
     void registrationLoginProfileAndAddressCrudPersistWithOwnershipAndPreserveOrderSnapshots() {
-        AccountService service = new AccountService(new JpaAccountRepository(emf));
-        ProfileResponse owner = register(service);
-        ProfileResponse other = register(service);
-        assertEquals(owner, service.login(new LoginRequest(owner.email().toUpperCase(), "Integration#123", false)));
+        AccountService service = new AccountService(new JpaAccountDAO(emf));
+        ProfileBean owner = register(service);
+        ProfileBean other = register(service);
+        assertEquals(owner, service.login(new LoginForm(owner.email().toUpperCase(), "Integration#123", false)));
         assertEquals(owner.id(), service.getProfile(owner.id()).id());
-        ProfileResponse profile = service.updateProfile(owner.id(),
-                new ProfileUpdateRequest("Integration Updated", owner.email(), owner.phone()));
+        ProfileBean profile = service.updateProfile(owner.id(),
+                new ProfileUpdateForm("Integration Updated", owner.email(), owner.phone()));
         assertEquals("Integration Updated", service.getProfile(owner.id()).fullName());
         assertEquals(owner.email(), profile.email());
         AccountException duplicate = assertThrows(AccountException.class, () -> service.updateProfile(owner.id(),
-                new ProfileUpdateRequest("Attempted duplicate", other.email(), owner.phone())));
+                new ProfileUpdateForm("Attempted duplicate", other.email(), owner.phone())));
         assertEquals(409, duplicate.getStatusCode());
         assertTrue(duplicate.getDetails().containsKey("email"));
         assertEquals("Integration Updated", service.getProfile(owner.id()).fullName());
 
-        AddressResponse first = service.createAddress(owner.id(), write("Original integration address", false));
-        AddressResponse second = service.createAddress(owner.id(), write("Second integration address", false));
+        AddressBean first = service.createAddress(owner.id(), write("Original integration address", false));
+        AddressBean second = service.createAddress(owner.id(), write("Second integration address", false));
         assertTrue(first.isDefault());
         assertFalse(second.isDefault());
         assertNotNull(first.createdAt());
@@ -123,7 +123,7 @@ class AccountServiceIntegrationTest {
                 () -> service.deleteAddress(other.id(), first.id())).getStatusCode());
 
         String orderId = createOrder(owner.id(), first.addressLine());
-        AddressResponse changed = service.updateAddress(owner.id(), first.id(), write("Updated integration address", false));
+        AddressBean changed = service.updateAddress(owner.id(), first.id(), write("Updated integration address", false));
         assertFalse(changed.isDefault());
         assertEquals("Updated integration address", service.getAddress(owner.id(), first.id()).addressLine());
         assertTrue(service.getAddress(owner.id(), second.id()).isDefault());
@@ -140,25 +140,25 @@ class AccountServiceIntegrationTest {
 
     @Test
     void concurrentAddressCreationSerializesDefaultChangesAndKeepsExactlyOneDefault() throws Exception {
-        AccountService service = new AccountService(new JpaAccountRepository(emf));
-        ProfileResponse owner = register(service);
+        AccountService service = new AccountService(new JpaAccountDAO(emf));
+        ProfileBean owner = register(service);
         ExecutorService executor = Executors.newFixedThreadPool(2);
         CountDownLatch start = new CountDownLatch(1);
         try {
-            Future<AddressResponse> first = executor.submit(() -> {
+            Future<AddressBean> first = executor.submit(() -> {
                 start.await();
                 return service.createAddress(owner.id(), write("Concurrent first address", true));
             });
-            Future<AddressResponse> second = executor.submit(() -> {
+            Future<AddressBean> second = executor.submit(() -> {
                 start.await();
                 return service.createAddress(owner.id(), write("Concurrent second address", true));
             });
             start.countDown();
             first.get(20, TimeUnit.SECONDS);
             second.get(20, TimeUnit.SECONDS);
-            List<AddressResponse> addresses = service.listAddresses(owner.id());
+            List<AddressBean> addresses = service.listAddresses(owner.id());
             assertEquals(2, addresses.size());
-            assertEquals(1, addresses.stream().filter(AddressResponse::isDefault).count());
+            assertEquals(1, addresses.stream().filter(AddressBean::isDefault).count());
         } finally {
             executor.shutdownNow();
             assertTrue(executor.awaitTermination(20, TimeUnit.SECONDS));
@@ -166,12 +166,57 @@ class AccountServiceIntegrationTest {
     }
 
     @Test
+    void deletingAddressesAfterCartInitializationRemovesRowsAndReassignsDefault() {
+        AccountService service = new AccountService(new JpaAccountDAO(emf));
+        ProfileBean owner = register(service);
+        new CartService().getOrCreateCart(owner.id());
+        AddressBean first = service.createAddress(owner.id(), write("Default address with cart", true));
+        AddressBean second = service.createAddress(owner.id(), write("Other address with cart", false));
+        service.getProfile(owner.id());
+        service.listAddresses(owner.id());
+
+        service.deleteAddress(owner.id(), second.id());
+        assertEquals(404, assertThrows(AccountException.class,
+                () -> service.getAddress(owner.id(), second.id())).getStatusCode());
+        assertEquals(List.of(first.id()), service.listAddresses(owner.id()).stream().map(AddressBean::id).toList());
+        service.deleteAddress(owner.id(), first.id());
+        assertTrue(service.listAddresses(owner.id()).isEmpty());
+    }
+
+    @Test
+    void deletingAddressAlsoRemovesItFromAnInitializedCustomerCollection() {
+        AccountService service = new AccountService(new JpaAccountDAO(emf));
+        ProfileBean owner = register(service);
+        AddressBean first = service.createAddress(owner.id(), write("Initialized default address", true));
+        AddressBean second = service.createAddress(owner.id(), write("Initialized other address", false));
+        JpaAccountDAO initializedDAO = new JpaAccountDAO(emf) {
+            @Override
+            public <T> T write(java.util.function.Function<Session, T> operation) {
+                return super.write(session -> {
+                    session.findCustomer(owner.id(), false).orElseThrow().getAddresses().size();
+                    return operation.apply(session);
+                });
+            }
+        };
+        AccountService initializedService = new AccountService(initializedDAO);
+
+        initializedService.deleteAddress(owner.id(), second.id());
+        assertEquals(List.of(first.id()), service.listAddresses(owner.id()).stream().map(AddressBean::id).toList());
+        AddressBean replacement = service.createAddress(owner.id(), write("Replacement address", false));
+        initializedService.deleteAddress(owner.id(), first.id());
+        assertEquals(List.of(replacement.id()), service.listAddresses(owner.id()).stream().map(AddressBean::id).toList());
+        assertTrue(service.getAddress(owner.id(), replacement.id()).isDefault());
+        initializedService.deleteAddress(owner.id(), replacement.id());
+        assertTrue(service.listAddresses(owner.id()).isEmpty());
+    }
+
+    @Test
     void databaseUniquenessViolationReturnsFieldConflictAndRollsBackInsert() {
-        AccountService service = new AccountService(new JpaAccountRepository(emf));
-        ProfileResponse owner = register(service);
+        AccountService service = new AccountService(new JpaAccountDAO(emf));
+        ProfileBean owner = register(service);
         String conflictingId = "KH" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
         accountEmails.put(conflictingId, owner.email());
-        JpaAccountRepository repository = new JpaAccountRepository(emf);
+        JpaAccountDAO repository = new JpaAccountDAO(emf);
         AccountException exception = assertThrows(AccountException.class, () -> repository.write(session -> {
             session.persistCustomer(new Customer(conflictingId, "Conflicting User", owner.email(), newPhone(),
                     "not-a-login-hash"));
@@ -190,10 +235,10 @@ class AccountServiceIntegrationTest {
 
     @Test
     void mixedConcurrentDefaultMutationsAndDeletingLastAddressSerializeWithoutLosingDefaults() throws Exception {
-        AccountService service = new AccountService(new JpaAccountRepository(emf));
-        ProfileResponse owner = register(service);
-        AddressResponse first = service.createAddress(owner.id(), write("First address", true));
-        AddressResponse second = service.createAddress(owner.id(), write("Second address", false));
+        AccountService service = new AccountService(new JpaAccountDAO(emf));
+        ProfileBean owner = register(service);
+        AddressBean first = service.createAddress(owner.id(), write("First address", true));
+        AddressBean second = service.createAddress(owner.id(), write("Second address", false));
         service.createAddress(owner.id(), write("Third address", false));
 
         runTogether(List.of(
@@ -203,21 +248,21 @@ class AccountServiceIntegrationTest {
                 },
                 () -> service.updateAddress(owner.id(), second.id(), write("Second revised", true)),
                 () -> service.createAddress(owner.id(), write("Concurrent new default", true))));
-        List<AddressResponse> remaining = service.listAddresses(owner.id());
+        List<AddressBean> remaining = service.listAddresses(owner.id());
         assertEquals(3, remaining.size());
-        assertEquals(1, remaining.stream().filter(AddressResponse::isDefault).count());
+        assertEquals(1, remaining.stream().filter(AddressBean::isDefault).count());
         assertTrue(remaining.stream().noneMatch(address -> address.id().equals(first.id())));
         assertEquals("Second revised", service.getAddress(owner.id(), second.id()).addressLine());
 
-        for (AddressResponse address : remaining) service.deleteAddress(owner.id(), address.id());
-        AddressResponse last = service.createAddress(owner.id(), write("Last old address", false));
+        for (AddressBean address : remaining) service.deleteAddress(owner.id(), address.id());
+        AddressBean last = service.createAddress(owner.id(), write("Last old address", false));
         runTogether(List.of(
                 () -> {
                     service.deleteAddress(owner.id(), last.id());
                     return null;
                 },
                 () -> service.createAddress(owner.id(), write("Replacement address", false))));
-        List<AddressResponse> replacement = service.listAddresses(owner.id());
+        List<AddressBean> replacement = service.listAddresses(owner.id());
         assertEquals(1, replacement.size());
         assertTrue(replacement.get(0).isDefault());
         assertEquals("Replacement address", replacement.get(0).addressLine());
@@ -225,12 +270,12 @@ class AccountServiceIntegrationTest {
 
     @Test
     void constraintFailureAfterFlushingDefaultClearRollsBackAllAddressChanges() {
-        JpaAccountRepository repository = new JpaAccountRepository(emf);
+        JpaAccountDAO repository = new JpaAccountDAO(emf);
         AccountService service = new AccountService(repository);
-        ProfileResponse owner = register(service);
-        ProfileResponse other = register(service);
-        AddressResponse original = service.createAddress(owner.id(), write("Original default", true));
-        AddressResponse foreign = service.createAddress(other.id(), write("Other customer's address", true));
+        ProfileBean owner = register(service);
+        ProfileBean other = register(service);
+        AddressBean original = service.createAddress(owner.id(), write("Original default", true));
+        AddressBean foreign = service.createAddress(other.id(), write("Other customer's address", true));
 
         AccountException failure = assertThrows(AccountException.class, () -> repository.write(session -> {
             Customer locked = session.findCustomer(owner.id(), true).orElseThrow();
@@ -254,19 +299,19 @@ class AccountServiceIntegrationTest {
 
     @Test
     void concurrentProfileContactClaimsCommitExactlyOneAndLeaveLoserUnchanged() throws Exception {
-        AccountService service = new AccountService(new JpaAccountRepository(emf));
-        ProfileResponse first = register(service);
-        ProfileResponse second = register(service);
+        AccountService service = new AccountService(new JpaAccountDAO(emf));
+        ProfileBean first = register(service);
+        ProfileBean second = register(service);
         String claimedPhone = newPhone();
         List<Object> outcomes = runTogether(List.of(
                 () -> claimContacts(service, first.id(), first.email(), claimedPhone),
                 () -> claimContacts(service, second.id(), second.email(), claimedPhone)));
 
-        assertEquals(1, outcomes.stream().filter(ProfileResponse.class::isInstance).count());
+        assertEquals(1, outcomes.stream().filter(ProfileBean.class::isInstance).count());
         assertEquals(1, outcomes.stream().filter(AccountException.class::isInstance).count());
         for (int index = 0; index < outcomes.size(); index++) {
-            ProfileResponse original = index == 0 ? first : second;
-            ProfileResponse stored = service.getProfile(original.id());
+            ProfileBean original = index == 0 ? first : second;
+            ProfileBean stored = service.getProfile(original.id());
             if (outcomes.get(index) instanceof AccountException failure) {
                 assertEquals(409, failure.getStatusCode());
                 assertFalse(failure.getDetails().isEmpty());
@@ -280,8 +325,8 @@ class AccountServiceIntegrationTest {
 
     @Test
     void employeeAuthorizationAndInactiveAccountsAreEnforcedAgainstRealDatabaseRecords() {
-        AccountService service = new AccountService(new JpaAccountRepository(emf));
-        ProfileResponse customer = register(service);
+        AccountService service = new AccountService(new JpaAccountDAO(emf));
+        ProfileBean customer = register(service);
         String employeeId = "NV" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
         String employeeEmail = "it-employee-" + UUID.randomUUID().toString().replace("-", "") + "@example.com";
         accountEmails.put(employeeId, employeeEmail);
@@ -292,11 +337,11 @@ class AccountServiceIntegrationTest {
                     EmployeeRole.ORDER_STAFF, null, LocalDate.of(2026, 1, 1)));
             em.getTransaction().commit();
         }
-        ProfileResponse employee = service.login(new LoginRequest(employeeEmail, "Integration#123", false));
+        ProfileBean employee = service.login(new LoginForm(employeeEmail, "Integration#123", false));
         assertEquals(AccountType.EMPLOYEE, employee.accountType());
         assertEquals(EmployeeRole.ORDER_STAFF, employee.role());
         assertEquals(403, assertThrows(AccountException.class, () -> service.updateProfile(employeeId,
-                new ProfileUpdateRequest(employee.fullName(), employee.email(), employee.phone()))).getStatusCode());
+                new ProfileUpdateForm(employee.fullName(), employee.email(), employee.phone()))).getStatusCode());
         assertEquals(403, assertThrows(AccountException.class, () -> service.listAddresses(employeeId)).getStatusCode());
 
         try (EntityManager em = emf.createEntityManager()) {
@@ -307,10 +352,10 @@ class AccountServiceIntegrationTest {
         }
         assertEquals(401, assertThrows(AccountException.class, () -> service.getProfile(employeeId)).getStatusCode());
         assertEquals(401, assertThrows(AccountException.class,
-                () -> service.login(new LoginRequest(employeeEmail, "Integration#123", false))).getStatusCode());
+                () -> service.login(new LoginForm(employeeEmail, "Integration#123", false))).getStatusCode());
         assertEquals(401, assertThrows(AccountException.class, () -> service.getProfile(customer.id())).getStatusCode());
         assertEquals(401, assertThrows(AccountException.class,
-                () -> service.login(new LoginRequest(customer.email(), "Integration#123", false))).getStatusCode());
+                () -> service.login(new LoginForm(customer.email(), "Integration#123", false))).getStatusCode());
         assertEquals(401, assertThrows(AccountException.class, () -> service.listAddresses(customer.id())).getStatusCode());
         assertEquals(401, assertThrows(AccountException.class,
                 () -> service.createAddress(customer.id(), write("Unauthorized new address", true))).getStatusCode());
@@ -318,13 +363,13 @@ class AccountServiceIntegrationTest {
 
     @Test
     void databasePhoneUniquenessReturnsFieldConflictAndDoesNotLeavePartialAccount() {
-        AccountService service = new AccountService(new JpaAccountRepository(emf));
-        ProfileResponse owner = register(service);
+        AccountService service = new AccountService(new JpaAccountDAO(emf));
+        ProfileBean owner = register(service);
         String id = "KH" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
         String email = "it-phone-" + UUID.randomUUID().toString().replace("-", "") + "@example.com";
         accountEmails.put(id, email);
         AccountException failure = assertThrows(AccountException.class,
-                () -> new JpaAccountRepository(emf).write(session -> {
+                () -> new JpaAccountDAO(emf).write(session -> {
                     session.persistCustomer(new Customer(id, "Phone conflict", email, owner.phone(), "unsupported"));
                     session.flush();
                     return null;
@@ -340,7 +385,7 @@ class AccountServiceIntegrationTest {
 
     private static Object claimContacts(AccountService service, String id, String email, String phone) {
         try {
-            return service.updateProfile(id, new ProfileUpdateRequest("Contact Winner", email, phone));
+            return service.updateProfile(id, new ProfileUpdateForm("Contact Winner", email, phone));
         } catch (AccountException failure) {
             return failure;
         }
@@ -367,9 +412,9 @@ class AccountServiceIntegrationTest {
         }
     }
 
-    private ProfileResponse register(AccountService service) {
+    private ProfileBean register(AccountService service) {
         String email = "it-" + UUID.randomUUID().toString().replace("-", "") + "@example.com";
-        ProfileResponse customer = service.register(new RegisterRequest("Integration Customer", email, newPhone(),
+        ProfileBean customer = service.register(new RegisterForm("Integration Customer", email, newPhone(),
                 "Integration#123", "Integration#123"));
         accountEmails.put(customer.id(), customer.email());
         return customer;
@@ -402,7 +447,7 @@ class AccountServiceIntegrationTest {
         return "09" + String.format("%09d", RANDOM.nextInt(1_000_000_000));
     }
 
-    private static AddressWriteRequest write(String line, boolean isDefault) {
-        return new AddressWriteRequest(line, null, isDefault);
+    private static AddressWriteForm write(String line, boolean isDefault) {
+        return new AddressWriteForm(line, null, isDefault);
     }
 }

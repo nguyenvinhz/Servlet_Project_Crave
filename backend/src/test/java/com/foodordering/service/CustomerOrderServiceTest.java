@@ -1,17 +1,17 @@
 package com.foodordering.service;
 
-import com.foodordering.dto.OrderRequest;
-import com.foodordering.dto.OrderResponse;
-import com.foodordering.entity.Customer;
-import com.foodordering.entity.CustomerOrder;
+import com.foodordering.bean.OrderForm;
+import com.foodordering.bean.OrderBean;
+import com.foodordering.model.Customer;
+import com.foodordering.model.CustomerOrder;
 import com.foodordering.enums.FulfillmentType;
 import com.foodordering.enums.OrderStatus;
 import com.foodordering.enums.PaymentMethod;
 import com.foodordering.exception.BadRequestException;
 import com.foodordering.exception.ForbiddenException;
 import com.foodordering.exception.ResourceNotFoundException;
-import com.foodordering.repository.CustomerOrderRepository;
-import com.foodordering.repository.PaymentRepository;
+import com.foodordering.dao.OrderDAO;
+import com.foodordering.dao.PaymentDAO;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import jakarta.persistence.EntityTransaction;
@@ -27,8 +27,8 @@ import static org.mockito.Mockito.*;
 
 class CustomerOrderServiceTest {
 
-    private CustomerOrderRepository orderRepository;
-    private PaymentRepository paymentRepository;
+    private OrderDAO orderDAO;
+    private PaymentDAO paymentDAO;
     private EntityManagerFactory emf;
     private EntityManager em;
     private EntityTransaction tx;
@@ -36,8 +36,8 @@ class CustomerOrderServiceTest {
 
     @BeforeEach
     void setUp() {
-        orderRepository = mock(CustomerOrderRepository.class);
-        paymentRepository = mock(PaymentRepository.class);
+        orderDAO = mock(OrderDAO.class);
+        paymentDAO = mock(PaymentDAO.class);
         emf = mock(EntityManagerFactory.class);
         em = mock(EntityManager.class);
         tx = mock(EntityTransaction.class);
@@ -46,13 +46,13 @@ class CustomerOrderServiceTest {
         when(em.getTransaction()).thenReturn(tx);
         when(tx.isActive()).thenReturn(true);
 
-        orderService = new CustomerOrderServiceImpl(orderRepository, paymentRepository, emf);
+        orderService = new CustomerOrderServiceImpl(orderDAO, paymentDAO, emf);
     }
 
     @Test
     @DisplayName("Tạo đơn hàng thất bại khi thiếu tên người nhận")
     void createOrderFailsWhenReceiverNameIsEmpty() {
-        OrderRequest request = new OrderRequest();
+        OrderForm request = new OrderForm();
         request.setReceiverName("   ");
         request.setReceiverPhone("0987654321");
         request.setFulfillmentType(FulfillmentType.PICKUP);
@@ -65,9 +65,9 @@ class CustomerOrderServiceTest {
 
     @Test
     void outsideRadiusCannotCreateAnOrderEvenWithoutCallingQuoteApi() {
-        CustomerOrderServiceImpl service = new CustomerOrderServiceImpl(orderRepository, paymentRepository, emf,
+        CustomerOrderServiceImpl service = new CustomerOrderServiceImpl(orderDAO, paymentDAO, emf,
                 new DeliveryFeeService(new DeliveryFeeService.Store("Fixture store", 10.89, 106.76)));
-        OrderRequest request = new OrderRequest();
+        OrderForm request = new OrderForm();
         request.setReceiverName("Customer");
         request.setReceiverPhone("0901234567");
         request.setFulfillmentType(FulfillmentType.DELIVERY);
@@ -84,7 +84,7 @@ class CustomerOrderServiceTest {
     @Test
     @DisplayName("Tạo đơn hàng thất bại khi thiếu số điện thoại người nhận")
     void createOrderFailsWhenReceiverPhoneIsEmpty() {
-        OrderRequest request = new OrderRequest();
+        OrderForm request = new OrderForm();
         request.setReceiverName("Nguyễn Văn A");
         request.setReceiverPhone("");
         request.setFulfillmentType(FulfillmentType.PICKUP);
@@ -98,7 +98,7 @@ class CustomerOrderServiceTest {
     @Test
     @DisplayName("Tạo đơn giao hàng thất bại khi thiếu địa chỉ giao hàng")
     void createDeliveryOrderFailsWhenDeliveryAddressIsEmpty() {
-        OrderRequest request = new OrderRequest();
+        OrderForm request = new OrderForm();
         request.setReceiverName("Nguyễn Văn A");
         request.setReceiverPhone("0987654321");
         request.setFulfillmentType(FulfillmentType.DELIVERY);
@@ -141,7 +141,7 @@ class CustomerOrderServiceTest {
 
         when(em.find(CustomerOrder.class, "DH01")).thenReturn(order);
 
-        OrderResponse res = orderService.getOrderById("DH01");
+        OrderBean res = orderService.getOrderById("DH01");
 
         assertNotNull(res);
         assertEquals("DH01", res.getOrderId());

@@ -1,231 +1,130 @@
 <%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
-<c:set var="pageTitle" value="Giỏ hàng của bạn" />
-<c:set var="pageStyle" value="cart" />
+<%@ taglib prefix="fmt" uri="jakarta.tags.fmt" %>
+<fmt:setLocale value="vi_VN"/>
+<c:set var="pageTitle" value="Giỏ hàng của bạn"/>
+<c:set var="pageStyle" value="cart"/>
 <%@ include file="/WEB-INF/views/components/header.jspf" %>
-
-
 
 <main id="main-content" class="cart-page-wrapper">
     <div class="cart-container">
-
-        <!-- Page Title matching Framer screenshot -->
         <header class="cart-header-section">
             <h1 class="cart-page-title">Giỏ hàng của bạn</h1>
             <p class="cart-subtitle">Quản lý các món ăn đã chọn và áp dụng mã giảm giá tốt nhất.</p>
         </header>
-
-        <!-- 1. LOADING STATE (SKELETON SHIMMER) -->
-        <div id="cartLoadingState" class="cart-loading-state">
-            <div class="cart-layout-grid">
-                <div class="cart-items-column">
-                    <div class="skeleton-card">
-                        <div class="skeleton-thumb skeleton-shimmer"></div>
-                        <div class="skeleton-text-group">
-                            <div class="skeleton-line title skeleton-shimmer"></div>
-                            <div class="skeleton-line sub skeleton-shimmer"></div>
-                            <div class="skeleton-line price skeleton-shimmer"></div>
+        <c:if test="${not empty flashError}"><p class="voucher-feedback error" role="alert"><c:out value="${flashError}"/></p></c:if>
+        <c:if test="${not empty flashMessage}"><p class="voucher-feedback success" role="status"><c:out value="${flashMessage}"/></p></c:if>
+        <c:if test="${not empty editItem}">
+            <section class="order-summary-card cart-item-editor" id="cartItemEditor" aria-labelledby="cartEditorTitle">
+                <h2 class="order-summary-title" id="cartEditorTitle">Chỉnh sửa <c:out value="${editItem.foodName}"/></h2>
+                <form id="cartItemEditorForm" action="<c:url value='/cart/items'/>" method="post" data-base-price="<c:out value='${editFood.price}'/>">
+                    <input type="hidden" name="action" value="update">
+                    <input type="hidden" name="cartItemId" value="<c:out value='${editItem.cartItemId}'/>">
+                    <input type="hidden" name="customization" value="true">
+                    <%@ include file="/WEB-INF/views/components/food-options.jspf" %>
+                    <label class="cart-editor-field" for="cartEditorQuantity">Số lượng
+                        <input id="cartEditorQuantity" name="quantity" type="number" value="${editItem.quantity}" min="1" max="100" step="1" required>
+                    </label>
+                    <label class="cart-editor-field" for="cartEditorNote">Ghi chú cho món
+                        <textarea id="cartEditorNote" name="note" maxlength="255" rows="2"><c:out value="${editItem.note}"/></textarea>
+                    </label>
+                    <div class="summary-total-row"><span>Thành tiền</span><strong id="cartEditorTotal"><fmt:formatNumber value="${editItem.lineTotal}" groupingUsed="true"/> ₫</strong></div>
+                    <div class="cart-editor-actions">
+                        <a href="<c:url value='/cart'/>" class="voucher-apply-btn">Hủy</a>
+                        <button type="submit" class="btn-checkout" ${editFood.status != 'AVAILABLE' ? 'disabled' : ''}>Lưu thay đổi</button>
+                    </div>
+                    <c:if test="${editFood.status != 'AVAILABLE'}"><p role="alert">Món ăn hiện tạm ngưng phục vụ. Bạn có thể xóa món khỏi giỏ hàng.</p></c:if>
+                </form>
+            </section>
+        </c:if>
+        <c:choose>
+            <c:when test="${empty cart.items}">
+                <div class="cart-empty-state">
+                    <div class="cart-empty-illustration" aria-hidden="true">🛒</div>
+                    <h2 class="cart-empty-title">Giỏ hàng của bạn đang trống</h2>
+                    <p class="cart-empty-desc">Bạn chưa thêm món ăn nào vào giỏ. Hãy khám phá thực đơn để tìm món ngon yêu thích.</p>
+                    <a href="<c:url value='/menu'/>" class="btn-explore-menu">Khám phá thực đơn ngay</a>
+                </div>
+            </c:when>
+            <c:otherwise>
+                <div class="cart-layout-grid">
+                    <div class="cart-items-column">
+                        <div class="cart-items-column">
+                            <c:forEach var="item" items="${cart.items}">
+                                <c:url var="editUrl" value="/cart"><c:param name="edit" value="${item.cartItemId}"/></c:url>
+                                <article class="cart-item-card">
+                                    <div class="cart-item-image-wrapper">
+                                        <c:set var="cartImageUrl" value="${empty item.imageUrl ? pageContext.request.contextPath.concat('/assets/images/food-placeholder.svg') : item.imageUrl}"/>
+                                        <c:if test="${not empty item.imageUrl and not item.imageUrl.startsWith('/') and not item.imageUrl.startsWith('http://') and not item.imageUrl.startsWith('https://')}">
+                                            <c:set var="cartImageUrl" value="${pageContext.request.contextPath.concat('/').concat(item.imageUrl)}"/>
+                                        </c:if>
+                                        <img class="cart-item-image" src="<c:out value='${cartImageUrl}'/>" alt="<c:out value='${item.foodName}'/>" onerror="this.onerror=null;this.src='<c:url value='/assets/images/food-placeholder.svg'/>'">
+                                    </div>
+                                    <div class="cart-item-info">
+                                        <h3 class="cart-item-title"><a class="cart-item-title-button" href="<c:out value='${editUrl}'/>#cartItemEditor"><c:out value="${item.foodName}"/></a></h3>
+                                        <c:if test="${not empty item.options}"><p class="cart-item-options"><c:forEach var="opt" items="${item.options}" varStatus="loop"><c:if test="${not loop.first}"> · </c:if><c:out value="${opt.name}"/></c:forEach></p></c:if>
+                                        <c:if test="${not empty item.note}"><p class="cart-item-note">Ghi chú: <c:out value="${item.note}"/></p></c:if>
+                                        <div class="cart-item-actions">
+                                            <a class="cart-item-edit-btn" href="<c:out value='${editUrl}'/>#cartItemEditor">Chỉnh sửa món</a>
+                                            <form action="<c:url value='/cart/items'/>" method="post" class="cart-stepper">
+                                                <input type="hidden" name="action" value="update">
+                                                <input type="hidden" name="cartItemId" value="<c:out value='${item.cartItemId}'/>">
+                                                <button type="submit" class="cart-stepper-btn" name="quantity" value="${item.quantity - 1}" aria-label="Giảm số lượng">−</button>
+                                                <span class="cart-stepper-val">${item.quantity}</span>
+                                                <button type="submit" class="cart-stepper-btn" name="quantity" value="${item.quantity + 1}" ${item.quantity >= 100 ? 'disabled' : ''} aria-label="Tăng số lượng">+</button>
+                                            </form>
+                                            <form action="<c:url value='/cart/items'/>" method="post">
+                                                <input type="hidden" name="action" value="remove">
+                                                <input type="hidden" name="cartItemId" value="<c:out value='${item.cartItemId}'/>">
+                                                <button type="submit" class="cart-item-remove-btn" title="Xóa món khỏi giỏ">Xóa</button>
+                                            </form>
+                                        </div>
+                                    </div>
+                                    <div class="cart-item-price-tag"><fmt:formatNumber value="${item.unitPrice}" groupingUsed="true"/> ₫ × ${item.quantity}</div>
+                                </article>
+                            </c:forEach>
+                        </div>
+                        <div class="cart-bottom-actions">
+                            <a href="<c:url value='/menu'/>" class="btn-link-action">← Chọn thêm món khác</a>
+                            <form action="<c:url value='/cart/clear'/>" method="post" data-confirm="Xóa toàn bộ giỏ hàng?">
+                                <button type="submit" class="btn-link-action danger">Xóa toàn bộ giỏ</button>
+                            </form>
                         </div>
                     </div>
-                    <div class="skeleton-card">
-                        <div class="skeleton-thumb skeleton-shimmer"></div>
-                        <div class="skeleton-text-group">
-                            <div class="skeleton-line title skeleton-shimmer"></div>
-                            <div class="skeleton-line sub skeleton-shimmer"></div>
-                            <div class="skeleton-line price skeleton-shimmer"></div>
-                        </div>
-                    </div>
-                </div>
-                <div>
-                    <div class="order-summary-card" style="box-shadow: none;">
-                        <div class="skeleton-line title skeleton-shimmer" style="margin-bottom: 20px;"></div>
-                        <div class="skeleton-line sub skeleton-shimmer" style="margin-bottom: 12px;"></div>
-                        <div class="skeleton-line sub skeleton-shimmer" style="margin-bottom: 12px;"></div>
-                        <div class="summary-divider"></div>
-                        <div class="skeleton-line price skeleton-shimmer" style="height: 36px; margin-bottom: 24px;"></div>
-                        <div class="skeleton-line skeleton-shimmer" style="height: 52px; border-radius: 12px;"></div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- 2. ERROR STATE (TRẠNG THÁI LỖI) -->
-        <div id="cartErrorState" class="cart-error-state" style="display: none;">
-            <div class="cart-error-icon">
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="12" cy="12" r="10"></circle>
-                    <line x1="12" y1="8" x2="12" y2="12"></line>
-                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
-                </svg>
-            </div>
-            <h3 class="cart-error-title">Không thể tải thông tin giỏ hàng</h3>
-            <p class="cart-error-desc" id="cartErrorMsg">Đã xảy ra lỗi trong quá trình kết nối với máy chủ. Vui lòng thử lại.</p>
-            <button type="button" class="btn-retry" id="retryFetchCartBtn">Thử lại ngay</button>
-        </div>
-
-        <!-- 3. EMPTY STATE (TRẠNG THÁI RỖNG) -->
-        <div id="cartEmptyState" class="cart-empty-state" style="display: none;">
-            <div class="cart-empty-illustration">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="9" cy="21" r="1"></circle>
-                    <circle cx="20" cy="21" r="1"></circle>
-                    <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
-                </svg>
-            </div>
-            <h2 class="cart-empty-title">Giỏ hàng của bạn đang trống</h2>
-            <p class="cart-empty-desc">
-                Bạn chưa thêm món ăn nào vào giỏ. Hãy dạo quanh thực đơn phong phú của Crave để tìm những món ngon yêu thích nhé!
-            </p>
-            <a href="<c:url value='/menu'/>" class="btn-explore-menu">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M3 3h18v18H3zM9 9h6M9 15h6"></path>
-                </svg>
-                Khám phá thực đơn ngay
-            </a>
-        </div>
-
-        <!-- 4. POPULATED CART CONTENT (GIAO DIỆN CHÍNH THEO DESIGN MẪU) -->
-        <div id="cartContentWrapper" class="cart-layout-grid" style="display: none;">
-
-            <!-- Left Column: Cart Items -->
-            <div class="cart-items-column">
-                <div id="cartItemsList" class="cart-items-column">
-                    <!-- Populated dynamically by cart.js -->
-                </div>
-
-                <!-- Bottom Toolbar -->
-                <div class="cart-bottom-actions">
-                    <a href="<c:url value='/menu'/>" class="btn-link-action">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <line x1="19" y1="12" x2="5" y2="12"></line>
-                            <polyline points="12 19 5 12 12 5"></polyline>
-                        </svg>
-                        Chọn thêm món khác
-                    </a>
-                    <button type="button" class="btn-link-action danger" id="clearCartBtn">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <polyline points="3 6 5 6 21 6"></polyline>
-                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                        </svg>
-                        Xóa toàn bộ giỏ
-                    </button>
-                </div>
-            </div>
-
-            <!-- Right Column: Order Summary (Matching Screenshot) -->
-            <div class="cart-summary-column">
-                <div class="order-summary-card">
-                    <h2 class="order-summary-title">Tóm tắt đơn hàng</h2>
-
-                    <!-- Subtotal Row -->
-                    <div class="summary-row">
-                        <span>Tạm tính</span>
-                        <span id="summarySubtotal" style="font-weight: 600; color: var(--crave-text);">0 đ</span>
-                    </div>
-
-                    <!-- Delivery Fee Row -->
-                    <div class="summary-row">
-                        <span>Phí giao hàng</span>
-                        <span id="summaryDeliveryFee" style="font-weight: 600; color: var(--crave-text);">Tính khi thanh toán</span>
-                    </div>
-
-                    <!-- Discount Row (Shown when voucher applied) -->
-                    <div class="summary-row discount-row" id="summaryDiscountRow" style="display: none;">
-                        <span>Giảm giá</span>
-                        <span id="summaryDiscount">-0 đ</span>
-                    </div>
-
-                    <div class="summary-divider"></div>
-
-                    <!-- Total Row (Matching Screenshot: "Total $12.82") -->
-                    <div class="summary-total-row">
-                        <span class="summary-total-label">Tiền món sau giảm</span>
-                        <span class="summary-total-value" id="summaryTotal">0 đ</span>
-                    </div>
-
-                    <!-- Voucher / Promotion Area (Khu vực nhập voucher) -->
-                    <p class="cart-shipping-hint">Phí giao hàng được cập nhật sau khi chọn điểm nhận ở bước thanh toán.</p>
-                    <div class="voucher-section">
-                        <div class="voucher-section-title">
-                            <span>Mã khuyến mãi</span>
-                            <a href="<c:url value='/promotions'/>" class="voucher-view-all-link" id="viewPromosBtn">Xem mã có sẵn</a>
-                        </div>
-
-                        <div class="voucher-input-group">
-                            <input type="text" id="voucherCodeInput" class="voucher-input"
-                                   placeholder="Nhập mã ưu đãi" aria-label="Mã khuyến mãi" autocomplete="off">
-                            <button type="button" id="voucherApplyBtn" class="voucher-apply-btn">
-                                Áp dụng
-                            </button>
-                        </div>
-
-                        <!-- Applied Voucher Chip -->
-                        <div id="voucherAppliedChip" class="voucher-applied-chip" style="display: none;">
-                            <div class="voucher-chip-info">
-                                <span class="voucher-code-badge" id="voucherAppliedCode">CODE</span>
-                                <span class="voucher-discount-text" id="voucherAppliedDiscount">-0 đ</span>
+                    <div class="cart-summary-column">
+                        <div class="order-summary-card">
+                            <h2 class="order-summary-title">Tóm tắt đơn hàng</h2>
+                            <div class="summary-row"><span>Tạm tính</span><span><fmt:formatNumber value="${cart.subtotal}" groupingUsed="true"/> ₫</span></div>
+                            <div class="summary-row"><span>Phí giao hàng</span><span>Tính khi thanh toán</span></div>
+                            <c:if test="${discountAmount > 0}"><div class="summary-row discount-row"><span>Giảm giá</span><span>−<fmt:formatNumber value="${discountAmount}" groupingUsed="true"/> ₫</span></div></c:if>
+                            <div class="summary-divider"></div>
+                            <div class="summary-total-row"><span class="summary-total-label">Tiền món sau giảm</span><span class="summary-total-value"><fmt:formatNumber value="${finalSubtotal}" groupingUsed="true"/> ₫</span></div>
+                            <p class="cart-shipping-hint">Phí giao hàng được cập nhật sau khi chọn điểm nhận ở bước thanh toán.</p>
+                            <div class="voucher-section">
+                                <div class="voucher-section-title"><span>Mã khuyến mãi</span><a href="<c:url value='/promotions'/>" class="voucher-view-all-link">Xem mã có sẵn</a></div>
+                                <c:choose>
+                                    <c:when test="${not empty appliedPromotion}">
+                                        <form class="voucher-applied-chip" action="<c:url value='/cart/promotion'/>" method="post">
+                                            <input type="hidden" name="action" value="remove">
+                                            <div class="voucher-chip-info"><span class="voucher-code-badge"><c:out value="${appliedPromotion.code}"/></span><span class="voucher-discount-text">−<fmt:formatNumber value="${discountAmount}" groupingUsed="true"/> ₫</span></div>
+                                            <button type="submit" class="voucher-remove-btn" aria-label="Hủy mã khuyến mãi">×</button>
+                                        </form>
+                                    </c:when>
+                                    <c:otherwise>
+                                        <form class="voucher-input-group" action="<c:url value='/cart/promotion'/>" method="post">
+                                            <input type="text" name="code" value="<c:out value='${voucherCode}'/>" class="voucher-input" placeholder="Nhập mã ưu đãi" aria-label="Mã khuyến mãi" maxlength="50" required autocomplete="off">
+                                            <button type="submit" class="voucher-apply-btn">Áp dụng</button>
+                                        </form>
+                                    </c:otherwise>
+                                </c:choose>
                             </div>
-                            <button type="button" class="voucher-remove-btn" id="voucherRemoveBtn" title="Hủy mã khuyến mãi">
-                                &times;
-                            </button>
+                            <a href="<c:url value='/checkout'/>" class="btn-checkout">Tiếp tục thanh toán</a>
                         </div>
-
-                        <!-- Feedback Message -->
-                        <div id="voucherFeedback" class="voucher-feedback" role="status" aria-live="polite"></div>
                     </div>
-
-                    <!-- Checkout Button (Matching Screenshot: Orange Button) -->
-                    <button type="button" class="btn-checkout" id="proceedCheckoutBtn">
-                        Tiếp tục thanh toán
-                    </button>
                 </div>
-            </div>
-
-        </div>
-
+            </c:otherwise>
+        </c:choose>
     </div>
 </main>
-
-<!-- PROMOTIONS DRAWER / MODAL -->
-<div id="promosModal" class="promo-modal-backdrop" aria-hidden="true">
-    <div class="promo-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="promos-modal-title" tabindex="-1">
-        <div class="promo-modal-header">
-            <h3 id="promos-modal-title" class="promo-modal-title">Mã khuyến mãi dành cho bạn</h3>
-            <button type="button" class="promo-modal-close" id="promosModalClose" aria-label="Đóng">&times;</button>
-        </div>
-        <p style="color: var(--crave-text-muted); font-size: 0.9rem; margin-top: -10px; margin-bottom: 20px;">
-            Chọn mã ưu đãi phù hợp với đơn hàng của bạn để được áp dụng giảm giá ngay lập tức:
-        </p>
-        <div id="promosModalList" class="promo-list">
-            <!-- Loaded dynamically by cart.js -->
-        </div>
-    </div>
-</div>
-
-<dialog id="cartItemEditor" class="cart-editor" aria-labelledby="cartEditorTitle">
-    <form id="cartItemEditorForm">
-        <div class="promo-modal-header">
-            <h3 id="cartEditorTitle" class="promo-modal-title">Chỉnh sửa món</h3>
-            <button type="button" id="cartEditorClose" class="promo-modal-close" aria-label="Đóng">&times;</button>
-        </div>
-        <p id="cartEditorStatus" role="status" aria-live="polite"></p>
-        <div id="cartEditorFields" hidden>
-            <div id="cartEditorOptions"></div>
-            <label class="cart-editor-field" for="cartEditorQuantity">Số lượng
-                <input id="cartEditorQuantity" type="number" min="1" max="100" step="1" required>
-            </label>
-            <label class="cart-editor-field" for="cartEditorNote">Ghi chú cho món
-                <textarea id="cartEditorNote" maxlength="255" rows="2" placeholder="Ví dụ: ít cay, không hành"></textarea>
-            </label>
-            <div class="summary-total-row"><span>Thành tiền</span><strong id="cartEditorTotal"></strong></div>
-        </div>
-        <div class="cart-editor-actions">
-            <button type="button" id="cartEditorCancel" class="voucher-apply-btn">Hủy</button>
-            <button type="submit" id="cartEditorSave" class="btn-checkout" disabled>Lưu thay đổi</button>
-        </div>
-    </form>
-</dialog>
-
-<script src="<c:url value='/assets/js/cart.js?v=20261015-order1'/>"></script>
-
+<script src="<c:url value='/assets/js/cart.js'/>"></script>
 <%@ include file="/WEB-INF/views/components/footer.jspf" %>

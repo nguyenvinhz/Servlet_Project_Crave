@@ -1,86 +1,66 @@
 # Crave Food Ordering
 
-Ứng dụng Java Servlet/JSP đóng gói dạng WAR, dùng Jakarta Servlet 6, JPA/Hibernate,
-HikariCP và MySQL.
+Ứng dụng đặt món dùng **Jakarta Servlet 6 + JSP/JSTL + JPA/Hibernate + HikariCP + MySQL**, đóng gói WAR và chạy trên Tomcat 10.1+.
 
-Tài liệu được chia thành API, kế hoạch/quy ước làm việc và báo cáo theo chức năng.
-Xem [mục lục tài liệu](docs/README.md) để tìm đúng phần cần đọc.
+Servlet đọc `request.getParameter()`, gọi nghiệp vụ, đặt request attribute rồi forward JSP. Các thao tác ghi dùng form POST và redirect sau khi thành công. Trình duyệt nhận HTML, gửi form thông thường; JavaScript chỉ hỗ trợ giao diện, bản đồ và kiểm tra đầu vào. JSON chỉ còn phục vụ tích hợp máy chủ với payOS, dịch vụ tra tọa độ và webhook payOS.
 
-## Cấu trúc project
+Xem [kiến trúc Servlet/JSP](docs/architecture/servlet-jsp.md), [sơ đồ lớp và cấu trúc mã](docs/architecture/README.md), [mục lục tài liệu](docs/README.md).
+
+## Cấu trúc
 
 ```text
 backend/
-  pom.xml                Build ứng dụng WAR
-  src/main/java/         Java: API, servlet/page, service, repository, entity...
-  src/main/resources/    Cấu hình persistence và logging
+  pom.xml
+  src/main/java/com/foodordering/
+    servlet/             Servlet menu, giỏ, checkout, đơn hàng, thanh toán
+      account/           Đăng nhập, hồ sơ, địa chỉ, xác minh email
+      admin/             Quản trị, báo cáo và các form quản lý
+    filter/              UTF-8, xác thực, vai trò và kiểm tra nguồn POST
+    listener/            Vòng đời pool database và cấu hình session
+    bean/                Form và dữ liệu hiển thị JSP
+    model/               Entity JPA
+    dao/                 Truy cập dữ liệu bằng JPA
+    service/             Nghiệp vụ, transaction và tổng tiền
+    validator/           Kiểm tra dữ liệu
+    integration/         payOS, geocoder và SMTP
+    config/              Cấu hình database, email và payOS
+    security/, enums/, exception/, util/
+  src/main/resources/    persistence.xml và logging
   src/test/java/         Kiểm thử Java
-  src/dev/java/          Launcher và công cụ cục bộ (profile dev)
+  src/dev/java/          Launcher Tomcat và công cụ tạo nhân viên
 frontend/
-  WEB-INF/views/         JSP và các thành phần dùng chung
-  WEB-INF/web.xml        Cấu hình web
-  assets/                CSS, JavaScript, hình ảnh
-  index.jsp              Trang vào ứng dụng
-database/                Schema, dữ liệu mẫu và migrations
-scripts/
-  dev/                   Chạy ứng dụng, chọn JDK, tạo tài khoản quản trị
-  deploy-ec2.sh           Triển khai WAR lên EC2
-tests/
-  frontend/              Kiểm thử trình duyệt
-  runtime/               Kiểm thử HTTP trên ứng dụng thật
-  scripts/               Kiểm thử deploy và rollback
-docs/                    API, kiến trúc, preview, kế hoạch và báo cáo
+  WEB-INF/views/         JSP và thành phần dùng chung
+  WEB-INF/web.xml
+  assets/                CSS, JavaScript, hình ảnh và Leaflet
+database/                Schema, seed và migration
+scripts/                 Chạy local và triển khai EC2
+tests/                   Kiểm thử trình duyệt, HTTP và deploy
+docs/                    Kiến trúc, hướng dẫn và báo cáo
 ```
 
-Servlet hiển thị JSP nằm trong `com.foodordering.servlet.page`; API JSON nằm
-trong `api/`, cùng các servlet đơn hàng/thanh toán trong `servlet/`.
-Trang giỏ hàng và khuyến mãi nằm trong `WEB-INF/views/cart/` và
-`WEB-INF/views/promotions/`, được servlet phục vụ tại `/cart` và `/promotions`.
-Báo cáo nằm trong `docs/reports/<chức-năng>/` với ngày trong tên file.
-Kiểm thử và preview nằm ngoài `frontend/` để không đóng gói vào WAR.
+Các gói cũ `api`, `dto`, `mapper`, `repository`, `entity` và `servlet.page` đã được thay thế. JSP nằm trong `WEB-INF` và được Servlet forward; không mở trực tiếp file JSP.
 
-## CI/CD trên AWS EC2
+## Chạy local
 
-Pull request vào `main` chạy kiểm thử và build WAR. Push/merge `main` chạy CI rồi
-tự deploy ứng dụng vào `/home/ubuntu/crave` trên EC2, kiểm tra health và khôi phục
-WAR cũ nếu deploy lỗi. Cài runner EC2 một lần theo
-[hướng dẫn CI/CD](docs/project/ci-cd-ec2.md) để bật deploy tự động.
+Yêu cầu JDK 17 hoặc 21, Maven 3.9+, MySQL và Tomcat 10.1+. Có thể dùng Docker cho database.
 
-## Chạy môi trường phát triển
-
-Yêu cầu: JDK 17+, Maven 3.9+, Docker (nếu chưa có MySQL) và Tomcat 10.1+.
-
-Xem [cấu trúc mã nguồn và sơ đồ lớp](docs/architecture/README.md).
-
-1. Tạo cấu hình database cục bộ:
+1. Tạo cấu hình và khởi động MySQL:
 
    ```powershell
    Copy-Item .env.example .env
-   # Sửa hai mật khẩu mẫu trong .env trước khi chạy.
+   # Sửa các mật khẩu mẫu trong .env.
    docker compose up -d
    ```
 
-2. Cấu hình ứng dụng bằng biến môi trường. Không đặt mật khẩu thật trong source:
+2. Đặt biến môi trường khi cần ghi đè cấu hình local:
 
    ```powershell
    $env:DB_URL = 'jdbc:mysql://localhost:3306/crave?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Ho_Chi_Minh&characterEncoding=UTF-8'
    $env:DB_USER = 'crave_app'
-   $env:DB_PASSWORD = '<giống CRAVE_DB_PASSWORD trong .env>'
+   $env:DB_PASSWORD = '<mật khẩu database>'
    ```
 
-   Các biến tùy chọn: `DB_POOL_MAX_SIZE`, `DB_POOL_MIN_IDLE`,
-   `DB_CONNECTION_TIMEOUT_MS`, `DB_VALIDATION_TIMEOUT_MS`, `DB_FAIL_FAST`.
-
-   Với database đã tồn tại, áp dụng bản sửa voucher `INACTIVE` (issue #23) từ
-   thư mục gốc repository bằng tài khoản sở hữu procedure:
-
-   ```powershell
-   mysql --user=root --password --database=crave --execute="SOURCE database/migrations/2026-10-11-active-promotion-discount.sql"
-   ```
-
-   Script thay thế riêng `sp_calculate_discount`; đơn cũ giữ snapshot giảm giá
-   khi chỉ đổi trạng thái. Nếu đã cấp quyền `EXECUTE` riêng cho procedure,
-   cấp lại đúng các quyền đó sau khi chạy migration. Chạy migration trong lúc
-   tạm dừng ghi đơn vì MySQL thay thế routine qua `DROP`/`CREATE`.
+   Pool HikariCP nhận `DB_POOL_MAX_SIZE`, `DB_POOL_MIN_IDLE`, `DB_CONNECTION_TIMEOUT_MS` và `DB_VALIDATION_TIMEOUT_MS`. `DB_FAIL_FAST=true` yêu cầu dừng khởi động nếu database chưa sẵn sàng.
 
 3. Build và kiểm thử:
 
@@ -88,140 +68,80 @@ Xem [cấu trúc mã nguồn và sơ đồ lớp](docs/architecture/README.md).
    mvn -f backend/pom.xml clean verify
    ```
 
-4. Deploy `backend/target/crave.war` lên Tomcat. Sau khi deploy, kiểm tra:
-
-   - `GET /crave/api/health`
-   - `/crave/auth/login`
-   - `/crave/auth/register`
-   - `/crave/customer/profile`
-   - `/crave/customer/addresses`
-
-   Hoặc chạy Tomcat 10.1 tích hợp bằng một lệnh từ thư mục gốc:
+4. Chạy Tomcat tích hợp:
 
    ```powershell
-   powershell -ExecutionPolicy Bypass -File scripts/dev/run.ps1
-   # Cổng khác: thêm -Port 8081
+   powershell -ExecutionPolicy Bypass -File scripts/dev/run.ps1 -Port 8081
    ```
 
-   Trên Linux/macOS: `bash scripts/dev/run.sh 8080` (JDK 17/21 trên PATH).
-   Mở `http://localhost:8080/crave/menu`; nhấn Ctrl+C để dừng.
-   Profile `dev` chỉ dùng cho launcher, không thêm Tomcat vào WAR production.
+   Linux/macOS: `bash scripts/dev/run.sh 8081`. Mở `http://localhost:8081/crave/menu`; Ctrl+C để dừng. Hoặc deploy `backend/target/crave.war` lên Tomcat riêng. Profile `dev` chỉ phục vụ launcher, không đưa Tomcat vào WAR production.
 
-## Thanh toán QR qua payOS
+Kiểm tra `GET /crave/health` để xem trạng thái database. `/crave/api/health` là đường dẫn tương thích, cùng trả văn bản thuần.
 
-Chọn **Chuyển khoản ngân hàng** hoặc **Ví điện tử** khi đặt hàng để hiện QR
-trên trang chi tiết đơn. Server tạo link theo số tiền trong database và tự
-đồng bộ trạng thái với payOS. Ví cần hỗ trợ VietQR.
+Không chạy lại `database/schema.sql` trên database cần giữ dữ liệu vì script bootstrap có `DROP DATABASE`. Với database hiện có, dùng `database/migrations/`; các thay đổi lần tái cấu trúc Java này giữ nguyên tên bảng.
 
-Cấu hình local tại `http://localhost:8081/crave`; bản AWS dùng
-`http://15.134.39.86:8080/crave`. CI/CD lấy khóa từ GitHub environment `production`,
-chạy migration và đăng ký webhook khi deploy. Xem [hướng dẫn payOS](docs/project/payos.md).
-Các khóa chỉ đặt trong `.env` cục bộ hoặc cấu hình server, không đưa lên Git.
+## Chức năng và đường dẫn
 
-## Quản trị
+Các đường dẫn dưới đây tính từ context path `/crave`.
 
-Mẫu giao diện khách hàng tham khảo [Crave trên Framer](https://thrilled-calendar-459980.framer.app/),
-giao diện quản trị dựa trên mẫu `food-admin-dashboard` người dùng cung cấp.
-Trang quản trị dùng API và database của ứng dụng Servlet/JSP.
+| Chức năng | Đường dẫn |
+|---|---|
+| Thực đơn, chi tiết món | `/menu`, `/menu/detail?id=...` |
+| Đăng ký, đăng nhập, đăng xuất | `/auth/register`, `/auth/login`, POST `/auth/logout` |
+| Quên/đổi mật khẩu qua email | `/auth/forgot-password`, `/auth/change-password` |
+| Hồ sơ, địa chỉ | `/customer/profile`, `/customer/addresses` |
+| Giỏ hàng, voucher, checkout | `/cart`, `/cart/promotion`, `/checkout` |
+| Đơn của khách, chi tiết/hủy | `/orders`, `/orders/{id}`, POST `/orders/{id}/cancel` |
+| Khuyến mãi | `/promotions` |
+| Quản trị, báo cáo/CSV | `/admin`, `/admin/reports` |
+| Món, danh mục và tùy chọn món | `/admin/menu`, `/admin/categories` |
+| Khách hàng, nhân viên, khuyến mãi | `/admin/customers`, `/admin/employees`, `/admin/promotions` |
+| Xử lý đơn và thanh toán | `/admin/orders`, POST `/admin/payments` |
+| Tạo/đồng bộ thanh toán, ảnh QR | `/payments/payos/{orderId}`, `/payments/payos/{orderId}/qr` |
 
-Tài khoản seed chưa có mật khẩu hợp lệ. Tạo tài khoản quản trị bằng công cụ cục bộ
-(mật khẩu được nhập ẩn, băm bằng PBKDF2; email/số điện thoại phải chưa tồn tại):
+Filter đưa người chưa đăng nhập về form đăng nhập, kiểm tra lại tài khoản ở mỗi request bảo vệ và phân quyền theo vai trò. Khách chỉ thao tác giỏ/đơn của mình; nhân viên dùng các trang quản trị phù hợp. ID người thực hiện lấy từ session.
+
+Tài khoản seed có mật khẩu placeholder. Tạo quản trị viên local bằng công cụ nhập mật khẩu ẩn:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts/dev/create-admin.ps1 -Email admin@example.com -FullName 'Quản trị Crave' -Phone 0901234567
 ```
 
-Đăng nhập tại `/crave/auth/login`, mở `/crave/admin`. Có thể truyền `-Role`
-với `MENU_MANAGER`, `ORDER_STAFF`, `PROMOTION_MANAGER` hoặc `HR_MANAGER` để tạo nhân viên.
-Admin truy cập mọi chức năng; nhân viên chỉ thấy chức năng phù hợp vai trò.
+Có thể truyền `-Role` với `MENU_MANAGER`, `ORDER_STAFF`, `PROMOTION_MANAGER` hoặc `HR_MANAGER`. Admin truy cập toàn bộ chức năng. Mật khẩu được băm PBKDF2; dữ liệu hiển thị không chứa mật khẩu/hash. Session dùng cookie HttpOnly, SameSite=Lax; chọn ghi nhớ đăng nhập kéo dài thời gian session theo cấu hình hiện có.
 
-Không chạy lại `database/schema.sql` trên database có dữ liệu cần giữ:
-đây là script bootstrap có `DROP DATABASE`. Dùng `database/migrations/` cho database hiện có.
+## Tích hợp và triển khai
 
-Phần tài khoản Ngày 2 đã hoàn thiện: đăng ký, đăng nhập/đăng xuất, session,
-cập nhật hồ sơ và quản lý địa chỉ giao hàng. Hợp đồng nằm tại
-[`docs/api/api-auth-profile-address.yaml`](docs/api/api-auth-profile-address.yaml).
+- [payOS](docs/project/payos.md): tạo VietQR theo tổng tiền đã lưu, đồng bộ trạng thái và kiểm tra chữ ký webhook. `POST /api/payos/webhook` là giao tiếp payOS với máy chủ.
+- [Xác thực email](docs/project/email-verification.md): gửi mã OTP qua SMTP cho quên/đổi mật khẩu.
+- [Giao hàng và sửa giỏ](docs/architecture/delivery-and-cart-editing.md): vị trí cửa hàng, xác nhận tọa độ và phí giao hàng. Tổng tiền được máy chủ tính lại khi checkout.
+- [CI/CD EC2](docs/project/ci-cd-ec2.md): build WAR, deploy, kiểm tra health và rollback.
 
-## Demo tài khoản Ngày 2 — Nguyễn Quang Vinh
+Khóa payOS/SMTP và mật khẩu database đặt trong `.env` local hoặc môi trường server; không đưa vào Git.
 
-1. Mở `/crave/auth/register`, đăng ký bằng email và số điện thoại chưa tồn tại.
-2. Đăng nhập tại `/crave/auth/login`; ứng dụng chuyển tới hồ sơ.
-3. Sửa họ tên, email hoặc số điện thoại và lưu; tải lại trang để kiểm tra dữ liệu.
-4. Mở `/crave/customer/addresses`, thêm, sửa, chọn mặc định và xóa địa chỉ.
-   Địa chỉ đầu tiên tự động là mặc định; xóa địa chỉ mặc định sẽ chọn một địa chỉ còn lại.
-5. Đăng xuất; truy cập lại trang khách hàng sẽ chuyển về đăng nhập, API trả `401`.
+## Kiểm thử ứng dụng thật
 
-Mật khẩu tài khoản trong `database/seed.sql` là placeholder và không đăng nhập được.
-Hãy đăng ký tài khoản mới để demo. Ứng dụng lưu mật khẩu PBKDF2 có salt riêng;
-API không trả hash hoặc mật khẩu. Session dùng cookie HttpOnly, SameSite=Lax và
-hết hạn sau 30 phút không hoạt động. API hỗ trợ `rememberMe` kéo dài thời gian
-không hoạt động lên 7 ngày; cookie vẫn chỉ tồn tại trong phiên trình duyệt.
+Các browser smoke dùng Node 22+ và Chrome/Edge, kết nối ứng dụng đang chạy qua `CRAVE_SMOKE_BASE_URL`; không thay Servlet bằng API giả. Dùng database test riêng vì kiểm thử HTTP tạo tài khoản, món, khuyến mãi và đơn thử.
 
-Nhân viên đang làm việc có thể đăng nhập và xem hồ sơ; cập nhật hồ sơ và sổ địa chỉ
-dành cho khách hàng. Filter bảo vệ các route khách hàng và phân quyền route quản trị
-theo chức vụ. API quản trị menu yêu cầu `ADMIN`/`MENU_MANAGER`; API quản trị đơn và
-thanh toán yêu cầu `ADMIN`/`ORDER_STAFF`. Các servlet kiểm tra lại session và vai trò
-trước khi gọi service; ID khách hàng/nhân viên lấy từ session.
-
-Phần tài khoản Ngày 3 bổ sung kiểm thử tích hợp auth với cart/voucher/order/payment,
-validation Unicode cho dữ liệu tài khoản/địa chỉ và giao diện responsive với CSS
-riêng. Xem [báo cáo Ngày 3](docs/reports/account/2026-10-11-nguyen-quang-vinh-account-day3.md).
-Giao diện xóa voucher còn lưu của phiên trước khi đăng nhập thành công hoặc khi
-phát hiện session hết hạn; `returnTo` hợp lệ vẫn đưa người dùng về trang đang thực hiện.
-
-Demo kiểm tra quyền: chưa đăng nhập gọi `/api/cart`, `/api/orders` hoặc
-`/api/admin/orders` nhận `401`; khách hàng gọi API quản trị nhận `403`; nhân viên
-quản lý menu gọi `/api/admin/orders` nhận `403`. Đổi chức vụ hoặc khóa tài khoản
-trong database sẽ áp dụng ở request bảo vệ tiếp theo.
-
-Nếu máy đang dùng Java 25/26, chọn JDK 17 hoặc 21 trước khi chạy Maven để tương thích
-với phiên bản Mockito/Byte Buddy hiện tại:
+Chạy `node tests/runtime/smtp-fixture.cjs` trong terminal riêng. Trước khi khởi
+động Tomcat test, đặt `EMAIL_SMTP_HOST=127.0.0.1`, `EMAIL_SMTP_PORT=2525`,
+`EMAIL_SMTP_STARTTLS=false`, username/password SMTP rỗng, `EMAIL_FROM` là địa chỉ
+test và `EMAIL_OTP_SECRET` là chuỗi test dài ít nhất 32 ký tự. Inbox mặc định ở
+`http://127.0.0.1:2526`; cấu hình này chỉ dùng cho kiểm thử local/CI.
 
 ```powershell
-$env:JAVA_HOME = '<đường dẫn JDK 17 hoặc 21>'
-mvn -f backend/pom.xml clean verify
-```
-
-Kiểm thử tích hợp cần MySQL với schema/seed hiện có. Các test Ngày 2 tạo dữ liệu
-riêng và dọn dữ liệu của mình sau khi chạy.
-
-Kiểm thử giao diện tài khoản, giỏ hàng và checkout bằng Node 22+ và Chrome/Edge (API giả lập):
-
-```powershell
+$env:CRAVE_SMOKE_BASE_URL = 'http://127.0.0.1:8081/crave'
+$env:CRAVE_SMOKE_ADMIN_EMAIL = '<admin của database test>'
+$env:CRAVE_SMOKE_ADMIN_PASSWORD = '<mật khẩu admin>'
+node tests/runtime/http-smoke.cjs
 node tests/frontend/account-browser-smoke.cjs
 node tests/frontend/admin-management-browser-smoke.cjs
 node tests/frontend/admin-orders-dashboard-browser-smoke.cjs
 ```
 
-Nếu browser chưa được tìm thấy tự động, đặt `CHROME_PATH` tới file thực thi Chrome/Edge.
+HTTP smoke ghi tài khoản/đơn thử vào `backend/target/runtime-customer.env`.
+Nạp các biến trong file này để chạy tiếp kiểm thử tài khoản đã đăng nhập, OTP,
+giỏ/checkout và payOS; file chứa thông tin test nên không đưa vào Git. Nếu trình
+duyệt không được tìm thấy tự động, đặt `CHROME_PATH` tới Chrome/Edge. Kiểm thử
+script deploy/rollback: `bash tests/scripts/deploy-ec2-test.sh`.
 
-Kiểm thử script deploy và rollback bằng fixture độc lập (Bash, Python 3 và các công cụ GNU):
-
-```bash
-bash tests/scripts/deploy-ec2-test.sh
-```
-
-Kiểm thử HTTP trên WAR/Tomcat/MySQL thật (chạy với database test riêng đã seed,
-công cụ sẽ tạo dữ liệu thử cho tài khoản, món ăn, khuyến mãi và đơn hàng):
-
-```powershell
-$env:CRAVE_SMOKE_BASE_URL = 'http://localhost:8080/crave'
-$env:CRAVE_SMOKE_ADMIN_EMAIL = '<email admin của database test>'
-$env:CRAVE_SMOKE_ADMIN_PASSWORD = '<mật khẩu admin của database test>'
-node tests/runtime/http-smoke.cjs
-```
-
-## Demo cart/voucher Ngày 3 — Ung Văn Trí
-
-1. Đăng nhập, thêm món và tùy chọn vào giỏ, áp voucher còn hiệu lực.
-2. Đổi số lượng để kiểm tra voucher/tổng tiền được tính lại; giảm dưới mức tối thiểu
-   để kiểm tra thông báo và bỏ giảm giá không còn hợp lệ.
-3. Chuyển sang checkout; voucher được kiểm tra lại, tổng tiền lấy từ kết quả API.
-   Chọn giao tận nơi (15.000đ) hoặc nhận tại quán (0đ).
-4. Tạo đơn; kiểm tra tổng tiền/thanh toán và giỏ đã được xóa. Gửi lại request trên
-   giỏ đã checkout nhận `400 CART_EMPTY` và không tạo thêm đơn.
-5. Khóa voucher hoặc option sau khi thêm giỏ; checkout trả lỗi rõ và giữ giỏ
-   để khách sửa trước khi thử lại.
-
-Xem [báo cáo cart/voucher Ngày 3](docs/reports/cart-voucher/2026-10-09-ung-van-tri-cart-voucher-day3.md)
-để biết phạm vi và kết quả kiểm thử.
+Các file OpenAPI trong [docs/api](docs/api/) và báo cáo theo ngày ghi lại thiết kế trước đây; các route JSON trình duyệt trong đó không còn là hợp đồng hiện hành. Dùng [tài liệu Servlet/JSP](docs/architecture/servlet-jsp.md) để xem luồng và route đang sử dụng.

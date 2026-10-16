@@ -1,14 +1,11 @@
 package com.foodordering.filter;
 
-import com.foodordering.dto.ApiError;
-import com.foodordering.dto.ApiResponse;
-import com.foodordering.dto.ProfileResponse;
+import com.foodordering.bean.ProfileBean;
 import com.foodordering.enums.AccountType;
 import com.foodordering.enums.EmployeeRole;
 import com.foodordering.exception.AccountException;
 import com.foodordering.security.SessionAuth;
 import com.foodordering.service.AccountService;
-import com.foodordering.utils.JsonProvider;
 import jakarta.servlet.Filter;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -22,7 +19,6 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.util.Map;
 import java.util.Set;
 
 @WebFilter(filterName = "authenticationFilter", urlPatterns = "/*")
@@ -60,7 +56,7 @@ public class AuthenticationFilter implements Filter {
             if (protectedRoute) {
                 response.setHeader("Cache-Control", "no-store");
                 snapshot = SessionAuth.capture(request);
-                ProfileResponse fresh = accountService.getProfile(snapshot.user().id());
+                ProfileBean fresh = accountService.getProfile(snapshot.user().id());
                 SessionAuth.refresh(request, snapshot, fresh);
                 authorize(request, path, fresh);
             }
@@ -78,24 +74,16 @@ public class AuthenticationFilter implements Filter {
     }
 
     private static boolean isProtected(String path, String method) {
-        return under(path, "/customer") || under(path, "/admin") || under(path, "/api/admin")
-                || path.equals("/auth/change-password") || under(path, "/api/auth/password/change")
-                || path.equals("/api/profile") || under(path, "/api/addresses")
-                || under(path, "/api/orders") || under(path, "/api/payments")
-                || under(path, "/api/payos/orders")
-                || under(path, "/api/delivery")
-                || under(path, "/api/cart") || under(path, "/cart")
-                || (under(path, "/api/promotions") && !READ_METHODS.contains(method))
-                || under(path, "/checkout") || under(path, "/orders");
+        return under(path, "/customer") || under(path, "/admin") || path.equals("/auth/change-password")
+                || under(path, "/payments") || under(path, "/cart") || under(path, "/checkout") || under(path, "/orders");
     }
-
     private static boolean under(String path, String prefix) {
         return path.equals(prefix) || path.startsWith(prefix + "/");
     }
 
-    private static void authorize(HttpServletRequest request, String path, ProfileResponse user) {
-        if (under(path, "/admin") || under(path, "/api/admin")) {
-            String resource = path.startsWith("/api/") ? path.substring(4) : path;
+    private static void authorize(HttpServletRequest request, String path, ProfileBean user) {
+        if (under(path, "/admin")) {
+            String resource = path;
             if (resource.equals("/admin") || resource.equals("/admin/")) {
                 SessionAuth.requireEmployee(request, EmployeeRole.values());
                 return;
@@ -109,14 +97,14 @@ public class AuthenticationFilter implements Filter {
                     : under(resource, "/admin/customers") || under(resource, "/admin/employees")
                     ? EmployeeRole.HR_MANAGER : EmployeeRole.ADMIN;
             SessionAuth.requireEmployee(request, expected);
-        } else if (!path.equals("/api/profile") && !path.equals("/customer/profile")
-                && !path.equals("/auth/change-password") && !under(path, "/api/auth/password/change")
+        } else if (!path.equals("/customer/profile")
+                && !path.equals("/auth/change-password")
                 && user.accountType() != AccountType.CUSTOMER) {
             throw new AccountException("FORBIDDEN", "Chức năng này chỉ dành cho khách hàng.", 403);
         }
     }
 
-    /** JSON requests and SameSite cookies are supplemented by same-origin checks for mutations. */
+    /** SameSite cookies and same-origin checks also protect ordinary POST forms. */
     private static void validateOrigin(HttpServletRequest request) {
         String origin = request.getHeader("Origin");
         boolean crossSite = "cross-site".equals(request.getHeader("Sec-Fetch-Site"));
@@ -138,13 +126,7 @@ public class AuthenticationFilter implements Filter {
     private static void reject(HttpServletRequest request, HttpServletResponse response, String path,
                                int status, String code, String message) throws IOException {
         response.setHeader("Cache-Control", "no-store");
-        if (path.startsWith("/api/")) {
-            response.setStatus(status);
-            response.setCharacterEncoding("UTF-8");
-            response.setContentType("application/json");
-            JsonProvider.objectMapper().writeValue(response.getWriter(),
-                    ApiResponse.failure(new ApiError(code, message, Map.of())));
-        } else if (status == 401) {
+        if (status == 401) {
             String target = request.getRequestURI();
             if (request.getQueryString() != null) {
                 target += "?" + request.getQueryString();

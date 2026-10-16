@@ -1,8 +1,8 @@
 package com.foodordering.service;
 
-import com.foodordering.dto.OrderRequest;
-import com.foodordering.dto.OrderResponse;
-import com.foodordering.dto.OrderSummaryResponse;
+import com.foodordering.bean.OrderForm;
+import com.foodordering.bean.OrderBean;
+import com.foodordering.bean.OrderSummaryBean;
 import com.foodordering.enums.OrderStatus;
 import java.util.List;
 
@@ -31,10 +31,10 @@ public interface CustomerOrderService {
      * @throws IllegalStateException nếu giỏ hàng trống
      * @throws IllegalArgumentException nếu request thiếu trường bắt buộc
      */
-    OrderResponse createOrder(String customerId, OrderRequest request);
-    OrderResponse getOrderById(String orderId);
-    List<OrderSummaryResponse> getOrdersByCustomer(String customerId);
-    List<OrderResponse> getAllOrdersForAdmin();
+    OrderBean createOrder(String customerId, OrderForm request);
+    OrderBean getOrderById(String orderId);
+    List<OrderSummaryBean> getOrdersByCustomer(String customerId);
+    List<OrderBean> getAllOrdersForAdmin();
     void updateOrderStatus(String orderId, OrderStatus status, String employeeId, String note);
     void cancelOrder(String orderId, String customerId, String reason);
 }

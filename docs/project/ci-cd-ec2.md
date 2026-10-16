@@ -24,9 +24,10 @@ Merge PR / push main ──> CI thành công ──> artifact crave-war
 ```
 
 - [ci.yml](../../.github/workflows/ci.yml): JDK 17, MySQL 8.4 tạm thời, Maven
-  `clean verify`, assertion giỏ hàng/voucher, kiểm tra cú pháp JavaScript,
-  kiểm thử trình duyệt và kiểm thử script deploy/rollback. Schema/seed chỉ được
-  chạy trong database CI tạm thời.
+  `clean verify`, assertion giỏ hàng/voucher, kiểm tra cú pháp JavaScript và
+  script deploy/rollback. Sau khi khởi động WAR/Tomcat và SMTP fixture local,
+  CI kiểm thử HTTP cùng trình duyệt trên Servlet/JSP thật: HTML, form POST,
+  session, phân quyền và tải CSV. Schema/seed chỉ chạy trong database CI tạm thời.
 - [deploy.yml](../../.github/workflows/deploy.yml): chỉ nhận sự kiện `push` vào
   `main`, bao gồm commit tạo khi merge PR và push trực tiếp. Gọi CI, chỉ khi CI
   thành công mới tải artifact của cùng lần chạy rồi gọi
@@ -210,8 +211,9 @@ chạy. Push trực tiếp vào `main` cũng dùng đúng luồng này. Xem tab 
 1. `CI / Build and test` phải thành công và tạo artifact `crave-war`.
 2. `Deploy EC2` kiểm tra secrets và cấu hình, áp migration thanh toán/email, rồi lưu WAR
    cùng cấu hình hiện tại vào `.deploy-backups/`, thay WAR và recreate `app`.
-3. Endpoint health phải trả HTTP 200 với `success: true`,
-   `data.application: "UP"`, `data.database: "UP"` trong 180 giây.
+3. Endpoint health phải trả HTTP 200 với văn bản `application=UP` và
+   `database=UP` trên hai dòng trong 180 giây. `/health` là route chính;
+   `/api/health` giữ tương thích cho địa chỉ deploy hiện có, cũng trả văn bản.
 4. Workflow đăng ký `http://15.134.39.86:8080/crave/api/payos/webhook` với payOS
    bằng API `confirm-webhook`, rồi summary ghi commit đã deploy.
    [Tài liệu payOS](https://payos.vn/docs/api/) mô tả bước xác minh endpoint này.
@@ -227,12 +229,14 @@ thanh toán. Workflow vẫn báo lỗi để người triển khai kiểm tra. M
 recreate Tomcat nên có khoảng gián đoạn ngắn và session đang đăng nhập sẽ mất.
 Rollback khi force kill, hủy job hoặc EC2 crash có thể chưa hoàn tất; dùng backup
 trên server để khôi phục thủ công khi cần.
-Health endpoint xác nhận trạng thái database lúc khởi động, không thay thế
-giám sát database liên tục.
+Health endpoint thử kết nối database ở mỗi lần gọi. Kết quả chỉ phản ánh lần
+kiểm tra đó; vẫn cần giám sát database liên tục. Script deploy cũng nhận dạng
+health JSON của WAR cũ để có thể kiểm tra khi rollback.
 
 Nếu đăng ký webhook thất bại sau khi app đã khỏe, job CD báo lỗi ở đúng bước
-webhook; bản WAR mới vẫn chạy. Trang đơn hàng vẫn đồng bộ thanh toán qua API
-payOS khi đang mở. Kiểm tra URL public, Security Group và keys, sau đó chạy lại
+webhook; bản WAR mới vẫn chạy. Trang đơn hàng tải lại HTML để Servlet đồng bộ
+với payOS khi link đang chờ thanh toán; người dùng cũng có nút kiểm tra thủ công.
+Kiểm tra URL public, Security Group và keys, sau đó chạy lại
 job CD; migration có thể áp lại an toàn và không đổi các mã thanh toán đã lưu.
 
 ## Khi job không chạy được

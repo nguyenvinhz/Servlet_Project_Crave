@@ -1,12 +1,12 @@
 package com.foodordering.service;
 
-import com.foodordering.entity.Payment;
-import com.foodordering.entity.CustomerOrder;
+import com.foodordering.model.Payment;
+import com.foodordering.model.CustomerOrder;
 import com.foodordering.enums.OrderStatus;
 import com.foodordering.enums.PaymentStatus;
 import com.foodordering.exception.ResourceNotFoundException;
 import com.foodordering.exception.BadRequestException;
-import com.foodordering.repository.PaymentRepository;
+import com.foodordering.dao.PaymentDAO;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import jakarta.persistence.EntityTransaction;
@@ -20,7 +20,7 @@ import java.time.LocalDateTime;
 
 class PaymentServiceTest {
 
-    private PaymentRepository paymentRepository;
+    private PaymentDAO paymentDAO;
     private EntityManagerFactory emf;
     private EntityManager em;
     private EntityTransaction tx;
@@ -28,7 +28,7 @@ class PaymentServiceTest {
 
     @BeforeEach
     void setUp() {
-        paymentRepository = mock(PaymentRepository.class);
+        paymentDAO = mock(PaymentDAO.class);
         emf = mock(EntityManagerFactory.class);
         em = mock(EntityManager.class);
         tx = mock(EntityTransaction.class);
@@ -37,7 +37,7 @@ class PaymentServiceTest {
         when(em.getTransaction()).thenReturn(tx);
         when(tx.isActive()).thenReturn(true);
 
-        paymentService = new PaymentServiceImpl(paymentRepository, emf);
+        paymentService = new PaymentServiceImpl(paymentDAO, emf);
     }
 
     @Test

@@ -1,32 +1,32 @@
 package com.foodordering.service;
 
-import com.foodordering.dto.CartConsistencyItemRequest;
-import com.foodordering.dto.CartConsistencyItemResult;
-import com.foodordering.dto.CartConsistencyReport;
-import com.foodordering.dto.CategoryRequest;
-import com.foodordering.dto.CategoryResponse;
-import com.foodordering.dto.FoodDetailResponse;
-import com.foodordering.dto.FoodOptionRequest;
-import com.foodordering.dto.FoodOptionResponse;
-import com.foodordering.dto.FoodOptionValidationResult;
-import com.foodordering.dto.FoodRequest;
-import com.foodordering.dto.FoodSummaryResponse;
-import com.foodordering.entity.Category;
-import com.foodordering.entity.Food;
-import com.foodordering.entity.FoodOption;
+import com.foodordering.bean.CartConsistencyItemForm;
+import com.foodordering.bean.CartConsistencyItemResult;
+import com.foodordering.bean.CartConsistencyReport;
+import com.foodordering.bean.CategoryForm;
+import com.foodordering.bean.CategoryBean;
+import com.foodordering.bean.FoodDetailBean;
+import com.foodordering.bean.FoodOptionForm;
+import com.foodordering.bean.FoodOptionBean;
+import com.foodordering.bean.FoodOptionValidationResult;
+import com.foodordering.bean.FoodForm;
+import com.foodordering.bean.FoodSummaryBean;
+import com.foodordering.model.Category;
+import com.foodordering.model.Food;
+import com.foodordering.model.FoodOption;
 import com.foodordering.enums.FoodStatus;
 import com.foodordering.enums.OptionStatus;
 import com.foodordering.enums.OptionType;
 import com.foodordering.exception.ConflictException;
 import com.foodordering.exception.ResourceNotFoundException;
 import com.foodordering.exception.ValidationException;
-import com.foodordering.mapper.MenuMapper;
-import com.foodordering.repository.CategoryRepository;
-import com.foodordering.repository.FoodOptionRepository;
-import com.foodordering.repository.FoodRepository;
-import com.foodordering.repository.JpaCategoryRepository;
-import com.foodordering.repository.JpaFoodOptionRepository;
-import com.foodordering.repository.JpaFoodRepository;
+import java.util.Collections;
+import com.foodordering.dao.CategoryDAO;
+import com.foodordering.dao.FoodOptionDAO;
+import com.foodordering.dao.FoodDAO;
+import com.foodordering.dao.JpaCategoryDAO;
+import com.foodordering.dao.JpaFoodOptionDAO;
+import com.foodordering.dao.JpaFoodDAO;
 import com.foodordering.validator.MenuValidator;
 
 import java.math.BigDecimal;
@@ -40,47 +40,47 @@ import java.util.stream.Collectors;
  */
 public class MenuService {
 
-    private final CategoryRepository categoryRepository;
-    private final FoodRepository foodRepository;
-    private final FoodOptionRepository foodOptionRepository;
+    private final CategoryDAO categoryDAO;
+    private final FoodDAO foodDAO;
+    private final FoodOptionDAO foodOptionDAO;
 
     public MenuService() {
-        this(new JpaCategoryRepository(), new JpaFoodRepository(), new JpaFoodOptionRepository());
+        this(new JpaCategoryDAO(), new JpaFoodDAO(), new JpaFoodOptionDAO());
     }
 
-    public MenuService(CategoryRepository categoryRepository,
-                       FoodRepository foodRepository,
-                       FoodOptionRepository foodOptionRepository) {
-        this.categoryRepository = categoryRepository;
-        this.foodRepository = foodRepository;
-        this.foodOptionRepository = foodOptionRepository;
+    public MenuService(CategoryDAO categoryDAO,
+                       FoodDAO foodDAO,
+                       FoodOptionDAO foodOptionDAO) {
+        this.categoryDAO = categoryDAO;
+        this.foodDAO = foodDAO;
+        this.foodOptionDAO = foodOptionDAO;
     }
 
     // ==========================================
     // Category Operations
     // ==========================================
 
-    public List<CategoryResponse> getCategories() {
-        List<Category> categories = categoryRepository.findAll();
-        List<CategoryResponse> responses = new ArrayList<>();
+    public List<CategoryBean> getCategories() {
+        List<Category> categories = categoryDAO.findAll();
+        List<CategoryBean> responses = new ArrayList<>();
         for (Category category : categories) {
-            long count = foodRepository.countByCategoryId(category.getId());
+            long count = foodDAO.countByCategoryId(category.getId());
             List<String> imageUrls = getFoodImageUrlsForCategory(category.getId());
-            responses.add(MenuMapper.toCategoryResponse(category, count, imageUrls));
+            responses.add(toCategoryResponse(category, count, imageUrls));
         }
         return responses;
     }
 
-    public CategoryResponse getCategoryById(String id) {
-        Category category = categoryRepository.findById(id)
+    public CategoryBean getCategoryById(String id) {
+        Category category = categoryDAO.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy danh mục với mã: " + id));
-        long count = foodRepository.countByCategoryId(category.getId());
+        long count = foodDAO.countByCategoryId(category.getId());
         List<String> imageUrls = getFoodImageUrlsForCategory(category.getId());
-        return MenuMapper.toCategoryResponse(category, count, imageUrls);
+        return toCategoryResponse(category, count, imageUrls);
     }
 
     private List<String> getFoodImageUrlsForCategory(String categoryId) {
-        List<Food> foods = foodRepository.findByCategoryId(categoryId);
+        List<Food> foods = foodDAO.findByCategoryId(categoryId);
         if (foods == null || foods.isEmpty()) {
             return List.of();
         }
@@ -96,94 +96,94 @@ public class MenuService {
                 .toList();
     }
 
-    public CategoryResponse createCategory(CategoryRequest request) {
+    public CategoryBean createCategory(CategoryForm request) {
         MenuValidator.validateCategory(request);
         String trimmedName = request.name().trim();
-        if (categoryRepository.existsByName(trimmedName)) {
+        if (categoryDAO.existsByName(trimmedName)) {
             throw new ConflictException("Tên danh mục '" + trimmedName + "' đã tồn tại.");
         }
 
-        String id = categoryRepository.generateNextId();
+        String id = categoryDAO.generateNextId();
         String description = request.description() != null ? request.description().trim() : null;
         Category category = new Category(id, trimmedName, description);
-        Category saved = categoryRepository.save(category);
-        return MenuMapper.toCategoryResponse(saved, 0L, List.of());
+        Category saved = categoryDAO.save(category);
+        return toCategoryResponse(saved, 0L, List.of());
     }
 
-    public CategoryResponse updateCategory(String id, CategoryRequest request) {
+    public CategoryBean updateCategory(String id, CategoryForm request) {
         MenuValidator.validateCategory(request);
-        Category category = categoryRepository.findById(id)
+        Category category = categoryDAO.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy danh mục với mã: " + id));
 
         String trimmedName = request.name().trim();
-        if (categoryRepository.existsByNameAndIdNot(trimmedName, id)) {
+        if (categoryDAO.existsByNameAndIdNot(trimmedName, id)) {
             throw new ConflictException("Tên danh mục '" + trimmedName + "' đã tồn tại.");
         }
 
         category.setName(trimmedName);
         category.setDescription(request.description() != null ? request.description().trim() : null);
-        Category updated = categoryRepository.update(category);
-        long count = foodRepository.countByCategoryId(id);
+        Category updated = categoryDAO.update(category);
+        long count = foodDAO.countByCategoryId(id);
         List<String> imageUrls = getFoodImageUrlsForCategory(id);
-        return MenuMapper.toCategoryResponse(updated, count, imageUrls);
+        return toCategoryResponse(updated, count, imageUrls);
     }
 
     public void deleteCategory(String id) {
-        if (!categoryRepository.existsById(id)) {
+        if (!categoryDAO.existsById(id)) {
             throw new ResourceNotFoundException("Không tìm thấy danh mục với mã: " + id);
         }
-        if (foodRepository.countByCategoryId(id) > 0) {
+        if (foodDAO.countByCategoryId(id) > 0) {
             throw new ConflictException("Không thể xóa danh mục đang có món ăn.");
         }
-        categoryRepository.deleteById(id);
+        categoryDAO.deleteById(id);
     }
 
     // ==========================================
     // Food Operations
     // ==========================================
 
-    public List<FoodSummaryResponse> getMenu(String categoryId, String keyword) {
-        List<Food> foods = foodRepository.search(keyword, categoryId, FoodStatus.AVAILABLE);
+    public List<FoodSummaryBean> getMenu(String categoryId, String keyword) {
+        List<Food> foods = foodDAO.search(keyword, categoryId, FoodStatus.AVAILABLE);
         return foods.stream()
-                .map(MenuMapper::toFoodSummaryResponse)
+                .map(MenuService::toFoodSummaryResponse)
                 .collect(Collectors.toList());
     }
 
-    public List<FoodSummaryResponse> getAllFoodsForAdmin(String categoryId, String keyword, FoodStatus status) {
-        List<Food> foods = foodRepository.search(keyword, categoryId, status);
+    public List<FoodSummaryBean> getAllFoodsForAdmin(String categoryId, String keyword, FoodStatus status) {
+        List<Food> foods = foodDAO.search(keyword, categoryId, status);
         return foods.stream()
-                .map(MenuMapper::toFoodSummaryResponse)
+                .map(MenuService::toFoodSummaryResponse)
                 .collect(Collectors.toList());
     }
 
-    public FoodDetailResponse getFoodDetail(String id, boolean onlyActiveOptions) {
-        Food food = foodRepository.findByIdWithOptions(id)
+    public FoodDetailBean getFoodDetail(String id, boolean onlyActiveOptions) {
+        Food food = foodDAO.findByIdWithOptions(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy món ăn với mã: " + id));
 
-        return MenuMapper.toFoodDetailResponse(food, onlyActiveOptions);
+        return toFoodDetailResponse(food, onlyActiveOptions);
     }
 
-    public FoodDetailResponse createFood(FoodRequest request) {
+    public FoodDetailBean createFood(FoodForm request) {
         MenuValidator.validateFood(request);
-        Category category = categoryRepository.findById(request.categoryId())
+        Category category = categoryDAO.findById(request.categoryId())
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy danh mục với mã: " + request.categoryId()));
 
-        String id = foodRepository.generateNextId();
+        String id = foodDAO.generateNextId();
         FoodStatus status = request.status() != null ? request.status() : FoodStatus.AVAILABLE;
         String imageUrl = request.imageUrl() != null ? request.imageUrl().trim() : null;
         String description = request.description() != null ? request.description().trim() : null;
 
         Food food = new Food(id, category, request.name().trim(), request.price(), imageUrl, description, status);
-        Food saved = foodRepository.save(food);
-        return MenuMapper.toFoodDetailResponse(saved, false);
+        Food saved = foodDAO.save(food);
+        return toFoodDetailResponse(saved, false);
     }
 
-    public FoodDetailResponse updateFood(String id, FoodRequest request) {
+    public FoodDetailBean updateFood(String id, FoodForm request) {
         MenuValidator.validateFood(request);
-        Food food = foodRepository.findById(id)
+        Food food = foodDAO.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy món ăn với mã: " + id));
 
-        Category category = categoryRepository.findById(request.categoryId())
+        Category category = categoryDAO.findById(request.categoryId())
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy danh mục với mã: " + request.categoryId()));
 
         food.setCategory(category);
@@ -195,30 +195,30 @@ public class MenuService {
             food.setStatus(request.status());
         }
 
-        foodRepository.update(food);
-        Food reloaded = foodRepository.findByIdWithOptions(id).orElse(food);
-        return MenuMapper.toFoodDetailResponse(reloaded, false);
+        foodDAO.update(food);
+        Food reloaded = foodDAO.findByIdWithOptions(id).orElse(food);
+        return toFoodDetailResponse(reloaded, false);
     }
 
-    public FoodDetailResponse updateFoodStatus(String id, FoodStatus newStatus) {
+    public FoodDetailBean updateFoodStatus(String id, FoodStatus newStatus) {
         if (newStatus == null) {
             throw new ValidationException("Trạng thái món ăn không được để trống.");
         }
-        Food food = foodRepository.findById(id)
+        Food food = foodDAO.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy món ăn với mã: " + id));
 
         food.setStatus(newStatus);
-        foodRepository.update(food);
-        Food reloaded = foodRepository.findByIdWithOptions(id).orElse(food);
-        return MenuMapper.toFoodDetailResponse(reloaded, false);
+        foodDAO.update(food);
+        Food reloaded = foodDAO.findByIdWithOptions(id).orElse(food);
+        return toFoodDetailResponse(reloaded, false);
     }
 
     public void deleteFood(String id) {
-        if (!foodRepository.existsById(id)) {
+        if (!foodDAO.existsById(id)) {
             throw new ResourceNotFoundException("Không tìm thấy món ăn với mã: " + id);
         }
         try {
-            foodRepository.deleteById(id);
+            foodDAO.deleteById(id);
         } catch (Exception e) {
             throw new ConflictException("Không thể xóa món ăn đang tồn tại trong đơn hàng hoặc giỏ hàng. Hãy chuyển trạng thái món sang Tạm hết món (UNAVAILABLE).");
         }
@@ -231,7 +231,7 @@ public class MenuService {
         if (foodId == null || foodId.isBlank()) {
             throw new ValidationException("Mã món ăn không được để trống.");
         }
-        Food food = foodRepository.findById(foodId)
+        Food food = foodDAO.findById(foodId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy món ăn với mã: " + foodId));
         if (food.getStatus() != FoodStatus.AVAILABLE) {
             throw new ValidationException("Món ăn '" + food.getName() + "' hiện đang tạm ngưng phục vụ.");
@@ -257,7 +257,7 @@ public class MenuService {
                 if (optionId == null || optionId.isBlank() || "0".equals(optionId)) {
                     continue;
                 }
-                FoodOption option = foodOptionRepository.findById(optionId)
+                FoodOption option = foodOptionDAO.findById(optionId)
                         .orElseThrow(() -> new ValidationException("Tùy chọn với mã '" + optionId + "' không tồn tại trong hệ thống."));
 
                 if (option.getFood() == null || !foodId.equals(option.getFood().getId())) {
@@ -299,7 +299,7 @@ public class MenuService {
     /**
      * Kiểm tra tính nhất quán giữa dữ liệu món trong giỏ hàng và thực đơn thực tế (giá, trạng thái món, trạng thái option).
      */
-    public CartConsistencyReport checkMenuCartConsistency(List<CartConsistencyItemRequest> items) {
+    public CartConsistencyReport checkMenuCartConsistency(List<CartConsistencyItemForm> items) {
         if (items == null || items.isEmpty()) {
             return new CartConsistencyReport(true, 0, 0, List.of());
         }
@@ -307,9 +307,9 @@ public class MenuService {
         List<CartConsistencyItemResult> results = new ArrayList<>();
         int invalidCount = 0;
 
-        for (CartConsistencyItemRequest item : items) {
+        for (CartConsistencyItemForm item : items) {
             String foodId = item.foodId();
-            Optional<Food> foodOpt = foodRepository.findById(foodId);
+            Optional<Food> foodOpt = foodDAO.findById(foodId);
 
             if (foodOpt.isEmpty()) {
                 invalidCount++;
@@ -342,7 +342,7 @@ public class MenuService {
                     if (optId == null || optId.isBlank() || "0".equals(optId)) {
                         continue;
                     }
-                    Optional<FoodOption> opt = foodOptionRepository.findById(optId);
+                    Optional<FoodOption> opt = foodOptionDAO.findById(optId);
                     if (opt.isEmpty() || opt.get().getFood() == null || !foodId.equals(opt.get().getFood().getId())
                             || opt.get().getStatus() != OptionStatus.ACTIVE) {
                         optionsValid = false;
@@ -400,52 +400,52 @@ public class MenuService {
     // Food Option Operations
     // ==========================================
 
-    public List<FoodOptionResponse> getOptionsByFoodId(String foodId, boolean onlyActive) {
-        if (!foodRepository.existsById(foodId)) {
+    public List<FoodOptionBean> getOptionsByFoodId(String foodId, boolean onlyActive) {
+        if (!foodDAO.existsById(foodId)) {
             throw new ResourceNotFoundException("Không tìm thấy món ăn với mã: " + foodId);
         }
         List<FoodOption> options = onlyActive
-                ? foodOptionRepository.findActiveByFoodId(foodId)
-                : foodOptionRepository.findByFoodId(foodId);
+                ? foodOptionDAO.findActiveByFoodId(foodId)
+                : foodOptionDAO.findByFoodId(foodId);
 
         return options.stream()
-                .map(MenuMapper::toFoodOptionResponse)
+                .map(MenuService::toFoodOptionResponse)
                 .collect(Collectors.toList());
     }
 
-    public FoodOptionResponse getFoodOptionById(String optionId) {
-        FoodOption option = foodOptionRepository.findById(optionId)
+    public FoodOptionBean getFoodOptionById(String optionId) {
+        FoodOption option = foodOptionDAO.findById(optionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy tùy chọn với mã: " + optionId));
-        return MenuMapper.toFoodOptionResponse(option);
+        return toFoodOptionResponse(option);
     }
 
-    public FoodOptionResponse createFoodOption(String foodId, FoodOptionRequest request) {
+    public FoodOptionBean createFoodOption(String foodId, FoodOptionForm request) {
         MenuValidator.validateFoodOption(request);
-        Food food = foodRepository.findById(foodId)
+        Food food = foodDAO.findById(foodId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy món ăn với mã: " + foodId));
 
         String trimmedName = request.name().trim();
-        if (foodOptionRepository.existsByFoodIdAndTypeAndName(foodId, request.optionType(), trimmedName)) {
+        if (foodOptionDAO.existsByFoodIdAndTypeAndName(foodId, request.optionType(), trimmedName)) {
             throw new ConflictException("Tùy chọn '" + trimmedName + "' thuộc nhóm " + request.optionType() + " đã tồn tại cho món này.");
         }
 
-        String id = foodOptionRepository.generateNextId();
+        String id = foodOptionDAO.generateNextId();
         BigDecimal extraPrice = request.extraPrice() != null ? request.extraPrice() : BigDecimal.ZERO;
         OptionStatus status = request.status() != null ? request.status() : OptionStatus.ACTIVE;
 
         FoodOption option = new FoodOption(id, food, request.optionType(), trimmedName, extraPrice, status);
-        FoodOption saved = foodOptionRepository.save(option);
-        return MenuMapper.toFoodOptionResponse(saved);
+        FoodOption saved = foodOptionDAO.save(option);
+        return toFoodOptionResponse(saved);
     }
 
-    public FoodOptionResponse updateFoodOption(String optionId, FoodOptionRequest request) {
+    public FoodOptionBean updateFoodOption(String optionId, FoodOptionForm request) {
         MenuValidator.validateFoodOption(request);
-        FoodOption option = foodOptionRepository.findById(optionId)
+        FoodOption option = foodOptionDAO.findById(optionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy tùy chọn với mã: " + optionId));
 
         String foodId = option.getFood().getId();
         String trimmedName = request.name().trim();
-        if (foodOptionRepository.existsByFoodIdAndTypeAndNameAndIdNot(foodId, request.optionType(), trimmedName, optionId)) {
+        if (foodOptionDAO.existsByFoodIdAndTypeAndNameAndIdNot(foodId, request.optionType(), trimmedName, optionId)) {
             throw new ConflictException("Tùy chọn '" + trimmedName + "' thuộc nhóm " + request.optionType() + " đã tồn tại cho món này.");
         }
 
@@ -456,30 +456,104 @@ public class MenuService {
             option.setStatus(request.status());
         }
 
-        FoodOption updated = foodOptionRepository.update(option);
-        return MenuMapper.toFoodOptionResponse(updated);
+        FoodOption updated = foodOptionDAO.update(option);
+        return toFoodOptionResponse(updated);
     }
 
-    public FoodOptionResponse updateFoodOptionStatus(String optionId, OptionStatus newStatus) {
+    public FoodOptionBean updateFoodOptionStatus(String optionId, OptionStatus newStatus) {
         if (newStatus == null) {
             throw new ValidationException("Trạng thái tùy chọn không được để trống.");
         }
-        FoodOption option = foodOptionRepository.findById(optionId)
+        FoodOption option = foodOptionDAO.findById(optionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy tùy chọn với mã: " + optionId));
 
         option.setStatus(newStatus);
-        FoodOption updated = foodOptionRepository.update(option);
-        return MenuMapper.toFoodOptionResponse(updated);
+        FoodOption updated = foodOptionDAO.update(option);
+        return toFoodOptionResponse(updated);
     }
 
     public void deleteFoodOption(String optionId) {
-        if (!foodOptionRepository.existsById(optionId)) {
+        if (!foodOptionDAO.existsById(optionId)) {
             throw new ResourceNotFoundException("Không tìm thấy tùy chọn với mã: " + optionId);
         }
         try {
-            foodOptionRepository.deleteById(optionId);
+            foodOptionDAO.deleteById(optionId);
         } catch (Exception e) {
             throw new ConflictException("Không thể xóa tùy chọn đang tồn tại trong đơn hàng hoặc giỏ hàng. Hãy chuyển trạng thái tùy chọn sang Không áp dụng (INACTIVE).");
         }
     }
+    private static CategoryBean toCategoryResponse(Category category, long foodCount) {
+        return toCategoryResponse(category, foodCount, Collections.emptyList());
+    }
+
+    private static CategoryBean toCategoryResponse(Category category, long foodCount, List<String> imageUrls) {
+        if (category == null) {
+            return null;
+        }
+        return new CategoryBean(
+                category.getId(),
+                category.getName(),
+                category.getDescription(),
+                foodCount,
+                imageUrls != null ? imageUrls : Collections.emptyList()
+        );
+    }
+
+    private static FoodOptionBean toFoodOptionResponse(FoodOption option) {
+        if (option == null) {
+            return null;
+        }
+        return new FoodOptionBean(
+                option.getId(),
+                option.getFood() != null ? option.getFood().getId() : null,
+                option.getOptionType(),
+                option.getName(),
+                option.getExtraPrice(),
+                option.getStatus()
+        );
+    }
+
+    private static FoodSummaryBean toFoodSummaryResponse(Food food) {
+        if (food == null) {
+            return null;
+        }
+        return new FoodSummaryBean(
+                food.getId(),
+                food.getCategory() != null ? food.getCategory().getId() : null,
+                food.getCategory() != null ? food.getCategory().getName() : null,
+                food.getName(),
+                food.getPrice(),
+                food.getImageUrl(),
+                food.getDescription(),
+                food.getStatus()
+        );
+    }
+
+    private static FoodDetailBean toFoodDetailResponse(Food food, boolean onlyActiveOptions) {
+        if (food == null) {
+            return null;
+        }
+        List<FoodOptionBean> options;
+        if (food.getOptions() == null) {
+            options = Collections.emptyList();
+        } else {
+            options = food.getOptions().stream()
+                    .filter(opt -> !onlyActiveOptions || opt.getStatus() == OptionStatus.ACTIVE)
+                    .map(MenuService::toFoodOptionResponse)
+                    .collect(Collectors.toList());
+        }
+
+        return new FoodDetailBean(
+                food.getId(),
+                food.getCategory() != null ? food.getCategory().getId() : null,
+                food.getCategory() != null ? food.getCategory().getName() : null,
+                food.getName(),
+                food.getPrice(),
+                food.getImageUrl(),
+                food.getDescription(),
+                food.getStatus(),
+                options
+        );
+    }
+
 }

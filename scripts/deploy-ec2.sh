@@ -119,9 +119,14 @@ wait_for_health() {
       printf '%s' "$response" | python3 -c '
 import json, sys
 try:
-    body = json.load(sys.stdin)
-    data = body.get("data", {})
-    healthy = body.get("success") is True and data.get("application") == "UP" and data.get("database") == "UP"
+    raw = sys.stdin.read()
+    # New releases use plain text. Keep the previous contract for WAR rollback.
+    if raw.lstrip().startswith("{"):
+        body = json.loads(raw)
+        data = body.get("data", {})
+        healthy = body.get("success") is True and data.get("application") == "UP" and data.get("database") == "UP"
+    else:
+        healthy = raw.strip().splitlines() == ["application=UP", "database=UP"]
 except (ValueError, AttributeError, TypeError):
     healthy = False
 sys.exit(0 if healthy else 1)

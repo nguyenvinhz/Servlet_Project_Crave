@@ -1,21 +1,16 @@
 package com.foodordering;
 
-import com.foodordering.dto.*;
-import com.foodordering.entity.*;
+import com.foodordering.bean.*;
+import com.foodordering.model.*;
 import com.foodordering.enums.DiscountType;
 import com.foodordering.enums.ErrorCode;
 import com.foodordering.enums.FoodStatus;
 import com.foodordering.enums.OptionType;
 import com.foodordering.enums.PromotionStatus;
 import com.foodordering.exception.PromotionValidationException;
-import com.foodordering.mapper.CartItemMapper;
-import com.foodordering.mapper.CartItemOptionMapper;
-import com.foodordering.mapper.CartMapper;
-import com.foodordering.mapper.PromotionMapper;
-import com.foodordering.repository.PromotionRepository;
+import com.foodordering.dao.PromotionDAO;
 import com.foodordering.service.CartService;
 import com.foodordering.service.PromotionService;
-import com.foodordering.utils.JsonUtils;
 import com.foodordering.validator.PromotionValidator;
 
 import java.math.BigDecimal;
@@ -36,10 +31,8 @@ public class CartPromotionServiceTest {
         testFixedAmountDiscountCalculation();
         testPromotionMinimumOrderValidation();
         testPromotionExpiredValidation();
-        testJsonUtilsApiResponse();
-        testJsonUtilsJacksonDeserialization();
-        testManualCartAndItemMappers();
-        testManualPromotionMapper();
+        testCartAndItemBeans();
+        testPromotionBean();
         testCustomerOrderOrderTimeValidation();
 
         System.out.println("=== TẤT CẢ KIỂM THỬ ĐÃ CHẠY THÀNH CÔNG (PASSED) ===");
@@ -47,11 +40,11 @@ public class CartPromotionServiceTest {
 
     private static void testCartTotalsCalculation() {
         System.out.println("-> Test 1: Tính toán thành tiền giỏ hàng phía server");
-        CartItemDto item = new CartItemDto();
+        CartItemBean item = new CartItemBean();
         item.setBasePrice(new BigDecimal("45000")); // MA01: Cơm gà xối mỡ: 45,000
         item.setQuantity(2);
 
-        CartItemOptionDto opt1 = new CartItemOptionDto("TC03", "Thêm trứng ốp la", "TOPPING", new BigDecimal("8000"));
+        CartItemOptionBean opt1 = new CartItemOptionBean("TC03", "Thêm trứng ốp la", "TOPPING", new BigDecimal("8000"));
         item.setOptions(List.of(opt1));
 
         CartService cartService = new CartService();
@@ -62,7 +55,7 @@ public class CartPromotionServiceTest {
         assert item.getUnitPrice().compareTo(new BigDecimal("53000")) == 0 : "Sai đơn giá: " + item.getUnitPrice();
         assert item.getLineTotal().compareTo(new BigDecimal("106000")) == 0 : "Sai thành tiền: " + item.getLineTotal();
 
-        CartDto cart = new CartDto("GH01", "KH01");
+        CartBean cart = new CartBean("GH01", "KH01");
         cart.setItems(List.of(item));
         cartService.calculateCartTotals(cart);
         assert cart.getTotalItems() == 2 : "Sai tổng số lượng: " + cart.getTotalItems();
@@ -164,35 +157,8 @@ public class CartPromotionServiceTest {
         System.out.println("   [PASSED] Chặn chính xác mã khuyến mãi đã hết hạn");
     }
 
-    private static void testJsonUtilsApiResponse() {
-        System.out.println("-> Test 7: Định dạng chuẩn JSON ApiResponse");
-        ApiResponse<String> resp = ApiResponse.success("OK");
-        String json = JsonUtils.toJson(resp);
-        assert json.contains("\"success\":true") : "JSON thiếu trường success";
-        assert json.contains("\"data\":\"OK\"") : "JSON sai data";
-        System.out.println("   [PASSED] JSON ApiResponse sinh ra chuẩn xác: " + json);
-    }
-
-    private static void testJsonUtilsJacksonDeserialization() {
-        System.out.println("-> Test 8: Jackson Deserialization từ JSON body sang DTO (toDTO)");
-        String addJson = "{\"foodId\":\"FOOD_001\",\"quantity\":2,\"note\":\"Ít cay\",\"optionIds\":[\"OPT_1\",\"OPT_2\"]}";
-        AddToCartRequest addReq = JsonUtils.toDTO(addJson, AddToCartRequest.class);
-        assert addReq != null : "AddToCartRequest null";
-        assert "FOOD_001".equals(addReq.getFoodId()) : "Sai foodId";
-        assert addReq.getQuantity() == 2 : "Sai quantity";
-        assert "Ít cay".equals(addReq.getNote()) : "Sai note";
-        assert addReq.getOptionIds().size() == 2 : "Sai optionIds size";
-
-        String promoJson = "{\"code\":\"DISCOUNT10\",\"subtotal\":120000}";
-        ValidatePromotionRequest promoReq = JsonUtils.toDTO(promoJson, ValidatePromotionRequest.class);
-        assert promoReq != null : "ValidatePromotionRequest null";
-        assert "DISCOUNT10".equals(promoReq.getCode()) : "Sai promo code";
-        assert new BigDecimal("120000").compareTo(promoReq.getSubtotal()) == 0 : "Sai subtotal";
-        System.out.println("   [PASSED] Jackson parse JSON body sang DTO (toDTO) chính xác tuyệt đối");
-    }
-
-    private static void testManualCartAndItemMappers() {
-        System.out.println("-> Test 9: Mapper thủ công Cart & CartItem (không dùng MapStruct)");
+    private static void testCartAndItemBeans() {
+        System.out.println("-> Test 7: Bean thủ công Cart & CartItem ");
         Customer customer = new Customer("KH01");
         Cart cart = new Cart("GH01", customer);
 
@@ -205,37 +171,34 @@ public class CartPromotionServiceTest {
         CartItemOption itemOption = new CartItemOption(item, option);
         item.setItemOptions(List.of(itemOption));
 
-        // Test CartItemOptionMapper
-        CartItemOptionMapper optionMapper = new CartItemOptionMapper();
-        CartItemOptionDto optDto = optionMapper.toDto(itemOption);
-        assert optDto != null : "CartItemOptionDto null";
-        assert "OPT01".equals(optDto.getOptionId()) : "Sai optionId";
-        assert "Thêm trứng".equals(optDto.getName()) : "Sai option name";
-        assert new BigDecimal("7000").compareTo(optDto.getExtraPrice()) == 0 : "Sai extraPrice";
+        // Test CartItemOptionBean
+        CartItemOptionBean optBean = new CartItemOptionBean(itemOption);
+        assert optBean != null : "CartItemOptionBean null";
+        assert "OPT01".equals(optBean.getOptionId()) : "Sai optionId";
+        assert "Thêm trứng".equals(optBean.getName()) : "Sai option name";
+        assert new BigDecimal("7000").compareTo(optBean.getExtraPrice()) == 0 : "Sai extraPrice";
 
-        // Test CartItemMapper
-        CartItemMapper itemMapper = new CartItemMapper(optionMapper);
-        CartItemDto itemDto = itemMapper.toDto(item);
-        assert itemDto != null : "CartItemDto null";
-        assert "CTGH01".equals(itemDto.getCartItemId()) : "Sai cartItemId";
-        assert "GH01".equals(itemDto.getCartId()) : "Sai cartId";
-        assert "FOOD01".equals(itemDto.getFoodId()) : "Sai foodId";
-        assert "Cơm chiên Dương Châu".equals(itemDto.getFoodName()) : "Sai foodName";
-        assert new BigDecimal("40000").compareTo(itemDto.getBasePrice()) == 0 : "Sai basePrice";
-        assert itemDto.getOptions().size() == 1 : "Sai số lượng options";
+        // Test CartItemBean
+        CartItemBean itemBean = new CartItemBean(item);
+        assert itemBean != null : "CartItemBean null";
+        assert "CTGH01".equals(itemBean.getCartItemId()) : "Sai cartItemId";
+        assert "GH01".equals(itemBean.getCartId()) : "Sai cartId";
+        assert "FOOD01".equals(itemBean.getFoodId()) : "Sai foodId";
+        assert "Cơm chiên Dương Châu".equals(itemBean.getFoodName()) : "Sai foodName";
+        assert new BigDecimal("40000").compareTo(itemBean.getBasePrice()) == 0 : "Sai basePrice";
+        assert itemBean.getOptions().size() == 1 : "Sai số lượng options";
 
-        // Test CartMapper
-        CartMapper cartMapper = new CartMapper(itemMapper);
-        CartDto cartDto = cartMapper.toDto(cart, List.of(item));
-        assert cartDto != null : "CartDto null";
-        assert "GH01".equals(cartDto.getCartId()) : "Sai cartId";
-        assert "KH01".equals(cartDto.getCustomerId()) : "Sai customerId";
-        assert cartDto.getItems().size() == 1 : "Sai số lượng items trong CartDto";
-        System.out.println("   [PASSED] Chuyển đổi Cart/CartItem Entity -> DTO thủ công hoàn toàn chính xác");
+        // Test CartBean
+        CartBean cartBean = new CartBean(cart, List.of(item));
+        assert cartBean != null : "CartBean null";
+        assert "GH01".equals(cartBean.getCartId()) : "Sai cartId";
+        assert "KH01".equals(cartBean.getCustomerId()) : "Sai customerId";
+        assert cartBean.getItems().size() == 1 : "Sai số lượng items trong CartBean";
+        System.out.println("   [PASSED] Chuyển đổi Cart/CartItem Entity -> bean thủ công hoàn toàn chính xác");
     }
 
-    private static void testManualPromotionMapper() {
-        System.out.println("-> Test 10: Mapper thủ công Promotion (không dùng MapStruct)");
+    private static void testPromotionBean() {
+        System.out.println("-> Test 8: Bean thủ công Promotion ");
         Promotion promo = new Promotion();
         promo.setPromotionId("KM01");
         promo.setCode("WELCOME10");
@@ -246,21 +209,20 @@ public class CartPromotionServiceTest {
         promo.setMaximumDiscount(new BigDecimal("20000"));
         promo.setStatus(PromotionStatus.ACTIVE);
 
-        PromotionMapper mapper = new PromotionMapper();
-        PromotionDto dto = mapper.toDto(promo);
-        assert dto != null : "PromotionDto null";
+        PromotionBean dto = new PromotionBean(promo);
+        assert dto != null : "PromotionBean null";
         assert "KM01".equals(dto.getPromotionId()) : "Sai promotionId";
         assert "WELCOME10".equals(dto.getCode()) : "Sai code";
         assert "Giảm giá chào bạn mới".equals(dto.getName()) : "Sai name";
         assert dto.getDescription().contains("Giảm 10% cho đơn từ 50,000 đ, tối đa 20,000 đ") : "Sai description: " + dto.getDescription();
 
-        List<PromotionDto> dtoList = mapper.toDtoList(List.of(promo));
+        List<PromotionBean> dtoList = List.of(new PromotionBean(promo));
         assert dtoList.size() == 1 : "Sai dtoList size";
-        System.out.println("   [PASSED] Chuyển đổi Promotion Entity -> DTO thủ công hoàn toàn chính xác");
+        System.out.println("   [PASSED] Chuyển đổi Promotion Entity -> bean thủ công hoàn toàn chính xác");
     }
 
     private static PromotionService offlinePromotionService() {
-        PromotionRepository repository = new PromotionRepository() {
+        PromotionDAO repository = new PromotionDAO() {
             @Override
             public BigDecimal calculateDiscountViaDatabase(String promotionId, BigDecimal subtotal, LocalDateTime orderTime) {
                 return null;
@@ -270,7 +232,7 @@ public class CartPromotionServiceTest {
     }
 
     private static void testCustomerOrderOrderTimeValidation() {
-        System.out.println("-> Test 11: Xác thực thời gian đặt hàng (CustomerOrder.orderTime) với hạn của Promotion");
+        System.out.println("-> Test 9: Xác thực thời gian đặt hàng (CustomerOrder.orderTime) với hạn của Promotion");
         Promotion promo = new Promotion();
         promo.setPromotionId("KM02");
         promo.setCode("FLASH50");

@@ -1,16 +1,16 @@
 package com.foodordering.service;
 
 import com.foodordering.config.DatabaseConfig;
-import com.foodordering.dto.LoginRequest;
-import com.foodordering.dto.ProfileResponse;
-import com.foodordering.dto.RegisterRequest;
-import com.foodordering.entity.EmailVerificationChallenge;
-import com.foodordering.entity.Employee;
-import com.foodordering.entity.User;
+import com.foodordering.bean.LoginForm;
+import com.foodordering.bean.ProfileBean;
+import com.foodordering.bean.RegisterForm;
+import com.foodordering.model.EmailVerificationChallenge;
+import com.foodordering.model.Employee;
+import com.foodordering.model.User;
 import com.foodordering.enums.EmployeeRole;
 import com.foodordering.exception.AccountException;
-import com.foodordering.repository.JpaAccountRepository;
-import com.foodordering.utils.PasswordHasher;
+import com.foodordering.dao.JpaAccountDAO;
+import com.foodordering.util.PasswordHasher;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import org.junit.jupiter.api.AfterAll;
@@ -101,7 +101,7 @@ class EmailVerificationServiceIntegrationTest {
     @Test
     void registrationConflictRollsBackWithoutConsumingCodeThenValidRegistrationConsumesIt() {
         AccountService accounts = accounts();
-        ProfileResponse existing = accounts.register(registration(newEmail(), newPhone()));
+        ProfileBean existing = accounts.register(registration(newEmail(), newPhone()));
         accountEmails.put(existing.id(), existing.email());
         String email = newEmail();
         service().requestRegistrationCode(email);
@@ -110,10 +110,10 @@ class EmailVerificationServiceIntegrationTest {
                 () -> service().register(registration(email, existing.phone()), code));
         assertEquals(409, failure.getStatusCode());
         assertFalse(challenge(email, "REGISTER").isConsumed());
-        ProfileResponse registered = service().register(registration(email, newPhone()), code);
+        ProfileBean registered = service().register(registration(email, newPhone()), code);
         accountEmails.put(registered.id(), email);
         assertTrue(challenge(email, "REGISTER").isConsumed());
-        assertEquals(registered.id(), accounts.login(new LoginRequest(email, PASSWORD, false)).id());
+        assertEquals(registered.id(), accounts.login(new LoginForm(email, PASSWORD, false)).id());
         assertInvalid(() -> service().register(registration(email, newPhone()), code));
     }
 
@@ -122,13 +122,13 @@ class EmailVerificationServiceIntegrationTest {
         String email = newEmail();
         service().requestRegistrationCode(email);
         String code = mail.get(0).code();
-        RegisterRequest request = registration(email, newPhone());
+        RegisterForm request = registration(email, newPhone());
         List<Object> outcomes = together(List.of(
                 () -> attempt(() -> service().register(request, code)),
                 () -> attempt(() -> service().register(request, code))));
-        assertEquals(1, outcomes.stream().filter(ProfileResponse.class::isInstance).count());
+        assertEquals(1, outcomes.stream().filter(ProfileBean.class::isInstance).count());
         assertEquals(1, outcomes.stream().filter(AccountException.class::isInstance).count());
-        ProfileResponse created = (ProfileResponse) outcomes.stream().filter(ProfileResponse.class::isInstance).findFirst().orElseThrow();
+        ProfileBean created = (ProfileBean) outcomes.stream().filter(ProfileBean.class::isInstance).findFirst().orElseThrow();
         accountEmails.put(created.id(), email);
         assertTrue(challenge(email, "REGISTER").isConsumed());
         try (EntityManager em = emf.createEntityManager()) {
@@ -152,7 +152,7 @@ class EmailVerificationServiceIntegrationTest {
 
     @Test
     void concurrentResetConsumesCodeAndChangesPasswordVersionExactlyOnce() throws Exception {
-        ProfileResponse customer = provisionCustomer();
+        ProfileBean customer = provisionCustomer();
         service().requestPasswordResetCode(customer.email());
         String code = mail.get(0).code();
         List<Object> outcomes = together(List.of(
@@ -162,18 +162,18 @@ class EmailVerificationServiceIntegrationTest {
         assertEquals(1, outcomes.stream().filter(AccountException.class::isInstance).count());
         assertEquals(1, accounts().getProfile(customer.id()).credentialVersion());
         assertTrue(challenge(customer.email(), "PASSWORD_RESET").isConsumed());
-        assertEquals(customer.id(), accounts().login(new LoginRequest(customer.email(), NEW_PASSWORD, false)).id());
+        assertEquals(customer.id(), accounts().login(new LoginForm(customer.email(), NEW_PASSWORD, false)).id());
         assertEquals(401, assertThrows(AccountException.class,
-                () -> accounts().login(new LoginRequest(customer.email(), PASSWORD, false))).getStatusCode());
+                () -> accounts().login(new LoginForm(customer.email(), PASSWORD, false))).getStatusCode());
     }
 
     @Test
     void resetAndSignedInChangePersistForCustomerEmployeeAndAdminAndRejectOldBinding() {
-        List<ProfileResponse> profiles = new ArrayList<>();
+        List<ProfileBean> profiles = new ArrayList<>();
         profiles.add(provisionCustomer());
         profiles.add(provisionEmployee(EmployeeRole.ORDER_STAFF));
         profiles.add(provisionEmployee(EmployeeRole.ADMIN));
-        for (ProfileResponse profile : profiles) {
+        for (ProfileBean profile : profiles) {
             service().requestPasswordResetCode(profile.email());
             String resetCode = mail.get(mail.size() - 1).code();
             service().requestPasswordChangeCode(profile.id(), PASSWORD);
@@ -181,30 +181,30 @@ class EmailVerificationServiceIntegrationTest {
             service().changePassword(profile.id(), changeCode, NEW_PASSWORD, NEW_PASSWORD);
             assertEquals(1, accounts().getProfile(profile.id()).credentialVersion());
             assertInvalid(() -> service().resetPassword(profile.email(), resetCode, PASSWORD, PASSWORD));
-            assertEquals(profile.id(), accounts().login(new LoginRequest(profile.email(), NEW_PASSWORD, false)).id());
+            assertEquals(profile.id(), accounts().login(new LoginForm(profile.email(), NEW_PASSWORD, false)).id());
             clock.advanceSeconds(60);
             service().requestPasswordResetCode(profile.email());
             String currentReset = mail.get(mail.size() - 1).code();
             service().resetPassword(profile.email(), currentReset, PASSWORD, PASSWORD);
             assertEquals(2, accounts().getProfile(profile.id()).credentialVersion());
-            assertEquals(profile.id(), accounts().login(new LoginRequest(profile.email(), PASSWORD, false)).id());
+            assertEquals(profile.id(), accounts().login(new LoginForm(profile.email(), PASSWORD, false)).id());
         }
     }
 
     private EmailVerificationService service() {
-        return new EmailVerificationService(new JpaAccountRepository(emf), hasher,
+        return new EmailVerificationService(new JpaAccountDAO(emf), hasher,
                 (email, code, purpose) -> mail.add(new Mail(email, code, purpose)), clock, SECRET);
     }
 
-    private AccountService accounts() { return new AccountService(new JpaAccountRepository(emf), hasher); }
+    private AccountService accounts() { return new AccountService(new JpaAccountDAO(emf), hasher); }
 
-    private ProfileResponse provisionCustomer() {
-        ProfileResponse profile = accounts().register(registration(newEmail(), newPhone()));
+    private ProfileBean provisionCustomer() {
+        ProfileBean profile = accounts().register(registration(newEmail(), newPhone()));
         accountEmails.put(profile.id(), profile.email());
         return profile;
     }
 
-    private ProfileResponse provisionEmployee(EmployeeRole role) {
+    private ProfileBean provisionEmployee(EmployeeRole role) {
         String id = "NV" + UUID.randomUUID().toString().replace("-", "").substring(0, 8).toUpperCase();
         String email = newEmail();
         accountEmails.put(id, email);
@@ -231,8 +231,8 @@ class EmailVerificationServiceIntegrationTest {
     }
 
     private static String newPhone() { return "08" + String.format("%09d", RANDOM.nextInt(1_000_000_000)); }
-    private static RegisterRequest registration(String email, String phone) {
-        return new RegisterRequest("OTP Integration Customer", email, phone, PASSWORD, PASSWORD);
+    private static RegisterForm registration(String email, String phone) {
+        return new RegisterForm("OTP Integration Customer", email, phone, PASSWORD, PASSWORD);
     }
 
     private static Object attempt(Callable<Object> action) throws Exception {

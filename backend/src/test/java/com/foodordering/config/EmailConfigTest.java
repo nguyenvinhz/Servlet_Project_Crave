@@ -1,7 +1,7 @@
 package com.foodordering.config;
 
 import com.foodordering.exception.AccountException;
-import com.foodordering.mail.SmtpVerificationEmailSender;
+import com.foodordering.integration.mail.SmtpVerificationEmailSender;
 import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;

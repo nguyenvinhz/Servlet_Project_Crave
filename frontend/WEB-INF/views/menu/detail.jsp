@@ -69,141 +69,19 @@
                     <p id="foodDesc"><c:out value="${not empty food.description ? food.description : 'Món ăn thơm ngon được chế biến từ những nguyên liệu tươi mới nhất mỗi ngày.'}"/></p>
                 </div>
 
-                <form id="orderCustomizationForm" class="customization-form" data-food-id="<c:out value='${food.id}'/>" onsubmit="event.preventDefault(); handleAddToCart();">
-                    <c:if test="${not empty food.options}">
-                        <section class="options-container" id="foodOptionsContainer">
-                            <h3 class="options-title">Tùy chọn cho món ăn</h3>
-
-                        <c:set var="hasSize" value="false" />
-                        <c:forEach var="opt" items="${food.options}">
-                            <c:if test="${opt.optionType == 'SIZE'}"><c:set var="hasSize" value="true" /></c:if>
-                        </c:forEach>
-                        <c:if test="${hasSize}">
-                            <fieldset class="option-group">
-                                <legend class="option-group-title">Kích cỡ</legend>
-                                <div class="option-items-grid">
-                                    <label class="option-card">
-                                        <input type="radio" name="option_size" value="0" data-extra="0" checked onchange="updateTotalPrice()">
-                                        <span class="option-card-inner">
-                                            <span class="opt-label">Tiêu chuẩn</span>
-                                            <span class="opt-price">+0 ₫</span>
-                                        </span>
-                                    </label>
-                                    <c:forEach var="opt" items="${food.options}">
-                                        <c:if test="${opt.optionType == 'SIZE'}">
-                                            <label class="option-card">
-                                                <input type="radio" name="option_size" value="<c:out value='${opt.id}'/>" data-extra="<c:out value='${opt.extraPrice}'/>" onchange="updateTotalPrice()">
-                                                <span class="option-card-inner">
-                                                    <span class="opt-label"><c:out value="${opt.name}"/></span>
-                                                    <span class="opt-price">+<fmt:formatNumber value="${opt.extraPrice}" type="number" groupingUsed="true"/> ₫</span>
-                                                </span>
-                                            </label>
-                                        </c:if>
-                                    </c:forEach>
-                                </div>
-                            </fieldset>
-                        </c:if>
-
-                        <c:set var="hasTopping" value="false" />
-                        <c:forEach var="opt" items="${food.options}">
-                            <c:if test="${opt.optionType == 'TOPPING'}"><c:set var="hasTopping" value="true" /></c:if>
-                        </c:forEach>
-                        <c:if test="${hasTopping}">
-                            <fieldset class="option-group">
-                                <legend class="option-group-title">Món thêm</legend>
-                                <div class="option-items-grid">
-                                    <c:forEach var="opt" items="${food.options}">
-                                        <c:if test="${opt.optionType == 'TOPPING'}">
-                                            <label class="option-card">
-                                                <input type="checkbox" name="option_topping" value="<c:out value='${opt.id}'/>" data-extra="<c:out value='${opt.extraPrice}'/>" onchange="updateTotalPrice()">
-                                                <span class="option-card-inner">
-                                                    <span class="opt-label"><c:out value="${opt.name}"/></span>
-                                                    <span class="opt-price">+<fmt:formatNumber value="${opt.extraPrice}" type="number" groupingUsed="true"/> ₫</span>
-                                                </span>
-                                            </label>
-                                        </c:if>
-                                    </c:forEach>
-                                </div>
-                            </fieldset>
-                        </c:if>
-
-                        <c:set var="hasSugar" value="false" />
-                        <c:forEach var="opt" items="${food.options}">
-                            <c:if test="${opt.optionType == 'SUGAR_LEVEL'}"><c:set var="hasSugar" value="true" /></c:if>
-                        </c:forEach>
-                        <c:if test="${hasSugar}">
-                            <fieldset class="option-group">
-                                <legend class="option-group-title">Mức đường</legend>
-                                <div class="option-items-grid">
-                                    <c:forEach var="opt" items="${food.options}" varStatus="status">
-                                        <c:if test="${opt.optionType == 'SUGAR_LEVEL'}">
-                                            <label class="option-card">
-                                                <input type="radio" name="option_sugar" value="<c:out value='${opt.id}'/>" data-extra="<c:out value='${opt.extraPrice}'/>" ${status.first ? 'checked' : ''} onchange="updateTotalPrice()">
-                                                <span class="option-card-inner">
-                                                    <span class="opt-label"><c:out value="${opt.name}"/></span>
-                                                    <span class="opt-price">+<fmt:formatNumber value="${opt.extraPrice}" type="number" groupingUsed="true"/> ₫</span>
-                                                </span>
-                                            </label>
-                                        </c:if>
-                                    </c:forEach>
-                                </div>
-                            </fieldset>
-                        </c:if>
-
-                        <c:set var="hasIce" value="false" />
-                        <c:forEach var="opt" items="${food.options}">
-                            <c:if test="${opt.optionType == 'ICE_LEVEL'}"><c:set var="hasIce" value="true" /></c:if>
-                        </c:forEach>
-                        <c:if test="${hasIce}">
-                            <fieldset class="option-group">
-                                <legend class="option-group-title">Mức đá</legend>
-                                <div class="option-items-grid">
-                                    <c:forEach var="opt" items="${food.options}" varStatus="status">
-                                        <c:if test="${opt.optionType == 'ICE_LEVEL'}">
-                                            <label class="option-card">
-                                                <input type="radio" name="option_ice" value="<c:out value='${opt.id}'/>" data-extra="<c:out value='${opt.extraPrice}'/>" ${status.first ? 'checked' : ''} onchange="updateTotalPrice()">
-                                                <span class="option-card-inner">
-                                                    <span class="opt-label"><c:out value="${opt.name}"/></span>
-                                                    <span class="opt-price">+<fmt:formatNumber value="${opt.extraPrice}" type="number" groupingUsed="true"/> ₫</span>
-                                                </span>
-                                            </label>
-                                        </c:if>
-                                    </c:forEach>
-                                </div>
-                            </fieldset>
-                        </c:if>
-
-                        <c:set var="hasOther" value="false" />
-                        <c:forEach var="opt" items="${food.options}">
-                            <c:if test="${opt.optionType == 'OTHER'}"><c:set var="hasOther" value="true" /></c:if>
-                        </c:forEach>
-                        <c:if test="${hasOther}">
-                            <fieldset class="option-group">
-                                <legend class="option-group-title">Tùy chọn khác</legend>
-                                <div class="option-items-grid">
-                                    <c:forEach var="opt" items="${food.options}">
-                                        <c:if test="${opt.optionType == 'OTHER'}">
-                                            <label class="option-card">
-                                                <input type="checkbox" name="option_other" value="<c:out value='${opt.id}'/>" data-extra="<c:out value='${opt.extraPrice}'/>" onchange="updateTotalPrice()">
-                                                <span class="option-card-inner">
-                                                    <span class="opt-label"><c:out value="${opt.name}"/></span>
-                                                    <span class="opt-price">+<fmt:formatNumber value="${opt.extraPrice}" type="number" groupingUsed="true"/> ₫</span>
-                                                </span>
-                                            </label>
-                                        </c:if>
-                                    </c:forEach>
-                                </div>
-                            </fieldset>
-                        </c:if>
-                    </section>
-                </c:if>
-
+                <form id="orderCustomizationForm" class="customization-form" action="<c:url value='/cart/items'/>" method="post">
+                    <input type="hidden" name="foodId" value="<c:out value='${food.id}'/>">
+                    <input type="hidden" name="action" value="add">
+                    <%@ include file="/WEB-INF/views/components/food-options.jspf" %>
+                    <label class="cart-editor-field" for="orderNote">Ghi chú cho món
+                        <textarea id="orderNote" name="note" maxlength="255" rows="2" placeholder="Ví dụ: ít cay, không hành"></textarea>
+                    </label>
                 <div class="order-action-bar">
                     <div class="quantity-picker-wrap">
                         <label for="orderQuantity" class="qty-label">Số lượng:</label>
                         <div class="qty-controls">
                             <button type="button" class="qty-btn" onclick="changeQuantity(-1)" aria-label="Giảm">-</button>
-                            <input type="number" id="orderQuantity" name="quantity" value="1" min="1" max="99" onchange="updateTotalPrice()">
+                            <input type="number" id="orderQuantity" name="quantity" value="1" min="1" max="100" required onchange="updateTotalPrice()">
                             <button type="button" class="qty-btn" onclick="changeQuantity(1)" aria-label="Tăng">+</button>
                         </div>
                     </div>

@@ -1,71 +1,70 @@
-# Cấu trúc và sơ đồ lớp
+# Kiến trúc và sơ đồ lớp
 
-Sơ đồ gốc người dùng cung cấp được lưu ở [class-diagram.drawio](class-diagram.drawio),
-tải từ [Google Drive](https://drive.google.com/file/d/1eXr3heTw7kpOceJcbZLMliu14QfJW7ZB/view).
-Mở bằng diagrams.net để xem đủ các quan hệ và bội số.
+Ứng dụng hiện dùng **Servlet + JSP/JSTL + JPA/Hibernate + HikariCP + MySQL**. Xem [luồng request, form và route hiện hành](servlet-jsp.md).
 
-Tên lớp Java dùng tiếng Anh; giao diện và thông báo dành cho người dùng dùng tiếng Việt.
-Các thao tác trong diagram được thực hiện qua service để kiểm tra quyền, validation và
-transaction trước khi cập nhật entity. Số tiền dùng `BigDecimal`/`DECIMAL`, giữ chính xác
-khi tính giảm giá, tùy chọn món và thanh toán.
+Sơ đồ nghiệp vụ gốc nằm trong [class-diagram.drawio](class-diagram.drawio). Các quan hệ nghiệp vụ được giữ khi đổi cấu trúc Java; sơ đồ gốc không mô tả đầy đủ tên package mới.
 
-| Nhóm trong sơ đồ | Lớp Java | Quan hệ chính |
-|---|---|---|
-| Tài khoản và nhân sự | `User`, `Customer`, `Employee`, `Address` | `User` abstract, kế thừa JOINED; khách hàng có nhiều địa chỉ và một giỏ hàng |
-| Thực đơn và tùy chọn | `Category`, `Food`, `FoodOption` | Danh mục có nhiều món; món có nhiều tùy chọn |
-| Giỏ hàng | `Cart`, `CartItem`, `CartItemOption` | Giỏ thuộc khách hàng; mỗi chi tiết giữ món, số lượng, ghi chú và các tùy chọn |
-| Đơn hàng | `CustomerOrder`, `OrderDetail`, `OrderDetailOption`, `OrderStatusHistory` | Đơn thuộc khách hàng, có nhân viên phụ trách, chi tiết và lịch sử; tên/giá món là snapshot khi đặt |
-| Khuyến mãi | `Promotion`, `DiscountType`, `PromotionStatus` | Một mã áp dụng cho nhiều đơn; đơn giữ snapshot mức giảm |
-| Thanh toán | `Payment`, `PaymentMethod`, `PaymentStatus` | Thanh toán gắn với đơn; hoàn tiền giữ thời điểm thanh toán gốc |
-
-Các FK `promotion_id`, `assigned_employee_id`, `food_id` và `changed_by_employee_id`
-được ánh xạ thành quan hệ JPA bên cạnh thuộc tính ID tương thích API hiện có.
-Các bảng nối tùy chọn giữ giá tại thời điểm đặt, giúp đơn cũ không thay đổi khi thực đơn đổi giá.
-
-## Cây thư mục
+## Phân chia mã nguồn
 
 ```text
-backend/
-  pom.xml
-  src/main/java/com/foodordering/
-    api/                 API JSON
-    servlet/             Servlet API đơn hàng và thanh toán
-      page/              Toàn bộ servlet hiển thị JSP
-    service/             Nghiệp vụ, kiểm tra quyền theo tài khoản, transaction
-    repository/          Truy cập JPA và database
-    entity/              Domain/JPA theo sơ đồ lớp
-    dto/                 Dữ liệu request/response, không trả mật khẩu/hash
-    mapper/              Chuyển entity thành DTO
-    validator/           Quy tắc dữ liệu đầu vào
-    security/            Session và phân quyền
-    config/              Persistence pool và vòng đời ứng dụng
-    filter/              UTF-8, xác thực và kiểm tra origin
-    enums/, exception/, utils/
-  src/main/resources/    Persistence và logging
-  src/test/java/         Unit/integration tests
-  src/dev/java/          Launcher Tomcat và công cụ thiết lập tài khoản, chỉ profile dev
-frontend/
-  WEB-INF/web.xml        Cấu hình session và trang vào ứng dụng
-  WEB-INF/views/         JSP không truy cập trực tiếp
-    components/          Header/footer dùng chung
-    admin/, auth/, customer/, menu/, cart/, order/, promotions/
-  assets/                CSS, JavaScript và hình ảnh
-  index.jsp              Trang vào ứng dụng
-database/
-  schema.sql, seed.sql
-  migrations/            Bản cập nhật cho database đã tồn tại
-tests/
-  frontend/              Kiểm thử trên Chrome/Edge, nằm ngoài WAR
-  runtime/               Kiểm tra HTTP trên WAR/Tomcat/MySQL thật
-  scripts/               Kiểm tra deploy và rollback bằng fixture
-scripts/
-  dev/                   Chạy ứng dụng cục bộ
-  deploy-ec2.sh          Triển khai WAR lên EC2
-docs/
-  architecture/          Diagram và ánh xạ lớp
-  previews/              Trang mẫu phát triển, nằm ngoài WAR
-  api/, project/, reports/
+backend/src/main/java/com/foodordering/
+  servlet/
+    account/       AuthServlet, ProfileServlet, AddressServlet, EmailVerificationServlet
+    admin/         AdminServlet, AdminMenuServlet, AdminAccountServlet, AdminPromotionServlet
+    ...            MenuServlet, CartServlet, CheckoutServlet, OrderServlet,
+                   AdminOrderServlet, PaymentServlet, PayosPaymentServlet, HealthServlet
+  filter/          UTF-8, xác thực, phân quyền và nguồn gửi form
+  listener/        Khởi tạo/đóng database và cấu hình cookie session
+  bean/            *Form cho đầu vào; *Bean cho dữ liệu hiển thị
+  model/           Entity và quan hệ JPA
+  dao/             *DAO và Jpa*DAO
+  service/         Nghiệp vụ, transaction, kiểm tra sở hữu và tính tiền
+  validator/       Quy tắc đầu vào
+  integration/     payOS, geocoder; mail/ cho SMTP
+  config/          DatabaseConfig, EmailConfig, PayosConfig
+  security/        SessionAuth
+  enums/
+  exception/
+  util/
+backend/src/main/resources/META-INF/persistence.xml
+frontend/WEB-INF/views/
+  components/
+  admin/, auth/, customer/, menu/, cart/, order/, promotions/
+frontend/assets/   CSS, JavaScript giao diện, ảnh và Leaflet
 ```
 
-`backend/target/`, `.runtime/`, `node_modules/` và cấu hình `.env` là dữ liệu cục bộ,
-không đưa lên Git. WAR chỉ chứa frontend chạy thật, lớp ứng dụng và thư viện runtime.
+`listener` quản lý vòng đời `EntityManagerFactory`; HikariCP giữ pool kết nối. DAO và các service thống kê/quản trị dùng `EntityManager` trong phạm vi xử lý, đóng sau khi hoàn tất. `persistence.xml` tham chiếu entity trong `model`, dùng `RESOURCE_LOCAL` và xác minh schema hiện có.
+
+Servlet đọc parameter, gọi service và đặt bean lên request để JSP hiển thị. Form không được bind bằng JSON hay thư viện mapper. Việc tạo bean hiển thị được viết trực tiếp trong mã nghiệp vụ. JavaScript không gọi API JSON của ứng dụng.
+
+## Quan hệ nghiệp vụ
+
+| Nhóm | Entity trong `model` | Quan hệ chính |
+|---|---|---|
+| Tài khoản, nhân sự | `User`, `Customer`, `Employee`, `Address` | `User` abstract, kế thừa JOINED; khách có nhiều địa chỉ và một giỏ |
+| Thực đơn | `Category`, `Food`, `FoodOption` | Danh mục có nhiều món; món có nhiều tùy chọn |
+| Giỏ | `Cart`, `CartItem`, `CartItemOption` | Thuộc khách; chi tiết giữ số lượng, ghi chú và tùy chọn |
+| Đơn | `CustomerOrder`, `OrderDetail`, `OrderDetailOption`, `OrderStatusHistory` | Giữ khách, nhân viên, chi tiết và lịch sử; tên/giá món lưu snapshot |
+| Khuyến mãi | `Promotion` | Áp dụng cho nhiều đơn; đơn giữ snapshot mức giảm |
+| Thanh toán | `Payment`, `PayosPaymentLink` | Liên kết đơn với trạng thái thanh toán và dữ liệu đối soát payOS |
+
+Số tiền dùng `BigDecimal`/`DECIMAL`. Tên/giá món và tùy chọn của đơn đã đặt không thay đổi theo thực đơn hiện tại. Việc đổi package Java không đổi tên bảng, cột, khóa ngoại hoặc dữ liệu hiện có.
+
+## Đổi tên từ cấu trúc cũ
+
+| Trước đây | Hiện tại |
+|---|---|
+| `api/*ApiServlet` và `servlet/page/*PageServlet` | Servlet theo chức năng, cùng xử lý GET và form POST |
+| `dto/*Request` | `bean/*Form` |
+| `dto/*Response`, `dto/*Dto` | `bean/*Bean` |
+| `entity` | `model` |
+| `repository/*Repository` | `dao/*DAO` |
+| `config/*Listener` | `listener` |
+| `gateway`, `mail` | `integration`, `integration/mail` |
+| `utils` | `util` |
+| `mapper` | Đã bỏ; tạo bean trực tiếp trong service |
+| JSON giữa trình duyệt và backend | HTML, form parameter, redirect hoặc forward |
+
+Các file trong `docs/api` và báo cáo cũ giữ giá trị lịch sử; hợp đồng JSON của thiết kế cũ đã được thay bằng [route Servlet và form](servlet-jsp.md).
+
+`backend/target/`, `.runtime/`, `node_modules/` và `.env` là dữ liệu local. WAR chứa JSP/assets, lớp ứng dụng và thư viện runtime; kiểm thử, preview và launcher phát triển nằm ngoài phần triển khai.

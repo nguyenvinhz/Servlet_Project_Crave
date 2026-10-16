@@ -88,28 +88,12 @@ jobs:
       - name: Check frontend JavaScript syntax
         run: |
           find frontend/assets/js -type f -name '*.js' -print0 | xargs -0 -r -n 1 node --check
-          node --check tests/frontend/account-browser-smoke.cjs
-          node --check tests/frontend/admin-management-browser-smoke.cjs
-          node --check tests/frontend/admin-orders-dashboard-browser-smoke.cjs
-          node --check tests/frontend/payos-payment-browser-smoke.cjs
-          node --check tests/frontend/cart-checkout-browser-smoke.cjs
-          node --check tests/runtime/http-smoke.cjs
-          node --check tests/runtime/smtp-fixture.cjs
+          find tests/frontend tests/runtime -type f -name '*.cjs' -print0 | xargs -0 -r -n 1 node --check
 
       - name: Verify deployment and rollback script
         run: |
           bash tests/scripts/deploy-ec2-test.sh
           python3 tests/scripts/register-payos-webhook-test.py
-
-      - name: Run browser smoke tests
-        run: |
-          export CHROME_PATH="$(command -v google-chrome)"
-          "$CHROME_PATH" --version
-          node tests/frontend/account-browser-smoke.cjs
-          node tests/frontend/admin-management-browser-smoke.cjs
-          node tests/frontend/admin-orders-dashboard-browser-smoke.cjs
-          node tests/frontend/payos-payment-browser-smoke.cjs
-          node tests/frontend/cart-checkout-browser-smoke.cjs
 
       - name: Run packaged WAR HTTP smoke tests
         env:
@@ -148,7 +132,7 @@ jobs:
           server_pid=''
           smtp_pid=''
           runtime_log='backend/target/runtime-smoke-tomcat.log'
-          health_file='backend/target/runtime-health.json'
+          health_file='backend/target/runtime-health.txt'
           cleanup() {
             if [[ -n "$server_pid" ]] && kill -0 "$server_pid" 2>/dev/null; then
               kill "$server_pid" || true
@@ -183,7 +167,7 @@ jobs:
               exit 1
             fi
             if curl --fail --silent --max-time 2 "$CRAVE_SMOKE_BASE_URL/api/health" > "$health_file" \
-              && node -e "const p=JSON.parse(require('node:fs').readFileSync(process.argv[1],'utf8'));process.exit(p.success && p.data?.database==='UP' ? 0 : 1)" "$health_file"; then
+              && node -e "const p=require('node:fs').readFileSync(process.argv[1],'utf8');process.exit(p.trim()==='application=UP\ndatabase=UP' ? 0 : 1)" "$health_file"; then
               ready=1
               break
             fi
@@ -195,6 +179,17 @@ jobs:
             exit 1
           fi
           node tests/runtime/http-smoke.cjs
+          set -a
+          source backend/target/runtime-customer.env
+          set +a
+          export CHROME_PATH="$(command -v google-chrome)"
+          "$CHROME_PATH" --version
+          node tests/frontend/account-browser-smoke.cjs
+          node tests/frontend/otp-browser-smoke.cjs
+          node tests/frontend/admin-management-browser-smoke.cjs
+          node tests/frontend/admin-orders-dashboard-browser-smoke.cjs
+          node tests/frontend/payos-payment-browser-smoke.cjs
+          node tests/frontend/cart-checkout-browser-smoke.cjs
 
       - name: Upload tested WAR
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -220,7 +215,7 @@ jobs:
           name: runtime-smoke-diagnostics
           path: |
             backend/target/runtime-smoke-tomcat.log
-            backend/target/runtime-health.json
+            backend/target/runtime-health.txt
           if-no-files-found: ignore
           retention-days: 7
 

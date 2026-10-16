@@ -1,11 +1,11 @@
 package com.foodordering.dev;
 
 import com.foodordering.config.DatabaseConfig;
-import com.foodordering.dto.EmployeeCreateRequest;
-import com.foodordering.entity.Employee;
+import com.foodordering.bean.EmployeeCreateForm;
+import com.foodordering.model.Employee;
 import com.foodordering.enums.EmployeeRole;
-import com.foodordering.utils.PasswordHasher;
-import com.foodordering.utils.JsonUtils;
+import com.foodordering.util.PasswordHasher;
+
 import com.foodordering.validator.AdminAccountValidator;
 
 import java.time.LocalDate;
@@ -21,14 +21,11 @@ public final class CreateEmployee {
     }
 
     public static void main(String[] args) {
-        if (args.length == 2 && "--encoded-json".equals(args[0])) {
-            String json = new String(Base64.getDecoder().decode(args[1]), StandardCharsets.UTF_8);
-            BootstrapArguments decoded = JsonUtils.fromJson(json, BootstrapArguments.class);
-            if (decoded == null || decoded.email() == null || decoded.fullName() == null || decoded.phone() == null) {
-                throw new IllegalArgumentException("Thông tin tài khoản không hợp lệ.");
-            }
-            args = new String[]{decoded.email(), decoded.fullName(), decoded.phone(),
-                    decoded.role() == null ? "ADMIN" : decoded.role()};
+        if (args.length == 5 && "--encoded-args".equals(args[0])) {
+            String[] decoded = new String[4];
+            for (int index = 0; index < 4; index++)
+                decoded[index] = new String(Base64.getDecoder().decode(args[index + 1]), StandardCharsets.UTF_8);
+            args = decoded;
         }
         if (args.length < 3 || args.length > 4) {
             throw new IllegalArgumentException("Cách dùng: CreateEmployee email họ-tên số-điện-thoại [chức-vụ]");
@@ -45,8 +42,8 @@ public final class CreateEmployee {
                 Arrays.fill(entered, '\0');
             }
         }
-        EmployeeCreateRequest employee = AdminAccountValidator.validateEmployee(
-                new EmployeeCreateRequest(fullName, email, phone, password, role, null, LocalDate.now()));
+        EmployeeCreateForm employee = AdminAccountValidator.validateEmployee(
+                new EmployeeCreateForm(fullName, email, phone, password, role, null, LocalDate.now()));
         String hash = new PasswordHasher().hash(employee.password());
         try (var entityManager = DatabaseConfig.getEntityManagerFactory().createEntityManager()) {
             var transaction = entityManager.getTransaction();
@@ -72,6 +69,4 @@ public final class CreateEmployee {
         }
     }
 
-    private record BootstrapArguments(String email, String fullName, String phone, String role) {
-    }
 }

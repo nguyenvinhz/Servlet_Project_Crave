@@ -1,17 +1,17 @@
 package com.foodordering.service;
 
-import com.foodordering.dto.RegisterRequest;
-import com.foodordering.entity.Customer;
-import com.foodordering.entity.EmailVerificationChallenge;
-import com.foodordering.entity.Employee;
-import com.foodordering.entity.User;
+import com.foodordering.bean.RegisterForm;
+import com.foodordering.model.Customer;
+import com.foodordering.model.EmailVerificationChallenge;
+import com.foodordering.model.Employee;
+import com.foodordering.model.User;
 import com.foodordering.enums.CustomerStatus;
 import com.foodordering.enums.EmployeeRole;
 import com.foodordering.enums.EmployeeStatus;
 import com.foodordering.exception.AccountException;
-import com.foodordering.mail.VerificationEmailSender;
-import com.foodordering.repository.AccountRepository;
-import com.foodordering.utils.PasswordHasher;
+import com.foodordering.integration.mail.VerificationEmailSender;
+import com.foodordering.dao.AccountDAO;
+import com.foodordering.util.PasswordHasher;
 import org.junit.jupiter.api.Test;
 
 import java.security.SecureRandom;
@@ -39,14 +39,14 @@ class EmailVerificationServiceTest {
     private final Map<String, EmailVerificationChallenge> challenges = new LinkedHashMap<>();
     private final List<Mail> mail = new ArrayList<>();
     private final MutableClock clock = new MutableClock();
-    private final AccountRepository.Session session = mock(AccountRepository.Session.class);
-    private final AccountRepository repository = mock(AccountRepository.class);
+    private final AccountDAO.Session session = mock(AccountDAO.Session.class);
+    private final AccountDAO repository = mock(AccountDAO.class);
     private int commits;
 
     EmailVerificationServiceTest() {
-        when(repository.read(any())).thenAnswer(call -> ((Function<AccountRepository.Session, ?>) call.getArgument(0)).apply(session));
+        when(repository.read(any())).thenAnswer(call -> ((Function<AccountDAO.Session, ?>) call.getArgument(0)).apply(session));
         when(repository.write(any())).thenAnswer(call -> {
-            Object result = ((Function<AccountRepository.Session, ?>) call.getArgument(0)).apply(session);
+            Object result = ((Function<AccountDAO.Session, ?>) call.getArgument(0)).apply(session);
             commits++;
             return result;
         });
@@ -303,8 +303,8 @@ class EmailVerificationServiceTest {
                 null, LocalDate.of(2026, 1, 1));
     }
 
-    private static RegisterRequest registration(String email) {
-        return new RegisterRequest("New Customer", email, "0991234567", PASSWORD, PASSWORD);
+    private static RegisterForm registration(String email) {
+        return new RegisterForm("New Customer", email, "0991234567", PASSWORD, PASSWORD);
     }
 
     private static void assertInvalid(Runnable operation) {

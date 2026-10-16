@@ -1,0 +1,42 @@
+<%@ page pageEncoding="UTF-8" %>
+<c:if test="${not empty optionGroups}">
+    <section class="options-container" id="foodOptionsContainer">
+        <h3 class="options-title">Tùy chọn cho món ăn</h3>
+        <c:forEach var="group" items="${optionGroups}">
+            <c:set var="multipleOptions" value="${group.key == 'TOPPING' or group.key == 'OTHER'}"/>
+            <fieldset class="option-group cart-editor-group">
+                <legend class="option-group-title">
+                    <c:choose>
+                        <c:when test="${group.key == 'SIZE'}">Kích cỡ</c:when>
+                        <c:when test="${group.key == 'TOPPING'}">Món thêm</c:when>
+                        <c:when test="${group.key == 'SUGAR_LEVEL'}">Mức đường</c:when>
+                        <c:when test="${group.key == 'ICE_LEVEL'}">Mức đá</c:when>
+                        <c:otherwise>Tùy chọn khác</c:otherwise>
+                    </c:choose>
+                </legend>
+                <div class="option-items-grid">
+                    <c:if test="${not multipleOptions}">
+                        <c:set var="groupHasSelection" value="false"/>
+                        <c:forEach var="opt" items="${group.value}">
+                            <c:if test="${selectedOptionIds.contains(opt.id)}"><c:set var="groupHasSelection" value="true"/></c:if>
+                        </c:forEach>
+                        <label class="option-card cart-editor-option">
+                            <input type="radio" name="option_<c:out value='${group.key}'/>" value="" data-extra="0" ${not groupHasSelection ? 'checked' : ''}>
+                            <span class="option-card-inner"><span class="opt-label">Tiêu chuẩn</span><span class="opt-price">+0 ₫</span></span>
+                        </label>
+                    </c:if>
+                    <c:forEach var="opt" items="${group.value}">
+                        <label class="option-card cart-editor-option">
+                            <input type="${multipleOptions ? 'checkbox' : 'radio'}" name="${multipleOptions ? 'optionIds' : 'option_'.concat(group.key)}"
+                                   value="<c:out value='${opt.id}'/>" data-extra="<c:out value='${opt.extraPrice}'/>" ${selectedOptionIds.contains(opt.id) ? 'checked' : ''}>
+                            <span class="option-card-inner">
+                                <span class="opt-label"><c:out value="${opt.name}"/></span>
+                                <span class="opt-price">+<fmt:formatNumber value="${opt.extraPrice}" type="number" groupingUsed="true"/> ₫</span>
+                            </span>
+                        </label>
+                    </c:forEach>
+                </div>
+            </fieldset>
+        </c:forEach>
+    </section>
+</c:if>

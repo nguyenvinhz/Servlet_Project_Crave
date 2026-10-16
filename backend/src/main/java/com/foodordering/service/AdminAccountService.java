@@ -1,12 +1,12 @@
 package com.foodordering.service;
 
 import com.foodordering.config.DatabaseConfig;
-import com.foodordering.dto.AdminCustomerResponse;
-import com.foodordering.dto.AdminEmployeeResponse;
-import com.foodordering.dto.EmployeeCreateRequest;
-import com.foodordering.entity.Customer;
-import com.foodordering.entity.Employee;
-import com.foodordering.entity.User;
+import com.foodordering.bean.AdminCustomerBean;
+import com.foodordering.bean.AdminEmployeeBean;
+import com.foodordering.bean.EmployeeCreateForm;
+import com.foodordering.model.Customer;
+import com.foodordering.model.Employee;
+import com.foodordering.model.User;
 import com.foodordering.enums.CustomerStatus;
 import com.foodordering.enums.EmployeeRole;
 import com.foodordering.enums.EmployeeStatus;
@@ -14,7 +14,7 @@ import com.foodordering.exception.ConflictException;
 import com.foodordering.exception.ForbiddenException;
 import com.foodordering.exception.ResourceNotFoundException;
 import com.foodordering.exception.ValidationException;
-import com.foodordering.utils.PasswordHasher;
+import com.foodordering.util.PasswordHasher;
 import com.foodordering.validator.AdminAccountValidator;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
@@ -46,7 +46,7 @@ public class AdminAccountService {
         this.passwordHasher = passwordHasher;
     }
 
-    public List<AdminCustomerResponse> listCustomers() {
+    public List<AdminCustomerBean> listCustomers() {
         try (EntityManager em = emf.createEntityManager()) {
             @SuppressWarnings("unchecked")
             List<Object[]> rows = em.createNativeQuery("""
@@ -61,14 +61,14 @@ public class AdminAccountService {
         }
     }
 
-    public List<AdminEmployeeResponse> listEmployees() {
+    public List<AdminEmployeeBean> listEmployees() {
         try (EntityManager em = emf.createEntityManager()) {
             return em.createQuery("SELECT e FROM Employee e ORDER BY e.hireDate DESC, e.id", Employee.class)
                     .getResultList().stream().map(AdminAccountService::employee).toList();
         }
     }
 
-    public AdminCustomerResponse updateCustomerStatus(String actorId, String id, CustomerStatus status) {
+    public AdminCustomerBean updateCustomerStatus(String actorId, String id, CustomerStatus status) {
         if (status == null) throw new ValidationException("Vui lòng chọn trạng thái khách hàng.");
         return write(em -> {
             requireManager(lockEmployees(em), actorId);
@@ -80,12 +80,12 @@ public class AdminAccountService {
                     SELECT COUNT(order_id), COALESCE(SUM(CASE WHEN status = 'COMPLETED' THEN total_amount ELSE 0 END), 0)
                     FROM customer_order WHERE customer_id = :id
                     """).setParameter("id", id).getSingleResult();
-            return new AdminCustomerResponse(target.getId(), target.getFullName(), target.getEmail(), target.getPhone(),
+            return new AdminCustomerBean(target.getId(), target.getFullName(), target.getEmail(), target.getPhone(),
                     target.getStatus(), target.getRegisteredAt(), ((Number) stats[0]).longValue(), decimal(stats[1]));
         });
     }
 
-    public AdminEmployeeResponse updateEmployeeStatus(String actorId, String id, EmployeeStatus status) {
+    public AdminEmployeeBean updateEmployeeStatus(String actorId, String id, EmployeeStatus status) {
         if (status == null) throw new ValidationException("Vui lòng chọn trạng thái nhân viên.");
         return write(em -> {
             List<Employee> employees = lockEmployees(em);
@@ -105,7 +105,7 @@ public class AdminAccountService {
         });
     }
 
-    public AdminEmployeeResponse updateEmployeeRole(String actorId, String id, EmployeeRole role) {
+    public AdminEmployeeBean updateEmployeeRole(String actorId, String id, EmployeeRole role) {
         if (role == null) throw new ValidationException("Vui lòng chọn chức vụ nhân viên.");
         return write(em -> {
             List<Employee> employees = lockEmployees(em);
@@ -126,8 +126,8 @@ public class AdminAccountService {
         });
     }
 
-    public AdminEmployeeResponse createEmployee(String actorId, EmployeeCreateRequest request) {
-        EmployeeCreateRequest validated = AdminAccountValidator.validateEmployee(request);
+    public AdminEmployeeBean createEmployee(String actorId, EmployeeCreateForm request) {
+        EmployeeCreateForm validated = AdminAccountValidator.validateEmployee(request);
         String hash = passwordHasher.hash(validated.password());
         return write(em -> {
             Employee actor = requireManager(lockEmployees(em), actorId);
@@ -202,16 +202,16 @@ public class AdminAccountService {
         return false;
     }
 
-    private static AdminEmployeeResponse employee(Employee employee) {
-        return new AdminEmployeeResponse(employee.getId(), employee.getFullName(), employee.getEmail(), employee.getPhone(),
+    private static AdminEmployeeBean employee(Employee employee) {
+        return new AdminEmployeeBean(employee.getId(), employee.getFullName(), employee.getEmail(), employee.getPhone(),
                 employee.getRole(), employee.getStatus(), employee.getAddress(), employee.getHireDate());
     }
 
-    private static AdminCustomerResponse customer(Object[] row) {
+    private static AdminCustomerBean customer(Object[] row) {
         Object registeredAt = row[5];
         LocalDateTime registered = registeredAt instanceof Timestamp timestamp ? timestamp.toLocalDateTime()
                 : (LocalDateTime) registeredAt;
-        return new AdminCustomerResponse((String) row[0], (String) row[1], (String) row[2], (String) row[3],
+        return new AdminCustomerBean((String) row[0], (String) row[1], (String) row[2], (String) row[3],
                 CustomerStatus.valueOf((String) row[4]), registered, ((Number) row[6]).longValue(), decimal(row[7]));
     }
 

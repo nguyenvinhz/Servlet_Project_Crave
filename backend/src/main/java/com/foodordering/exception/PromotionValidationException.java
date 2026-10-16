@@ -5,7 +5,7 @@ import com.foodordering.enums.ErrorCode;
 /**
  * Exception ném ra khi kiểm tra mã khuyến mãi thất bại.
  */
-public class PromotionValidationException extends ApiException {
+public class PromotionValidationException extends BusinessException {
     public PromotionValidationException(ErrorCode errorCode) {
         super(errorCode, errorCode.getDefaultMessage(), 400);
     }

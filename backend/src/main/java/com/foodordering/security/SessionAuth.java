@@ -1,6 +1,6 @@
 package com.foodordering.security;
 
-import com.foodordering.dto.ProfileResponse;
+import com.foodordering.bean.ProfileBean;
 import com.foodordering.enums.AccountType;
 import com.foodordering.enums.EmployeeRole;
 import com.foodordering.exception.AccountException;
@@ -16,13 +16,13 @@ public final class SessionAuth {
     private static final String AUTH_REVISION = SessionAuth.class.getName() + ".revision";
     private static final String REQUEST_SNAPSHOT = SessionAuth.class.getName() + ".snapshot";
 
-    public record Snapshot(HttpSession session, String revision, ProfileResponse user) {
+    public record Snapshot(HttpSession session, String revision, ProfileBean user) {
     }
 
     private SessionAuth() {
     }
 
-    public static ProfileResponse requireUser(HttpServletRequest request) {
+    public static ProfileBean requireUser(HttpServletRequest request) {
         return capture(request).user();
     }
 
@@ -50,14 +50,14 @@ public final class SessionAuth {
             synchronized (session) {
                 Object value = session.getAttribute(CURRENT_USER);
                 String revision = revision(session);
-                return new Snapshot(session, revision, value instanceof ProfileResponse user ? user : null);
+                return new Snapshot(session, revision, value instanceof ProfileBean user ? user : null);
             }
         } catch (IllegalStateException exception) {
             throw unauthorized();
         }
     }
 
-    public static void login(HttpServletRequest request, Snapshot before, ProfileResponse user, int timeout) {
+    public static void login(HttpServletRequest request, Snapshot before, ProfileBean user, int timeout) {
         try {
             HttpSession session = before.session();
             if (session == null) {
@@ -80,7 +80,7 @@ public final class SessionAuth {
     }
 
     /** Refreshing profile data must not replace a login completed while the database call ran. */
-    public static void refresh(HttpServletRequest request, Snapshot before, ProfileResponse user) {
+    public static void refresh(HttpServletRequest request, Snapshot before, ProfileBean user) {
         try {
             synchronized (before.session()) {
                 requireCurrent(request, before);
@@ -138,7 +138,7 @@ public final class SessionAuth {
 
     private static boolean isCurrent(Snapshot before) {
         Object value = before.session().getAttribute(CURRENT_USER);
-        ProfileResponse user = value instanceof ProfileResponse profile ? profile : null;
+        ProfileBean user = value instanceof ProfileBean profile ? profile : null;
         return Objects.equals(before.revision(), before.session().getAttribute(AUTH_REVISION))
                 && (before.user() == null ? user == null : user != null
                 && before.user().id().equals(user.id()) && before.user().accountType() == user.accountType()
@@ -159,8 +159,8 @@ public final class SessionAuth {
         return new AccountException("UNAUTHORIZED", "Vui lòng đăng nhập để tiếp tục.", 401);
     }
 
-    public static ProfileResponse requireCustomer(HttpServletRequest request) {
-        ProfileResponse user = requireUser(request);
+    public static ProfileBean requireCustomer(HttpServletRequest request) {
+        ProfileBean user = requireUser(request);
         if (user.accountType() != AccountType.CUSTOMER) {
             throw new AccountException("FORBIDDEN", "Chức năng này chỉ dành cho khách hàng.", 403);
         }
@@ -168,8 +168,8 @@ public final class SessionAuth {
     }
 
     /** Admins may access all staff resources; other employees need an assigned role. */
-    public static ProfileResponse requireEmployee(HttpServletRequest request, EmployeeRole... allowedRoles) {
-        ProfileResponse user = requireUser(request);
+    public static ProfileBean requireEmployee(HttpServletRequest request, EmployeeRole... allowedRoles) {
+        ProfileBean user = requireUser(request);
         if (user.accountType() != AccountType.EMPLOYEE || user.role() == null
                 || (user.role() != EmployeeRole.ADMIN && !Arrays.asList(allowedRoles).contains(user.role()))) {
             throw new AccountException("FORBIDDEN", "Bạn không có quyền truy cập chức năng này.", 403);
@@ -177,7 +177,7 @@ public final class SessionAuth {
         return user;
     }
 
-    public static void store(HttpSession session, ProfileResponse user) {
+    public static void store(HttpSession session, ProfileBean user) {
         try {
             synchronized (session) {
                 session.setAttribute(AUTH_REVISION, UUID.randomUUID().toString());
@@ -188,7 +188,7 @@ public final class SessionAuth {
         }
     }
 
-    private static void storeFields(HttpSession session, ProfileResponse user) {
+    private static void storeFields(HttpSession session, ProfileBean user) {
         session.setAttribute(CURRENT_USER, user);
         session.setAttribute("userId", user.id());
         session.setAttribute("accountType", user.accountType().name());

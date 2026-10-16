@@ -1,23 +1,22 @@
 package com.foodordering.service;
 
-import com.foodordering.dto.AddressResponse;
-import com.foodordering.dto.AddressWriteRequest;
-import com.foodordering.dto.LoginRequest;
-import com.foodordering.dto.ProfileResponse;
-import com.foodordering.dto.ProfileUpdateRequest;
-import com.foodordering.dto.RegisterRequest;
-import com.foodordering.entity.Address;
-import com.foodordering.entity.Customer;
-import com.foodordering.entity.Employee;
-import com.foodordering.entity.User;
+import com.foodordering.bean.AddressBean;
+import com.foodordering.bean.AddressWriteForm;
+import com.foodordering.bean.LoginForm;
+import com.foodordering.bean.ProfileBean;
+import com.foodordering.bean.ProfileUpdateForm;
+import com.foodordering.bean.RegisterForm;
+import com.foodordering.model.Address;
+import com.foodordering.model.Customer;
+import com.foodordering.model.Employee;
+import com.foodordering.model.User;
 import com.foodordering.enums.AccountType;
 import com.foodordering.enums.CustomerStatus;
 import com.foodordering.enums.EmployeeRole;
 import com.foodordering.enums.EmployeeStatus;
 import com.foodordering.exception.AccountException;
-import com.foodordering.repository.AccountRepository;
-import com.foodordering.utils.JsonProvider;
-import com.foodordering.utils.PasswordHasher;
+import com.foodordering.dao.AccountDAO;
+import com.foodordering.util.PasswordHasher;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -56,7 +55,7 @@ class AccountServiceTest {
 
     @Test
     void registrationNormalizesContactsHashesPasswordAndSupportsLoginWithoutLeakingSecrets() throws Exception {
-        ProfileResponse registered = service.register(new RegisterRequest("  Nguyễn Quang Vinh  ",
+        ProfileBean registered = service.register(new RegisterForm("  Nguyễn Quang Vinh  ",
                 " VINH@Example.com ", " 0912345678 ", "Secret#123", "Secret#123"));
 
         assertEquals("Nguyễn Quang Vinh", registered.fullName());
@@ -67,22 +66,20 @@ class AccountServiceTest {
         assertTrue(registered.id().startsWith("KH"));
         assertEquals(10, registered.id().length());
         assertTrue(repository.users.get(registered.id()).getPasswordHash().startsWith("pbkdf2_sha256$600000$"));
-        assertEquals(registered, service.login(new LoginRequest("VINH@example.com", "Secret#123", true)));
-        String json = JsonProvider.objectMapper().writeValueAsString(registered);
-        assertFalse(json.contains("password"));
-        assertFalse(json.contains("Secret#123"));
-        assertFalse(json.contains("role"));
+        assertEquals(registered, service.login(new LoginForm("VINH@example.com", "Secret#123", true)));
+        var properties = java.beans.Introspector.getBeanInfo(ProfileBean.class).getPropertyDescriptors();
+        assertTrue(java.util.Arrays.stream(properties).noneMatch(property -> property.getName().toLowerCase().contains("password")));
         assertEquals(401, assertThrows(AccountException.class,
-                () -> service.login(new LoginRequest(registered.email(), "Wrong#123", false))).getStatusCode());
+                () -> service.login(new LoginForm(registered.email(), "Wrong#123", false))).getStatusCode());
         ((Customer) repository.users.get(registered.id())).setStatus(CustomerStatus.LOCKED);
         assertEquals(401, assertThrows(AccountException.class,
-                () -> service.login(new LoginRequest(registered.email(), "Secret#123", false))).getStatusCode());
+                () -> service.login(new LoginForm(registered.email(), "Secret#123", false))).getStatusCode());
     }
 
     @Test
     void registrationReportsAllInvalidFieldsBeforePersistence() {
         AccountException exception = assertThrows(AccountException.class, () -> service.register(
-                new RegisterRequest("A", "invalid", "12+34", "short", "different")));
+                new RegisterForm("A", "invalid", "12+34", "short", "different")));
 
         assertEquals(400, exception.getStatusCode());
         assertTrue(exception.getDetails().keySet().containsAll(
@@ -92,71 +89,71 @@ class AccountServiceTest {
 
     @Test
     void malformedContactTextIsRejectedBeforeHashingOrDatabaseAccess() {
-        AccountRepository guardedRepository = mock(AccountRepository.class);
+        AccountDAO guardedDAO = mock(AccountDAO.class);
         PasswordHasher hasher = mock(PasswordHasher.class);
-        AccountService guarded = new AccountService(guardedRepository, hasher);
+        AccountService guarded = new AccountService(guardedDAO, hasher);
 
         for (String email : List.of("vinh\u0000@example.com", "vinh\u0007@example.com",
                 "vinh\u007f@example.com", "vinh\u0085@example.com",
                 "vinh" + (char) 0xD800 + "@example.com", "vinh" + (char) 0xDC00 + "@example.com")) {
             assertFieldValidation("email", assertThrows(AccountException.class, () -> guarded.register(
-                    new RegisterRequest("Audit User", email, "0912345678", "Password#123", "Password#123"))));
+                    new RegisterForm("Audit User", email, "0912345678", "Password#123", "Password#123"))));
             assertFieldValidation("email", assertThrows(AccountException.class, () -> guarded.login(
-                    new LoginRequest(email, "Password#123", false))));
+                    new LoginForm(email, "Password#123", false))));
             assertFieldValidation("email", assertThrows(AccountException.class, () -> guarded.updateProfile("KH01",
-                    new ProfileUpdateRequest("Audit User", email, "0912345678"))));
+                    new ProfileUpdateForm("Audit User", email, "0912345678"))));
         }
         for (String name : List.of("Audit " + (char) 0xD800, "Audit " + (char) 0xDC00)) {
             assertFieldValidation("fullName", assertThrows(AccountException.class, () -> guarded.register(
-                    new RegisterRequest(name, "audit@example.com", "0912345678", "Password#123", "Password#123"))));
+                    new RegisterForm(name, "audit@example.com", "0912345678", "Password#123", "Password#123"))));
             assertFieldValidation("fullName", assertThrows(AccountException.class, () -> guarded.updateProfile("KH01",
-                    new ProfileUpdateRequest(name, "audit@example.com", "0912345678"))));
+                    new ProfileUpdateForm(name, "audit@example.com", "0912345678"))));
         }
 
-        verifyNoInteractions(guardedRepository, hasher);
+        verifyNoInteractions(guardedDAO, hasher);
     }
 
     @Test
     void malformedAddressTextIsRejectedBeforePersistenceOrDefaultChanges() {
-        AccountRepository guardedRepository = mock(AccountRepository.class);
-        AccountService guarded = new AccountService(guardedRepository);
+        AccountDAO guardedDAO = mock(AccountDAO.class);
+        AccountService guarded = new AccountService(guardedDAO);
 
         for (String invalid : List.of("Địa chỉ " + (char) 0xD800, "Địa chỉ " + (char) 0xDC00,
                 "Địa chỉ " + '\0')) {
-            AddressWriteRequest line = new AddressWriteRequest(invalid, "Cổng trước", true);
+            AddressWriteForm line = new AddressWriteForm(invalid, "Cổng trước", true);
             assertFieldValidation("addressLine", assertThrows(AccountException.class,
                     () -> guarded.createAddress("KH01", line)));
             assertFieldValidation("addressLine", assertThrows(AccountException.class,
                     () -> guarded.updateAddress("KH01", "DC01", line)));
-            AddressWriteRequest note = new AddressWriteRequest("12 Nguyễn Trãi", invalid, true);
+            AddressWriteForm note = new AddressWriteForm("12 Nguyễn Trãi", invalid, true);
             assertFieldValidation("note", assertThrows(AccountException.class,
                     () -> guarded.createAddress("KH01", note)));
             assertFieldValidation("note", assertThrows(AccountException.class,
                     () -> guarded.updateAddress("KH01", "DC01", note)));
         }
 
-        verifyNoInteractions(guardedRepository);
+        verifyNoInteractions(guardedDAO);
     }
 
     @Test
     void contactAndAddressChangesPreserveVietnameseEmojiAndMultilineNotes() {
-        ProfileResponse registered = service.register(new RegisterRequest("  Nguyễn Quang Vinh 🍜  ",
+        ProfileBean registered = service.register(new RegisterForm("  Nguyễn Quang Vinh 🍜  ",
                 " VĨNH@example.com ", "0912345678", "Password#123", "Password#123"));
         assertEquals("Nguyễn Quang Vinh 🍜", registered.fullName());
         assertEquals("vĩnh@example.com", registered.email());
-        assertEquals(registered, service.login(new LoginRequest("VĨNH@example.com", "Password#123", false)));
+        assertEquals(registered, service.login(new LoginForm("VĨNH@example.com", "Password#123", false)));
 
-        ProfileResponse updated = service.updateProfile(registered.id(),
-                new ProfileUpdateRequest("Nguyễn Vinh 🚀", "vĩnh.🍜@example.com", "0912345678"));
+        ProfileBean updated = service.updateProfile(registered.id(),
+                new ProfileUpdateForm("Nguyễn Vinh 🚀", "vĩnh.🍜@example.com", "0912345678"));
         assertEquals("Nguyễn Vinh 🚀", updated.fullName());
         assertEquals("vĩnh.🍜@example.com", updated.email());
         String note = "Cổng trước 🚪\nGọi khi tới nơi 📞";
-        AddressResponse created = service.createAddress(registered.id(),
-                new AddressWriteRequest(" 12 Nguyễn Trãi 🏠 ", " " + note + " ", true));
+        AddressBean created = service.createAddress(registered.id(),
+                new AddressWriteForm(" 12 Nguyễn Trãi 🏠 ", " " + note + " ", true));
         assertEquals("12 Nguyễn Trãi 🏠", created.addressLine());
         assertEquals(note, created.note());
-        AddressResponse revised = service.updateAddress(registered.id(), created.id(),
-                new AddressWriteRequest("34 Lê Lợi 🏡", note + "\nTầng 2", true));
+        AddressBean revised = service.updateAddress(registered.id(), created.id(),
+                new AddressWriteForm("34 Lê Lợi 🏡", note + "\nTầng 2", true));
         assertEquals("34 Lê Lợi 🏡", revised.addressLine());
         assertEquals(note + "\nTầng 2", revised.note());
         assertTrue(revised.isDefault());
@@ -177,13 +174,13 @@ class AccountServiceTest {
                 "Password" + (char) 0xD800 + "42", "Password" + (char) 0xD801 + "42",
                 "Password" + (char) 0xDC00 + "42")) {
             AccountException register = assertThrows(AccountException.class, () -> guarded.register(
-                    new RegisterRequest("Audit User", "audit@example.com", "0912345678", invalid, invalid)));
+                    new RegisterForm("Audit User", "audit@example.com", "0912345678", invalid, invalid)));
             assertEquals(400, register.getStatusCode());
             assertEquals("VALIDATION_ERROR", register.getErrorCode());
             assertTrue(register.getDetails().keySet().containsAll(List.of("password", "confirmPassword")));
 
             AccountException login = assertThrows(AccountException.class, () -> guarded.login(
-                    new LoginRequest("customer@example.com", invalid, false)));
+                    new LoginForm("customer@example.com", invalid, false)));
             assertEquals(400, login.getStatusCode());
             assertEquals("VALIDATION_ERROR", login.getErrorCode());
             assertTrue(login.getDetails().containsKey("password"));
@@ -198,7 +195,7 @@ class AccountServiceTest {
         PasswordHasher hasher = mock(PasswordHasher.class);
         AccountService guarded = new AccountService(repository, hasher);
         AccountException failure = assertThrows(AccountException.class, () -> guarded.register(
-                new RegisterRequest("Audit User", "audit@example.com", "0912345678",
+                new RegisterForm("Audit User", "audit@example.com", "0912345678",
                         "Password?42", "Password" + (char) 0xD800 + "42")));
 
         assertEquals(400, failure.getStatusCode());
@@ -211,12 +208,12 @@ class AccountServiceTest {
     @Test
     void registrationAndLoginPreserveValidVietnameseAndEmojiPasswords() {
         String password = "MậtKhẩu#🔒123";
-        ProfileResponse registered = service.register(new RegisterRequest("Audit User", "audit@example.com",
+        ProfileBean registered = service.register(new RegisterForm("Audit User", "audit@example.com",
                 "0912345678", password, password));
 
-        assertEquals(registered, service.login(new LoginRequest(registered.email(), password, false)));
+        assertEquals(registered, service.login(new LoginForm(registered.email(), password, false)));
         AccountException wrong = assertThrows(AccountException.class, () -> service.login(
-                new LoginRequest(registered.email(), "MậtKhẩu#🔑123", false)));
+                new LoginForm(registered.email(), "MậtKhẩu#🔑123", false)));
         assertEquals(401, wrong.getStatusCode());
         assertEquals("INVALID_CREDENTIALS", wrong.getErrorCode());
     }
@@ -225,7 +222,7 @@ class AccountServiceTest {
     void registrationChecksEmailAndPhoneInOneSharedCustomerEmployeeNamespace() {
         repository.users.put("NV01", employee(EmployeeStatus.WORKING));
         AccountException exception = assertThrows(AccountException.class, () -> service.register(
-                new RegisterRequest("New User", "ADMIN@example.com", "0901234567", "Secret#123", "Secret#123")));
+                new RegisterForm("New User", "ADMIN@example.com", "0901234567", "Secret#123", "Secret#123")));
 
         assertEquals(409, exception.getStatusCode());
         assertTrue(exception.getDetails().containsKey("email"));
@@ -235,9 +232,9 @@ class AccountServiceTest {
     @Test
     void rejectsSeedPlaceholderAndUnknownLoginWithSameCredentialsError() {
         AccountException placeholder = assertThrows(AccountException.class,
-                () -> service.login(new LoginRequest("customer@example.com", "customer123", false)));
+                () -> service.login(new LoginForm("customer@example.com", "customer123", false)));
         AccountException missing = assertThrows(AccountException.class,
-                () -> service.login(new LoginRequest("nobody@example.com", "customer123", false)));
+                () -> service.login(new LoginForm("nobody@example.com", "customer123", false)));
 
         assertEquals(401, placeholder.getStatusCode());
         assertEquals("INVALID_CREDENTIALS", placeholder.getErrorCode());
@@ -250,9 +247,9 @@ class AccountServiceTest {
         AccountService instrumented = new AccountService(repository, hasher);
 
         assertThrows(AccountException.class,
-                () -> instrumented.login(new LoginRequest("nobody@example.com", "customer123", false)));
+                () -> instrumented.login(new LoginForm("nobody@example.com", "customer123", false)));
         assertThrows(AccountException.class,
-                () -> instrumented.login(new LoginRequest("customer@example.com", "customer123", false)));
+                () -> instrumented.login(new LoginForm("customer@example.com", "customer123", false)));
 
         verify(hasher).verify("customer123", null);
         verify(hasher).verify("customer123", "hashed_customer123");
@@ -264,7 +261,7 @@ class AccountServiceTest {
         customer.setStatus(CustomerStatus.LOCKED);
         assertEquals(401, assertThrows(AccountException.class, () -> service.getProfile("KH01")).getStatusCode());
         repository.users.put("NV01", employee(EmployeeStatus.WORKING));
-        ProfileResponse employee = service.getProfile("NV01");
+        ProfileBean employee = service.getProfile("NV01");
         assertEquals(AccountType.EMPLOYEE, employee.accountType());
         assertEquals(EmployeeRole.ADMIN, employee.role());
         ((Employee) repository.users.get("NV01")).setStatus(EmployeeStatus.ON_LEAVE);
@@ -274,12 +271,12 @@ class AccountServiceTest {
 
     @Test
     void profileUpdateAllowsOwnContactsAndRejectsContactsOwnedByAnotherAccount() {
-        ProfileResponse updated = service.updateProfile("KH01",
-                new ProfileUpdateRequest("Tên mới", "CUSTOMER@example.com", "0901234567"));
+        ProfileBean updated = service.updateProfile("KH01",
+                new ProfileUpdateForm("Tên mới", "CUSTOMER@example.com", "0901234567"));
         assertEquals("Tên mới", updated.fullName());
         assertTrue(repository.locked);
         AccountException exception = assertThrows(AccountException.class, () -> service.updateProfile("KH01",
-                new ProfileUpdateRequest("Tên mới", "other@example.com", "0907654321")));
+                new ProfileUpdateForm("Tên mới", "other@example.com", "0907654321")));
         assertEquals(409, exception.getStatusCode());
         assertEquals(2, exception.getDetails().size());
         assertEquals("customer@example.com", repository.users.get("KH01").getEmail());
@@ -289,31 +286,31 @@ class AccountServiceTest {
     void employeeCannotUpdateCustomerProfileOrManageCustomerAddresses() {
         repository.users.put("NV01", employee(EmployeeStatus.WORKING));
         assertEquals(403, assertThrows(AccountException.class, () -> service.updateProfile("NV01",
-                new ProfileUpdateRequest("Admin User", "admin@example.com", "0991234567"))).getStatusCode());
+                new ProfileUpdateForm("Admin User", "admin@example.com", "0991234567"))).getStatusCode());
         assertEquals(403, assertThrows(AccountException.class, () -> service.listAddresses("NV01")).getStatusCode());
     }
 
     @Test
     void firstAddressAutomaticallyBecomesDefaultAndSwitchingDefaultFlushesSafely() {
-        AddressResponse first = service.createAddress("KH01", writeAddress(" First address ", false));
+        AddressBean first = service.createAddress("KH01", writeAddress(" First address ", false));
         assertTrue(first.isDefault());
         assertEquals("First address", first.addressLine());
-        AddressResponse second = service.createAddress("KH01", writeAddress("Second address", true));
+        AddressBean second = service.createAddress("KH01", writeAddress("Second address", true));
 
         assertTrue(second.isDefault());
         assertFalse(service.getAddress("KH01", first.id()).isDefault());
-        assertEquals(1, service.listAddresses("KH01").stream().filter(AddressResponse::isDefault).count());
+        assertEquals(1, service.listAddresses("KH01").stream().filter(AddressBean::isDefault).count());
         assertTrue(repository.locked);
         assertTrue(repository.flushes >= 4);
     }
 
     @Test
     void clearingDefaultPromotesAnotherAddressAndSingletonRetainsDefault() {
-        AddressResponse first = service.createAddress("KH01", writeAddress("First address", false));
+        AddressBean first = service.createAddress("KH01", writeAddress("First address", false));
         service.updateAddress("KH01", first.id(), writeAddress("First revised", false));
         assertTrue(service.getAddress("KH01", first.id()).isDefault());
-        AddressResponse second = service.createAddress("KH01", writeAddress("Second address", false));
-        AddressResponse updated = service.updateAddress("KH01", first.id(), writeAddress("First revised", false));
+        AddressBean second = service.createAddress("KH01", writeAddress("Second address", false));
+        AddressBean updated = service.updateAddress("KH01", first.id(), writeAddress("First revised", false));
 
         assertFalse(updated.isDefault());
         assertTrue(service.getAddress("KH01", second.id()).isDefault());
@@ -322,8 +319,8 @@ class AccountServiceTest {
 
     @Test
     void deletionPromotesRemainingAddressAndCanDeleteLastAddress() {
-        AddressResponse first = service.createAddress("KH01", writeAddress("First address", true));
-        AddressResponse second = service.createAddress("KH01", writeAddress("Second address", false));
+        AddressBean first = service.createAddress("KH01", writeAddress("First address", true));
+        AddressBean second = service.createAddress("KH01", writeAddress("Second address", false));
         service.deleteAddress("KH01", first.id());
 
         assertTrue(service.getAddress("KH01", second.id()).isDefault());
@@ -333,7 +330,7 @@ class AccountServiceTest {
 
     @Test
     void ownershipHidesAnotherCustomersAddressOnReadUpdateAndDelete() {
-        AddressResponse owned = service.createAddress("KH01", writeAddress("Private address", true));
+        AddressBean owned = service.createAddress("KH01", writeAddress("Private address", true));
 
         assertTrue(service.listAddresses("KH02").isEmpty());
         assertEquals(404, assertThrows(AccountException.class,
@@ -348,15 +345,15 @@ class AccountServiceTest {
     @Test
     void addressValidationReportsRequiredFieldsAndLimits() {
         AccountException exception = assertThrows(AccountException.class,
-                () -> service.createAddress("KH01", new AddressWriteRequest("  ", "a".repeat(256), null)));
+                () -> service.createAddress("KH01", new AddressWriteForm("  ", "a".repeat(256), null)));
 
         assertEquals(400, exception.getStatusCode());
         assertTrue(exception.getDetails().keySet().containsAll(List.of("addressLine", "note", "isDefault")));
         assertTrue(repository.addresses.isEmpty());
     }
 
-    private static AddressWriteRequest writeAddress(String addressLine, boolean isDefault) {
-        return new AddressWriteRequest(addressLine, null, isDefault);
+    private static AddressWriteForm writeAddress(String addressLine, boolean isDefault) {
+        return new AddressWriteForm(addressLine, null, isDefault);
     }
 
     private static Employee employee(EmployeeStatus status) {
@@ -364,7 +361,7 @@ class AccountServiceTest {
                 EmployeeRole.ADMIN, null, LocalDate.of(2026, 1, 1), status);
     }
 
-    private static class MemoryRepository implements AccountRepository, AccountRepository.Session {
+    private static class MemoryRepository implements AccountDAO, AccountDAO.Session {
         private final Map<String, User> users = new LinkedHashMap<>();
         private final Map<String, Address> addresses = new LinkedHashMap<>();
         private boolean locked;

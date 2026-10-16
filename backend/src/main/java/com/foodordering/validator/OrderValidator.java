@@ -1,6 +1,6 @@
 package com.foodordering.validator;
 
-import com.foodordering.dto.OrderRequest;
+import com.foodordering.bean.OrderForm;
 import com.foodordering.enums.FulfillmentType;
 import com.foodordering.exception.BadRequestException;
 
@@ -10,7 +10,7 @@ public final class OrderValidator {
     private OrderValidator() {
     }
 
-    public static void validate(OrderRequest request) {
+    public static void validate(OrderForm request) {
         if (request == null) {
             throw new BadRequestException("Dữ liệu đặt hàng không được để trống");
         }

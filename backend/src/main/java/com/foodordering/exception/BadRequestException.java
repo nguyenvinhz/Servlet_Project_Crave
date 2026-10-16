@@ -5,7 +5,7 @@ import com.foodordering.enums.ErrorCode;
 /**
  * Exception ném ra khi client gửi request không hợp lệ (HTTP 400).
  */
-public class BadRequestException extends ApiException {
+public class BadRequestException extends BusinessException {
     public BadRequestException(ErrorCode errorCode) {
         super(errorCode, errorCode.getDefaultMessage(), 400);
     }

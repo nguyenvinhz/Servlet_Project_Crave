@@ -1,7 +1,7 @@
 package com.foodordering.config;
 
 import com.foodordering.exception.AccountException;
-import com.foodordering.gateway.PayosClient;
+import com.foodordering.integration.PayosClient;
 
 import java.io.IOException;
 import java.net.URI;
@@ -10,7 +10,7 @@ import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 
-/** Server-only settings. Never expose credentials through a DTO or toString(). */
+/** Server-only settings. Never expose credentials through a bean or toString(). */
 public final class PayosConfig {
     private final String clientId;
     private final String apiKey;

@@ -1,8 +1,8 @@
 package com.foodordering.validator;
 
-import com.foodordering.dto.EmployeeCreateRequest;
+import com.foodordering.bean.EmployeeCreateForm;
 import com.foodordering.exception.ValidationException;
-import com.foodordering.utils.PasswordHasher;
+import com.foodordering.util.PasswordHasher;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -11,7 +11,7 @@ public final class AdminAccountValidator {
     private AdminAccountValidator() {
     }
 
-    public static EmployeeCreateRequest validateEmployee(EmployeeCreateRequest request) {
+    public static EmployeeCreateForm validateEmployee(EmployeeCreateForm request) {
         if (request == null) throw new ValidationException("Vui lòng cung cấp thông tin nhân viên.");
         Map<String, String> errors = new LinkedHashMap<>();
         String name = trim(request.fullName());
@@ -40,7 +40,7 @@ public final class AdminAccountValidator {
             errors.put("address", "Địa chỉ không được vượt quá 255 ký tự.");
         }
         if (!errors.isEmpty()) throw new ValidationException("Thông tin nhân viên không hợp lệ.", errors);
-        return new EmployeeCreateRequest(name, email, phone, request.password(), request.role(), address, request.hireDate());
+        return new EmployeeCreateForm(name, email, phone, request.password(), request.role(), address, request.hireDate());
     }
 
     private static String trim(String value) {

@@ -181,7 +181,7 @@ if [[ $count == 1 ]]; then
     http-failure) exit 22 ;;
   esac
 fi
-printf '{"success":true,"data":{"application":"UP","database":"UP"},"error":null}'
+printf 'application=UP\ndatabase=UP\n'
 SH
 
 cat > "$test_root/bin/install" <<'SH'

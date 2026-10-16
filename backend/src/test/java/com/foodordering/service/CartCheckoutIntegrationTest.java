@@ -1,22 +1,22 @@
 package com.foodordering.service;
 
 import com.foodordering.config.DatabaseConfig;
-import com.foodordering.dto.AddToCartRequest;
-import com.foodordering.dto.CartDto;
-import com.foodordering.dto.OrderRequest;
-import com.foodordering.dto.OrderResponse;
-import com.foodordering.dto.ProfileResponse;
-import com.foodordering.dto.RegisterRequest;
-import com.foodordering.dto.UpdateCartItemRequest;
-import com.foodordering.dto.ValidatePromotionRequest;
-import com.foodordering.entity.Category;
-import com.foodordering.entity.CartItem;
-import com.foodordering.entity.CartItemOption;
-import com.foodordering.entity.CustomerOrder;
-import com.foodordering.entity.Payment;
-import com.foodordering.entity.Food;
-import com.foodordering.entity.FoodOption;
-import com.foodordering.entity.Promotion;
+import com.foodordering.bean.AddToCartForm;
+import com.foodordering.bean.CartBean;
+import com.foodordering.bean.OrderForm;
+import com.foodordering.bean.OrderBean;
+import com.foodordering.bean.ProfileBean;
+import com.foodordering.bean.RegisterForm;
+import com.foodordering.bean.UpdateCartItemForm;
+import com.foodordering.bean.ValidatePromotionForm;
+import com.foodordering.model.Category;
+import com.foodordering.model.CartItem;
+import com.foodordering.model.CartItemOption;
+import com.foodordering.model.CustomerOrder;
+import com.foodordering.model.Payment;
+import com.foodordering.model.Food;
+import com.foodordering.model.FoodOption;
+import com.foodordering.model.Promotion;
 import com.foodordering.enums.DiscountType;
 import com.foodordering.enums.ErrorCode;
 import com.foodordering.enums.FoodStatus;
@@ -29,9 +29,9 @@ import com.foodordering.enums.PaymentStatus;
 import com.foodordering.enums.PromotionStatus;
 import com.foodordering.exception.BadRequestException;
 import com.foodordering.exception.PromotionValidationException;
-import com.foodordering.repository.CustomerOrderRepositoryImpl;
-import com.foodordering.repository.JpaAccountRepository;
-import com.foodordering.repository.PaymentRepositoryImpl;
+import com.foodordering.dao.JpaOrderDAO;
+import com.foodordering.dao.JpaAccountDAO;
+import com.foodordering.dao.JpaPaymentDAO;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import org.junit.jupiter.api.AfterAll;
@@ -73,9 +73,9 @@ class CartCheckoutIntegrationTest {
     private final CartService carts = new CartService();
     private final PromotionService promotions = new PromotionService();
     private final CustomerOrderService orders = new CustomerOrderServiceImpl(
-            new CustomerOrderRepositoryImpl(), new PaymentRepositoryImpl(), null,
+            new JpaOrderDAO(), new JpaPaymentDAO(), null,
             new DeliveryFeeService(new DeliveryFeeService.Store("Fixture store", 10.89, 106.76)));
-    private ProfileResponse owner;
+    private ProfileBean owner;
 
     @BeforeAll
     static void connect() {
@@ -90,9 +90,9 @@ class CartCheckoutIntegrationTest {
 
     @BeforeEach
     void createFixtures() {
-        AccountService accounts = new AccountService(new JpaAccountRepository(emf));
+        AccountService accounts = new AccountService(new JpaAccountDAO(emf));
         String phone = "09" + String.format("%08d", ThreadLocalRandom.current().nextInt(100_000_000));
-        owner = accounts.register(new RegisterRequest(
+        owner = accounts.register(new RegisterForm(
                 fixtureName, email, phone, "Integration#123", "Integration#123"));
         transaction(em -> {
             Category category = new Category(categoryId, fixtureName);
@@ -140,7 +140,7 @@ class CartCheckoutIntegrationTest {
     @EnumSource(FulfillmentType.class)
     void checkoutCopiesOptionsPricesVoucherAndPaymentThenClearsCart(FulfillmentType fulfillment) {
         addCart();
-        OrderResponse order = orders.createOrder(owner.id(), checkout(fulfillment));
+        OrderBean order = orders.createOrder(owner.id(), checkout(fulfillment));
 
         assertEquals(owner.id(), order.getCustomerId());
         assertEquals(OrderStatus.PENDING_CONFIRMATION, order.getStatus());
@@ -187,10 +187,21 @@ class CartCheckoutIntegrationTest {
     }
 
     @Test
+    void persistedBadgeCountSumsQuantitiesWithoutCreatingAnEmptyCart() {
+        assertEquals(0, carts.countItems(owner.id()));
+        assertEquals(0, count("SELECT COUNT(*) FROM cart WHERE customer_id = :customer"));
+        carts.addItem(owner.id(), new AddToCartForm(foodId, 2, null, List.of()));
+        carts.addItem(owner.id(), new AddToCartForm(otherFoodId, 3, null, List.of()));
+        assertEquals(5, new CartService().countItems(owner.id()));
+        carts.clearCart(owner.id());
+        assertEquals(0, new CartService().countItems(owner.id()));
+    }
+
+    @Test
     void freeDeliveryUsesPersistedFoodSubtotalBeforeVoucherAndMatchesPayment() {
-        CartDto cart = addCart();
-        carts.updateItem(owner.id(), new com.foodordering.dto.UpdateCartItemRequest(cart.getItems().get(0).getCartItemId(), 4, null));
-        OrderResponse order = orders.createOrder(owner.id(), checkout(FulfillmentType.DELIVERY));
+        CartBean cart = addCart();
+        carts.updateItem(owner.id(), new com.foodordering.bean.UpdateCartItemForm(cart.getItems().get(0).getCartItemId(), 4, null));
+        OrderBean order = orders.createOrder(owner.id(), checkout(FulfillmentType.DELIVERY));
         assertMoney("200000", order.getSubtotal());
         assertMoney("20000", order.getDiscountAmount());
         assertMoney("0", order.getDeliveryFee());
@@ -203,11 +214,11 @@ class CartCheckoutIntegrationTest {
     @CsvSource({"10.94,106.76,8399", "10.96,106.76,14351", "10.8905,106.76,0"})
     void checkoutUsesAndPersistsChosenCoordinatesInsteadOfResolvingTextAgain(double latitude, double longitude, String fee) {
         addCart();
-        OrderRequest request = checkout(FulfillmentType.DELIVERY);
+        OrderForm request = checkout(FulfillmentType.DELIVERY);
         request.setDeliveryLatitude(latitude);
         request.setDeliveryLongitude(longitude);
         request.setDeliveryAddress(String.format(java.util.Locale.ROOT, "%.6f, %.6f", latitude, longitude));
-        OrderResponse order = orders.createOrder(owner.id(), request);
+        OrderBean order = orders.createOrder(owner.id(), request);
         assertMoney(fee, order.getDeliveryFee());
         assertMoney("150000", order.getSubtotal());
         assertMoney("20000", order.getDiscountAmount());
@@ -227,15 +238,15 @@ class CartCheckoutIntegrationTest {
     @Test
     void pickupCheckoutClearsStaleDeliveryAddressAndCompletesWithoutDelivery() {
         addCart();
-        OrderRequest request = checkout(FulfillmentType.PICKUP);
+        OrderForm request = checkout(FulfillmentType.PICKUP);
         request.setDeliveryAddress("Địa chỉ còn lại khi đổi sang tự đến lấy");
 
-        OrderResponse order = orders.createOrder(owner.id(), request);
+        OrderBean order = orders.createOrder(owner.id(), request);
         orders.updateOrderStatus(order.getOrderId(), OrderStatus.PREPARING, null, "Đang chuẩn bị");
         orders.updateOrderStatus(order.getOrderId(), OrderStatus.COMPLETED, null, "Khách đã nhận món");
         orders.updateOrderStatus(order.getOrderId(), OrderStatus.COMPLETED, null, "Yêu cầu lặp lại");
 
-        OrderResponse completed = orders.getOrderById(order.getOrderId());
+        OrderBean completed = orders.getOrderById(order.getOrderId());
         assertNull(completed.getDeliveryAddress());
         assertEquals(OrderStatus.COMPLETED, completed.getStatus());
         assertEquals(3, completed.getHistory().size());
@@ -244,8 +255,8 @@ class CartCheckoutIntegrationTest {
     @Test
     void paymentAndRefundKeepOriginalPaidAtAndRejectInvalidReversal() {
         addCart();
-        OrderResponse order = orders.createOrder(owner.id(), checkout(FulfillmentType.PICKUP));
-        PaymentService payments = new PaymentServiceImpl(new PaymentRepositoryImpl(), emf);
+        OrderBean order = orders.createOrder(owner.id(), checkout(FulfillmentType.PICKUP));
+        PaymentService payments = new PaymentServiceImpl(new JpaPaymentDAO(), emf);
         String paymentId = order.getPayment().getPaymentId();
         String transactionRef = "IT-" + token;
         payments.updatePaymentStatus(paymentId, PaymentStatus.SUCCESS, transactionRef);
@@ -278,7 +289,7 @@ class CartCheckoutIntegrationTest {
         });
 
         BadRequestException failure = assertThrows(BadRequestException.class,
-                () -> carts.addItem(owner.id(), new AddToCartRequest(foodId, 1, null, List.of(optionId, secondOptionId))));
+                () -> carts.addItem(owner.id(), new AddToCartForm(foodId, 1, null, List.of(optionId, secondOptionId))));
 
         assertEquals(ErrorCode.INVALID_OPTION, failure.getErrorCode());
         assertEquals(0, count("SELECT COUNT(*) FROM cart WHERE customer_id = :customer"));
@@ -287,7 +298,7 @@ class CartCheckoutIntegrationTest {
 
     @Test
     void checkoutRevalidatesExclusiveOptionGroupsAndPreservesInvalidCart() {
-        CartDto cart = addCart();
+        CartBean cart = addCart();
         String secondOptionId = "XH" + token.substring(0, 8);
         transaction(em -> {
             em.find(FoodOption.class, optionId).setOptionType(OptionType.SIZE);
@@ -301,7 +312,7 @@ class CartCheckoutIntegrationTest {
                 () -> orders.createOrder(owner.id(), checkout(FulfillmentType.PICKUP)));
 
         assertEquals(ErrorCode.INVALID_OPTION, failure.getErrorCode());
-        CartDto preserved = carts.getOrCreateCart(owner.id());
+        CartBean preserved = carts.getOrCreateCart(owner.id());
         assertEquals(cart.getCartId(), preserved.getCartId());
         assertEquals(2, preserved.getItems().get(0).getOptions().size());
         assertMoney("180000", preserved.getSubtotal());
@@ -311,9 +322,9 @@ class CartCheckoutIntegrationTest {
     @ParameterizedTest
     @ValueSource(strings = {"INACTIVE", "EXPIRED", "NOT_STARTED", "MINIMUM", "UNKNOWN"})
     void checkoutRevalidatesVoucherAndRollsBackWithoutLosingCart(String scenario) {
-        CartDto cart = addCart();
-        assertTrue(promotions.validatePromotion(new ValidatePromotionRequest(promotionCode, money("1")), owner.id()).isValid());
-        OrderRequest request = checkout(FulfillmentType.PICKUP);
+        CartBean cart = addCart();
+        assertTrue(promotions.validatePromotion(new ValidatePromotionForm(promotionCode, money("1")), owner.id()).isValid());
+        OrderForm request = checkout(FulfillmentType.PICKUP);
         int expectedQuantity = 3;
         String expectedSubtotal = "150000";
         ErrorCode expectedCode;
@@ -339,7 +350,7 @@ class CartCheckoutIntegrationTest {
                 expectedCode = ErrorCode.PROMOTION_NOT_STARTED;
             }
             case "MINIMUM" -> {
-                carts.updateItem(owner.id(), new UpdateCartItemRequest(cart.getItems().get(0).getCartItemId(), 1, null));
+                carts.updateItem(owner.id(), new UpdateCartItemForm(cart.getItems().get(0).getCartItemId(), 1, null));
                 expectedQuantity = 1;
                 expectedSubtotal = "50000";
                 expectedCode = ErrorCode.PROMOTION_MIN_ORDER_NOT_MET;
@@ -363,7 +374,7 @@ class CartCheckoutIntegrationTest {
     @ParameterizedTest
     @ValueSource(strings = {"DISABLED", "OTHER_FOOD"})
     void checkoutRejectsChangedOptionsAndPreservesCart(String scenario) {
-        CartDto cart = addCart();
+        CartBean cart = addCart();
         transaction(em -> {
             FoodOption option = em.find(FoodOption.class, optionId);
             if ("DISABLED".equals(scenario)) option.setStatus(OptionStatus.INACTIVE);
@@ -381,7 +392,7 @@ class CartCheckoutIntegrationTest {
 
     @Test
     void checkoutRejectsUnavailableFoodAndPreservesCart() {
-        CartDto cart = addCart();
+        CartBean cart = addCart();
         transaction(em -> em.find(Food.class, foodId).setStatus(FoodStatus.UNAVAILABLE));
 
         BadRequestException failure = assertThrows(BadRequestException.class,
@@ -394,7 +405,7 @@ class CartCheckoutIntegrationTest {
 
     @Test
     void emptyAndRepeatedCheckoutReturnBadRequestWithoutExtraOrders() {
-        OrderRequest request = checkout(FulfillmentType.PICKUP);
+        OrderForm request = checkout(FulfillmentType.PICKUP);
         assertEmptyCartFailure(request);
         carts.getOrCreateCart(owner.id());
         assertEmptyCartFailure(request);
@@ -429,7 +440,7 @@ class CartCheckoutIntegrationTest {
             start.countDown();
             List<Object> outcomes = List.of(first.get(20, TimeUnit.SECONDS), second.get(20, TimeUnit.SECONDS));
 
-            assertEquals(1, outcomes.stream().filter(OrderResponse.class::isInstance).count());
+            assertEquals(1, outcomes.stream().filter(OrderBean.class::isInstance).count());
             BadRequestException rejected = outcomes.stream().filter(BadRequestException.class::isInstance)
                     .map(BadRequestException.class::cast).findFirst().orElseThrow();
             assertEquals(ErrorCode.CART_EMPTY, rejected.getErrorCode());
@@ -449,13 +460,13 @@ class CartCheckoutIntegrationTest {
         CountDownLatch start = new CountDownLatch(1);
         ExecutorService workers = Executors.newFixedThreadPool(2);
         try {
-            java.util.concurrent.Callable<CartDto> attempt = () -> {
+            java.util.concurrent.Callable<CartBean> attempt = () -> {
                 ready.countDown();
                 if (!start.await(10, TimeUnit.SECONDS)) throw new AssertionError("Cart start timed out");
                 return carts.getOrCreateCart(owner.id());
             };
-            Future<CartDto> first = workers.submit(attempt);
-            Future<CartDto> second = workers.submit(attempt);
+            Future<CartBean> first = workers.submit(attempt);
+            Future<CartBean> second = workers.submit(attempt);
             assertTrue(ready.await(10, TimeUnit.SECONDS));
             start.countDown();
 
@@ -467,12 +478,12 @@ class CartCheckoutIntegrationTest {
         }
     }
 
-    private CartDto addCart() {
-        return carts.addItem(owner.id(), new AddToCartRequest(foodId, 3, "checkout note", List.of(optionId)));
+    private CartBean addCart() {
+        return carts.addItem(owner.id(), new AddToCartForm(foodId, 3, "checkout note", List.of(optionId)));
     }
 
-    private OrderRequest checkout(FulfillmentType fulfillment) {
-        OrderRequest request = new OrderRequest();
+    private OrderForm checkout(FulfillmentType fulfillment) {
+        OrderForm request = new OrderForm();
         request.setFulfillmentType(fulfillment);
         request.setReceiverName(fixtureName);
         request.setReceiverPhone(owner.phone());
@@ -487,7 +498,7 @@ class CartCheckoutIntegrationTest {
         return request;
     }
 
-    private void assertEmptyCartFailure(OrderRequest request) {
+    private void assertEmptyCartFailure(OrderForm request) {
         BadRequestException failure = assertThrows(BadRequestException.class,
                 () -> orders.createOrder(owner.id(), request));
         assertEquals(ErrorCode.CART_EMPTY, failure.getErrorCode());
@@ -495,7 +506,7 @@ class CartCheckoutIntegrationTest {
     }
 
     private void assertCartPreserved(String expectedCartId, int expectedQuantity, String expectedSubtotal) {
-        CartDto preserved = carts.getOrCreateCart(owner.id());
+        CartBean preserved = carts.getOrCreateCart(owner.id());
         assertEquals(expectedCartId, preserved.getCartId());
         assertEquals(1, preserved.getItems().size());
         assertEquals(expectedQuantity, preserved.getItems().get(0).getQuantity());

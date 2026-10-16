@@ -1,13 +1,13 @@
 package com.foodordering.service;
 
 import com.foodordering.config.DatabaseConfig;
-import com.foodordering.dto.AdminEmployeeResponse;
-import com.foodordering.dto.AdminPromotionRequest;
-import com.foodordering.dto.EmployeeCreateRequest;
-import com.foodordering.dto.PromotionDto;
-import com.foodordering.entity.Customer;
-import com.foodordering.entity.Employee;
-import com.foodordering.entity.User;
+import com.foodordering.bean.AdminEmployeeBean;
+import com.foodordering.bean.AdminPromotionForm;
+import com.foodordering.bean.EmployeeCreateForm;
+import com.foodordering.bean.PromotionBean;
+import com.foodordering.model.Customer;
+import com.foodordering.model.Employee;
+import com.foodordering.model.User;
 import com.foodordering.enums.CustomerStatus;
 import com.foodordering.enums.DiscountType;
 import com.foodordering.enums.EmployeeRole;
@@ -15,8 +15,7 @@ import com.foodordering.enums.EmployeeStatus;
 import com.foodordering.enums.PromotionStatus;
 import com.foodordering.exception.ConflictException;
 import com.foodordering.exception.ForbiddenException;
-import com.foodordering.utils.JsonProvider;
-import com.foodordering.utils.PasswordHasher;
+import com.foodordering.util.PasswordHasher;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import org.junit.jupiter.api.AfterAll;
@@ -101,9 +100,8 @@ class AdminManagementIntegrationTest {
         assertEquals(CustomerStatus.ACTIVE, customer.status());
         assertEquals(0, customer.orderCount());
         assertEquals(0, BigDecimal.ZERO.compareTo(customer.totalSpent()));
-        String json = JsonProvider.objectMapper().writeValueAsString(accounts.listEmployees());
-        assertFalse(json.contains("passwordHash"));
-        assertFalse(json.contains("pbkdf2_sha256"));
+        var properties = java.beans.Introspector.getBeanInfo(com.foodordering.bean.AdminEmployeeBean.class).getPropertyDescriptors();
+        assertTrue(java.util.Arrays.stream(properties).noneMatch(property -> property.getName().toLowerCase().contains("password")));
 
         assertEquals(CustomerStatus.LOCKED, accounts.updateCustomerStatus(hrId, customerId, CustomerStatus.LOCKED).status());
         try (EntityManager em = emf.createEntityManager()) {
@@ -114,9 +112,9 @@ class AdminManagementIntegrationTest {
 
     @Test
     void employeeCreationHashesPasswordAndReportsContactConflicts() {
-        EmployeeCreateRequest request = new EmployeeCreateRequest(fixtureName, email("created"), phone(),
+        EmployeeCreateForm request = new EmployeeCreateForm(fixtureName, email("created"), phone(),
                 "Created#123", EmployeeRole.ORDER_STAFF, "123 Nguyễn Huệ", LocalDate.of(2026, 10, 1));
-        AdminEmployeeResponse created = accounts.createEmployee(hrId, request);
+        AdminEmployeeBean created = accounts.createEmployee(hrId, request);
         ownedUserIds.add(created.id());
 
         assertEquals(EmployeeRole.ORDER_STAFF, created.role());
@@ -136,7 +134,7 @@ class AdminManagementIntegrationTest {
         assertThrows(ForbiddenException.class, () -> accounts.updateEmployeeRole(hrId, staffId, EmployeeRole.ADMIN));
         assertThrows(ForbiddenException.class, () -> accounts.updateEmployeeStatus(hrId, adminId, EmployeeStatus.ON_LEAVE));
         assertThrows(ForbiddenException.class, () -> accounts.createEmployee(hrId,
-                new EmployeeCreateRequest(fixtureName, email("forbidden"), phone(), "Created#123",
+                new EmployeeCreateForm(fixtureName, email("forbidden"), phone(), "Created#123",
                         EmployeeRole.ADMIN, null, LocalDate.now())));
     }
 
@@ -163,7 +161,7 @@ class AdminManagementIntegrationTest {
             assertTrue(ready.await(10, TimeUnit.SECONDS));
             start.countDown();
             List<Object> outcomes = List.of(first.get(20, TimeUnit.SECONDS), second.get(20, TimeUnit.SECONDS));
-            assertEquals(1, outcomes.stream().filter(AdminEmployeeResponse.class::isInstance).count());
+            assertEquals(1, outcomes.stream().filter(AdminEmployeeBean.class::isInstance).count());
             assertEquals(1, outcomes.stream().filter(ForbiddenException.class::isInstance).count());
             try (EntityManager em = emf.createEntityManager()) {
                 long remaining = em.createQuery("SELECT COUNT(e) FROM Employee e WHERE e.id IN :ids AND e.role = :role AND e.status = :status", Long.class)
@@ -179,16 +177,16 @@ class AdminManagementIntegrationTest {
 
     @Test
     void promotionCreateUpdateAndStatusPersistWithoutDeletingSnapshots() {
-        PromotionDto created = promotions.createPromotion(promotionRequest("IP" + token.substring(0, 20), DiscountType.PERCENT, "10"));
+        PromotionBean created = promotions.createPromotion(promotionRequest("IP" + token.substring(0, 20), DiscountType.PERCENT, "10"));
         ownedPromotionIds.add(created.getPromotionId());
         assertTrue(promotions.listPromotions().stream().anyMatch(p -> p.getPromotionId().equals(created.getPromotionId())));
         assertThrows(ConflictException.class, () -> promotions.createPromotion(promotionRequest(created.getCode(), DiscountType.PERCENT, "20")));
 
-        PromotionDto updated = promotions.updatePromotion(created.getPromotionId(), promotionRequest(created.getCode(), DiscountType.FIXED_AMOUNT, "20000"));
+        PromotionBean updated = promotions.updatePromotion(created.getPromotionId(), promotionRequest(created.getCode(), DiscountType.FIXED_AMOUNT, "20000"));
         assertEquals(DiscountType.FIXED_AMOUNT, updated.getDiscountType());
         assertEquals(0, new BigDecimal("20000").compareTo(updated.getDiscountValue()));
         assertEquals(PromotionStatus.INACTIVE, promotions.updatePromotionStatus(created.getPromotionId(), PromotionStatus.INACTIVE).getStatus());
-        PromotionDto listed = promotions.listPromotions().stream().filter(p -> p.getPromotionId().equals(created.getPromotionId())).findFirst().orElseThrow();
+        PromotionBean listed = promotions.listPromotions().stream().filter(p -> p.getPromotionId().equals(created.getPromotionId())).findFirst().orElseThrow();
         assertEquals(PromotionStatus.INACTIVE, listed.getStatus());
     }
 
@@ -202,8 +200,8 @@ class AdminManagementIntegrationTest {
         }
     }
 
-    private AdminPromotionRequest promotionRequest(String code, DiscountType type, String value) {
-        return new AdminPromotionRequest(code, fixtureName, type, new BigDecimal(value), new BigDecimal("50000"),
+    private AdminPromotionForm promotionRequest(String code, DiscountType type, String value) {
+        return new AdminPromotionForm(code, fixtureName, type, new BigDecimal(value), new BigDecimal("50000"),
                 new BigDecimal("30000"), LocalDateTime.now().minusDays(1), LocalDateTime.now().plusDays(1), PromotionStatus.ACTIVE);
     }
 

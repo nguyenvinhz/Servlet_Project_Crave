@@ -1,69 +1,37 @@
 <%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
-<c:set var="pageTitle" value="Thanh toán" />
-<c:set var="pageStyle" value="order" />
-<c:set var="pageBodyClass" value="order-page" />
+<%@ taglib prefix="fmt" uri="jakarta.tags.fmt" %>
+<c:set var="pageTitle" value="Thanh toán"/><c:set var="pageStyle" value="order"/><c:set var="pageBodyClass" value="order-page"/>
 <%@ include file="/WEB-INF/views/components/header.jspf" %>
 <link rel="stylesheet" href="<c:url value='/assets/vendor/leaflet/leaflet.css'/>">
 <main class="page-container checkout-page" id="main-content">
-    <header class="customer-page-heading">
-        <p class="eyebrow">Hoàn tất đặt món</p>
-        <h1>Thanh toán</h1>
-        <p>Kiểm tra thông tin nhận món và tổng tiền trước khi đặt hàng.</p>
-    </header>
-    <div class="checkout-grid">
-        <section class="card checkout-form-card" aria-labelledby="delivery-title">
-            <h2 id="delivery-title">Thông tin nhận món</h2>
-            <div id="checkoutAlert" class="alert" role="alert" aria-live="polite"></div>
-            <p><a href="<c:url value='/cart'/>">← Quay lại giỏ hàng</a></p>
-            <button type="button" id="retryCheckoutBtn" class="button outline" hidden>Thử tải lại</button>
-            <form id="checkoutForm">
-                <div class="form-group"><label for="fulfillmentType">Hình thức nhận món</label><select name="fulfillmentType" id="fulfillmentType"><option value="DELIVERY">Giao hàng tận nơi</option><option value="PICKUP">Lấy tại quán</option></select></div>
-                <div class="form-group"><label for="receiverName">Người nhận</label><input type="text" name="receiverName" id="receiverName" autocomplete="name" maxlength="100" value="<c:out value='${sessionScope.currentUser.fullName}'/>" placeholder="Họ và tên người nhận" required></div>
-                <div class="form-group"><label for="receiverPhone">Số điện thoại</label><input type="tel" name="receiverPhone" id="receiverPhone" autocomplete="tel" inputmode="tel" maxlength="15" value="<c:out value='${sessionScope.currentUser.phone}'/>" placeholder="0901234567" required></div>
-                <div class="form-group" id="addressGroup">
-                    <div class="address-label-row">
-                        <label for="deliveryAddress">Địa chỉ nhận hàng</label>
-                        <a href="<c:url value='/customer/addresses'/>" target="_blank" class="address-manage-link" title="Mở sổ địa chỉ để thêm hoặc chỉnh sửa">Quản lý sổ địa chỉ ↗</a>
-                    </div>
-                    <div id="savedAddressWrap" class="saved-address-wrap" style="display: none; margin-bottom: 0.65rem;">
-                        <label for="savedAddressSelect" class="sub-label">Chọn từ sổ địa chỉ đã lưu</label>
-                        <select id="savedAddressSelect" class="saved-address-select" aria-label="Chọn từ sổ địa chỉ đã lưu">
-                            <!-- Nạp động từ /api/addresses -->
-                        </select>
-                    </div>
-                    <input type="text" name="deliveryAddress" id="deliveryAddress" autocomplete="street-address" maxlength="255" placeholder="Địa chỉ hoặc tọa độ: 10.852791, 106.772558" required>
-                    <p class="field-hint" id="addressHint">Hệ thống tự động điền địa chỉ mặc định. Bạn có thể chọn địa chỉ khác hoặc sửa trực tiếp.</p>
-                    <div class="delivery-location">
-                        <p id="storeAddress" class="field-hint">Đang tải vị trí cửa hàng...</p>
-                        <p class="field-hint">Nhập tên đường, địa điểm hoặc tọa độ theo thứ tự vĩ độ, kinh độ. Bạn cũng có thể chạm bản đồ khi chưa nhập địa chỉ; ô địa chỉ sẽ cập nhật theo ghim. Kéo ghim đến đúng nơi nhận rồi xác nhận.</p>
-                        <div id="deliverySearchResults" class="delivery-search-results" aria-label="Kết quả tìm địa chỉ" aria-live="polite"></div>
-                        <p id="matchedDeliveryAddress" class="field-hint" aria-live="polite"></p>
-                        <div id="deliveryMap" class="delivery-map" aria-label="Bản đồ chọn điểm nhận hàng"></div>
-                        <div class="delivery-map-actions">
-                            <button type="button" id="findDeliveryAddressBtn" class="button outline" disabled>Tìm theo địa chỉ</button>
-                            <button type="button" id="useMyLocationBtn" class="button outline" hidden>Dùng vị trí hiện tại</button>
-                            <button type="button" id="confirmDeliveryLocationBtn" class="button" hidden>Xác nhận điểm nhận</button>
-                        </div>
-                        <p id="deliveryLocationStatus" class="field-hint" role="status" aria-live="polite">Chọn điểm nhận hàng để tính phí giao hàng.</p>
-                        <button type="button" id="retryDeliveryQuoteBtn" class="button outline" hidden>Thử tính phí lại</button>
-                    </div>
-                </div>
-                <div class="form-group"><label for="paymentMethod">Phương thức thanh toán</label><select name="paymentMethod" id="paymentMethod"><option value="CASH">Tiền mặt</option><option value="BANK_TRANSFER">Chuyển khoản ngân hàng</option><option value="E_WALLET">Ví điện tử</option></select></div>
-                <div class="form-group"><label for="customerNote">Ghi chú <span class="optional-label">(không bắt buộc)</span></label><textarea name="customerNote" id="customerNote" rows="3" maxlength="500" placeholder="Ví dụ: gọi trước khi giao"></textarea></div>
-                <button type="submit" id="placeOrderBtn" class="btn-primary" disabled>Đặt hàng</button>
-            </form>
-        </section>
-        <aside class="order-summary" aria-labelledby="summary-title">
-            <h2 id="summary-title">Tóm tắt đơn hàng</h2>
-            <div class="summary-row"><span>Tạm tính</span><strong id="summarySubtotal">Đang tải...</strong></div>
-            <div class="summary-row"><span>Phí giao hàng</span><strong id="summaryFee">Đang tải...</strong></div>
-            <div class="summary-row discount-row" id="summaryDiscountRow" hidden><span>Giảm giá</span><strong id="summaryDiscount">0 đ</strong></div>
-            <div class="summary-row total"><span>Tổng cộng</span><strong id="summaryTotal">Đang tải...</strong></div>
-            <p class="summary-hint">Miễn phí giao hàng cho đơn có tiền món trên 150.000đ trước giảm giá, áp dụng tại khu vực được hỗ trợ. Lấy tại quán miễn phí.</p>
-        </aside>
-    </div>
-</main>
-<script src="<c:url value='/assets/vendor/leaflet/leaflet.js'/>"></script>
-<script src="<c:url value='/assets/js/checkout.js?v=20261015-order7'/>"></script>
+<header class="customer-page-heading"><p class="eyebrow">Hoàn tất đặt món</p><h1>Thanh toán</h1><p>Kiểm tra thông tin nhận món và tổng tiền trước khi đặt hàng.</p></header>
+<c:if test="${not empty flashError}"><p class="form-error" role="alert"><c:out value="${flashError}"/></p></c:if>
+<div class="checkout-grid"><section class="card checkout-form-card"><h2>Thông tin nhận món</h2><p><a href="<c:url value='/cart'/>">← Quay lại giỏ hàng</a></p>
+<form id="checkoutForm" method="post" action="<c:url value='/checkout'/>">
+<div class="form-group"><label for="fulfillmentType">Hình thức nhận món</label><select name="fulfillmentType" id="fulfillmentType"><option value="DELIVERY">Giao hàng tận nơi</option><option value="PICKUP" ${param.fulfillmentType == 'PICKUP' ? 'selected' : ''}>Lấy tại quán</option></select></div>
+<div class="form-group"><label for="receiverName">Người nhận</label><input name="receiverName" id="receiverName" maxlength="100" autocomplete="name" value="<c:out value='${empty param.receiverName ? sessionScope.currentUser.fullName : param.receiverName}'/>" required></div>
+<div class="form-group"><label for="receiverPhone">Số điện thoại</label><input name="receiverPhone" id="receiverPhone" type="tel" maxlength="15" autocomplete="tel" value="<c:out value='${empty param.receiverPhone ? sessionScope.currentUser.phone : param.receiverPhone}'/>" required></div>
+<div id="addressGroup"><div class="form-group"><label for="savedAddressSelect">Sổ địa chỉ</label><select id="savedAddressSelect"><option value="">Chọn địa chỉ đã lưu</option><c:forEach var="address" items="${addresses}"><option value="<c:out value='${address.addressLine()}'/>"><c:out value="${address.addressLine()}"/>${address.isDefault() ? ' (Mặc định)' : ''}</option></c:forEach></select><a href="<c:url value='/customer/addresses'/>">Quản lý sổ địa chỉ</a></div>
+<div class="form-group"><label for="deliveryAddress">Địa chỉ nhận hàng</label><input name="deliveryAddress" id="deliveryAddress" maxlength="255" value="<c:out value='${empty resolvedAddress ? param.deliveryAddress : resolvedAddress}'/>" placeholder="Nhập địa chỉ hoặc vĩ độ, kinh độ"></div>
+<p class="field-hint">Cửa hàng: <c:out value="${storeAddress}"/>. Chọn kết quả tìm kiếm hoặc ghim trên bản đồ rồi tính phí.</p>
+<button class="button outline" name="action" value="search" formnovalidate>Tìm địa chỉ</button>
+<div id="deliverySearchResults"><c:forEach var="location" items="${locations}"><button type="button" class="button outline location-result" data-latitude="${location.latitude()}" data-longitude="${location.longitude()}" data-address="<c:out value='${location.label()}'/>"><c:out value="${location.label()}"/>${location.approximate() ? ' — kiểm tra lại số nhà trên bản đồ' : ''}</button></c:forEach></div>
+<div id="deliveryMap" class="delivery-map" data-store-latitude="${storeLatitude}" data-store-longitude="${storeLongitude}" aria-label="Chọn vị trí nhận hàng"></div>
+<div class="form-group"><label for="deliveryLatitude">Vĩ độ</label><input name="deliveryLatitude" id="deliveryLatitude" type="number" step="any" min="-90" max="90" value="<c:out value='${param.deliveryLatitude}'/>"><label for="deliveryLongitude">Kinh độ</label><input name="deliveryLongitude" id="deliveryLongitude" type="number" step="any" min="-180" max="180" value="<c:out value='${param.deliveryLongitude}'/>"></div>
+<button class="button outline" type="button" id="useMyLocationBtn">Dùng vị trí hiện tại</button><button class="button outline" name="action" value="reverse" formnovalidate>Lấy địa chỉ tại ghim</button>
+<p class="field-hint" id="deliveryLocationStatus"><c:out value="${deliveryMessage}"/></p></div>
+<div class="form-group"><label for="paymentMethod">Phương thức thanh toán</label><select name="paymentMethod" id="paymentMethod"><option value="CASH">Tiền mặt</option><option value="BANK_TRANSFER" ${param.paymentMethod == 'BANK_TRANSFER' ? 'selected' : ''}>Chuyển khoản ngân hàng</option><option value="E_WALLET" ${param.paymentMethod == 'E_WALLET' ? 'selected' : ''}>Ví điện tử</option></select></div>
+<div class="form-group"><label for="customerNote">Ghi chú</label><textarea name="customerNote" id="customerNote" maxlength="500" rows="3"><c:out value="${param.customerNote}"/></textarea></div>
+<button name="action" value="quote" class="button outline" formnovalidate>Tính lại tổng tiền</button>
+<button name="action" value="placeOrder" id="placeOrderBtn" class="btn-primary" ${empty cart.items ? 'disabled' : ''}>Đặt hàng</button>
+</form></section><aside class="order-summary"><h2>Tóm tắt đơn hàng</h2>
+<c:forEach var="item" items="${cart.items}"><div class="summary-row"><span><c:out value="${item.foodName}"/> × ${item.quantity}</span><strong><fmt:formatNumber value="${item.lineTotal}"/> đ</strong></div></c:forEach>
+<div class="summary-row"><span>Tạm tính</span><strong><fmt:formatNumber value="${subtotal}"/> đ</strong></div>
+<div class="summary-row"><span>Giảm giá</span><strong><fmt:formatNumber value="${discount}"/> đ</strong></div>
+<div class="summary-row"><span>Phí giao hàng</span><strong><c:choose><c:when test="${deliveryReady}"><fmt:formatNumber value="${fee}"/> đ</c:when><c:otherwise>Chọn vị trí để tính phí</c:otherwise></c:choose></strong></div>
+<div class="summary-row total"><span>Tổng cộng${deliveryReady ? '' : ' (chưa gồm phí giao hàng)'}</span><strong><fmt:formatNumber value="${total}"/> đ</strong></div>
+<p class="summary-hint">Lấy tại quán miễn phí. Giao hàng trong phạm vi hỗ trợ; miễn phí giao hàng khi tiền món trên 150.000đ trước giảm giá. Tổng tiền được kiểm tra lại khi đặt hàng.</p>
+</aside></div></main>
+<script src="<c:url value='/assets/vendor/leaflet/leaflet.js'/>"></script><script src="<c:url value='/assets/js/checkout.js'/>"></script>
 <%@ include file="/WEB-INF/views/components/footer.jspf" %>

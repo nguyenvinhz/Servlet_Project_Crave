@@ -1,23 +1,23 @@
 package com.foodordering.service;
 
-import com.foodordering.dto.AddressResponse;
-import com.foodordering.dto.AddressWriteRequest;
-import com.foodordering.dto.LoginRequest;
-import com.foodordering.dto.ProfileResponse;
-import com.foodordering.dto.ProfileUpdateRequest;
-import com.foodordering.dto.RegisterRequest;
-import com.foodordering.entity.Address;
-import com.foodordering.entity.Customer;
-import com.foodordering.entity.Employee;
-import com.foodordering.entity.User;
+import com.foodordering.bean.AddressBean;
+import com.foodordering.bean.AddressWriteForm;
+import com.foodordering.bean.LoginForm;
+import com.foodordering.bean.ProfileBean;
+import com.foodordering.bean.ProfileUpdateForm;
+import com.foodordering.bean.RegisterForm;
+import com.foodordering.model.Address;
+import com.foodordering.model.Customer;
+import com.foodordering.model.Employee;
+import com.foodordering.model.User;
 import com.foodordering.enums.AccountType;
 import com.foodordering.enums.CustomerStatus;
 import com.foodordering.enums.EmployeeStatus;
 import com.foodordering.exception.AccountException;
-import com.foodordering.repository.AccountRepository;
-import com.foodordering.repository.AccountRepository.Session;
-import com.foodordering.repository.JpaAccountRepository;
-import com.foodordering.utils.PasswordHasher;
+import com.foodordering.dao.AccountDAO;
+import com.foodordering.dao.AccountDAO.Session;
+import com.foodordering.dao.JpaAccountDAO;
+import com.foodordering.util.PasswordHasher;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -29,28 +29,28 @@ import java.util.function.Predicate;
 
 public class AccountService {
 
-    private final AccountRepository repository;
+    private final AccountDAO repository;
     private final PasswordHasher passwordHasher;
 
     public AccountService() {
-        this(new JpaAccountRepository(), new PasswordHasher());
+        this(new JpaAccountDAO(), new PasswordHasher());
     }
 
-    public AccountService(AccountRepository repository) {
+    public AccountService(AccountDAO repository) {
         this(repository, new PasswordHasher());
     }
 
-    public AccountService(AccountRepository repository, PasswordHasher passwordHasher) {
+    public AccountService(AccountDAO repository, PasswordHasher passwordHasher) {
         this.repository = repository;
         this.passwordHasher = passwordHasher;
     }
 
-    public ProfileResponse register(RegisterRequest request) {
+    public ProfileBean register(RegisterForm request) {
         Registration registration = prepareRegistration(request);
         return repository.write(session -> register(session, registration));
     }
 
-    Registration prepareRegistration(RegisterRequest request) {
+    Registration prepareRegistration(RegisterForm request) {
         requireRequest(request);
         Map<String, String> errors = new LinkedHashMap<>();
         Contact contact = validateContact(request.fullName(), request.email(), request.phone(), errors);
@@ -64,7 +64,7 @@ public class AccountService {
                 passwordHasher.hash(request.password()));
     }
 
-    ProfileResponse register(Session session, Registration registration) {
+    ProfileBean register(Session session, Registration registration) {
         Contact contact = new Contact(registration.fullName(), registration.email(), registration.phone());
         rejectConflicts(session, contact, null);
         Customer customer = new Customer(newId("KH", session::userIdExists), contact.fullName(),
@@ -74,7 +74,7 @@ public class AccountService {
         return profile(customer);
     }
 
-    public ProfileResponse login(LoginRequest request) {
+    public ProfileBean login(LoginForm request) {
         requireRequest(request);
         Map<String, String> errors = new LinkedHashMap<>();
         String email = normalizeEmail(request.email());
@@ -93,7 +93,7 @@ public class AccountService {
     }
 
     /** Revalidates account status for every authenticated request, including employee sessions. */
-    public ProfileResponse getProfile(String userId) {
+    public ProfileBean getProfile(String userId) {
         requireSessionId(userId);
         return repository.read(session -> {
             User user = session.findUser(userId).orElseThrow(AccountService::unauthorized);
@@ -102,7 +102,7 @@ public class AccountService {
         });
     }
 
-    public ProfileResponse updateProfile(String customerId, ProfileUpdateRequest request) {
+    public ProfileBean updateProfile(String customerId, ProfileUpdateForm request) {
         requireRequest(request);
         Map<String, String> errors = new LinkedHashMap<>();
         Contact contact = validateContact(request.fullName(), request.email(), request.phone(), errors);
@@ -118,22 +118,22 @@ public class AccountService {
         });
     }
 
-    public List<AddressResponse> listAddresses(String customerId) {
+    public List<AddressBean> listAddresses(String customerId) {
         return repository.read(session -> {
             requireCustomer(session, customerId, false);
             return session.findAddresses(customerId).stream().map(AccountService::address).toList();
         });
     }
 
-    public AddressResponse getAddress(String customerId, String addressId) {
+    public AddressBean getAddress(String customerId, String addressId) {
         return repository.read(session -> {
             requireCustomer(session, customerId, false);
             return address(requireAddress(session, customerId, addressId));
         });
     }
 
-    public AddressResponse createAddress(String customerId, AddressWriteRequest request) {
-        AddressWriteRequest validated = validateAddress(request);
+    public AddressBean createAddress(String customerId, AddressWriteForm request) {
+        AddressWriteForm validated = validateAddress(request);
         return repository.write(session -> {
             Customer customer = requireCustomer(session, customerId, true);
             List<Address> addresses = new ArrayList<>(session.findAddresses(customerId));
@@ -152,8 +152,8 @@ public class AccountService {
         });
     }
 
-    public AddressResponse updateAddress(String customerId, String addressId, AddressWriteRequest request) {
-        AddressWriteRequest validated = validateAddress(request);
+    public AddressBean updateAddress(String customerId, String addressId, AddressWriteForm request) {
+        AddressWriteForm validated = validateAddress(request);
         return repository.write(session -> {
             requireCustomer(session, customerId, true);
             Address updated = requireAddress(session, customerId, addressId);
@@ -270,7 +270,7 @@ public class AccountService {
         }
     }
 
-    private static AddressWriteRequest validateAddress(AddressWriteRequest request) {
+    private static AddressWriteForm validateAddress(AddressWriteForm request) {
         requireRequest(request);
         Map<String, String> errors = new LinkedHashMap<>();
         String addressLine = trim(request.addressLine());
@@ -285,7 +285,7 @@ public class AccountService {
             errors.put("isDefault", "Vui lòng chọn trạng thái địa chỉ mặc định.");
         }
         rejectInvalid(errors);
-        return new AddressWriteRequest(addressLine, note, request.isDefault());
+        return new AddressWriteForm(addressLine, note, request.isDefault());
     }
 
     private static void rejectConflicts(Session session, Contact contact, String excludedId) {
@@ -346,14 +346,14 @@ public class AccountService {
         throw new IllegalStateException("Unable to generate a unique account resource id.");
     }
 
-    private static ProfileResponse profile(User user) {
-        return new ProfileResponse(user.getId(), user instanceof Employee ? AccountType.EMPLOYEE : AccountType.CUSTOMER,
+    private static ProfileBean profile(User user) {
+        return new ProfileBean(user.getId(), user instanceof Employee ? AccountType.EMPLOYEE : AccountType.CUSTOMER,
                 user.getFullName(), user.getEmail(), user.getPhone(),
                 user instanceof Employee employee ? employee.getRole() : null, user.getPasswordVersion());
     }
 
-    private static AddressResponse address(Address address) {
-        return new AddressResponse(address.getId(), address.getAddressLine(), address.getNote(),
+    private static AddressBean address(Address address) {
+        return new AddressBean(address.getId(), address.getAddressLine(), address.getNote(),
                 address.isDefaultAddress(), address.getCreatedAt(), address.getUpdatedAt());
     }
 

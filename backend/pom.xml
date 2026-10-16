@@ -121,8 +121,16 @@
                 <artifactId>maven-war-plugin</artifactId>
                 <version>3.4.0</version>
                 <configuration>
-                    <warSourceDirectory>${project.basedir}/../frontend</warSourceDirectory>
-                    <failOnMissingWebXml>false</failOnMissingWebXml>
+                    <warSourceDirectory>${project.basedir}/src/main/webapp</warSourceDirectory>
+                    <webResources>
+                        <resource>
+                            <directory>${project.basedir}/../frontend</directory>
+                            <excludes>
+                                <exclude>WEB-INF/web.xml</exclude>
+                            </excludes>
+                        </resource>
+                    </webResources>
+                    <failOnMissingWebXml>true</failOnMissingWebXml>
                 </configuration>
             </plugin>
         </plugins>

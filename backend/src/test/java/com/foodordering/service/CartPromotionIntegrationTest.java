@@ -1,20 +1,20 @@
 package com.foodordering.service;
 
 import com.foodordering.config.DatabaseConfig;
-import com.foodordering.dto.AddToCartRequest;
-import com.foodordering.dto.CartDto;
-import com.foodordering.dto.ProfileResponse;
-import com.foodordering.dto.RegisterRequest;
-import com.foodordering.dto.UpdateCartItemRequest;
-import com.foodordering.dto.ValidatePromotionRequest;
-import com.foodordering.entity.Category;
-import com.foodordering.entity.Food;
-import com.foodordering.entity.FoodOption;
-import com.foodordering.entity.Promotion;
+import com.foodordering.bean.AddToCartForm;
+import com.foodordering.bean.CartBean;
+import com.foodordering.bean.ProfileBean;
+import com.foodordering.bean.RegisterForm;
+import com.foodordering.bean.UpdateCartItemForm;
+import com.foodordering.bean.ValidatePromotionForm;
+import com.foodordering.model.Category;
+import com.foodordering.model.Food;
+import com.foodordering.model.FoodOption;
+import com.foodordering.model.Promotion;
 import com.foodordering.enums.DiscountType;
 import com.foodordering.enums.OptionType;
 import com.foodordering.exception.ResourceNotFoundException;
-import com.foodordering.repository.JpaAccountRepository;
+import com.foodordering.dao.JpaAccountDAO;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import org.junit.jupiter.api.AfterAll;
@@ -46,8 +46,8 @@ class CartPromotionIntegrationTest {
     private final String promotionCode = "IT" + token.substring(0, 24);
     private final CartService carts = new CartService();
     private final PromotionService promotions = new PromotionService();
-    private ProfileResponse owner;
-    private ProfileResponse other;
+    private ProfileBean owner;
+    private ProfileBean other;
 
     @BeforeAll
     static void connect() {
@@ -62,7 +62,7 @@ class CartPromotionIntegrationTest {
 
     @BeforeEach
     void createFixtures() {
-        AccountService accounts = new AccountService(new JpaAccountRepository(emf));
+        AccountService accounts = new AccountService(new JpaAccountDAO(emf));
         owner = register(accounts);
         other = register(accounts);
         try (EntityManager em = emf.createEntityManager()) {
@@ -119,7 +119,7 @@ class CartPromotionIntegrationTest {
 
     @Test
     void optionTotalsVoucherAndMutationsPreserveCustomerOwnership() {
-        CartDto cart = carts.addItem(owner.id(), add(1));
+        CartBean cart = carts.addItem(owner.id(), add(1));
         assertMoney("50000", cart.getSubtotal());
         assertMoney("40000", cart.getItems().get(0).getBasePrice());
         assertMoney("10000", cart.getItems().get(0).getOptionTotal());
@@ -138,12 +138,12 @@ class CartPromotionIntegrationTest {
         String itemId = cart.getItems().get(0).getCartItemId();
         assertTrue(carts.getOrCreateCart(other.id()).getItems().isEmpty());
         assertThrows(ResourceNotFoundException.class,
-                () -> carts.updateItem(other.id(), new UpdateCartItemRequest(itemId, 1, "foreign write")));
+                () -> carts.updateItem(other.id(), new UpdateCartItemForm(itemId, 1, "foreign write")));
         assertThrows(ResourceNotFoundException.class, () -> carts.removeItem(other.id(), itemId));
         carts.clearCart(other.id());
         assertMoney("150000", carts.getVerifiedSubtotal(owner.id()));
 
-        cart = carts.updateItem(owner.id(), new UpdateCartItemRequest(itemId, 4, "owned update"));
+        cart = carts.updateItem(owner.id(), new UpdateCartItemForm(itemId, 4, "owned update"));
         assertMoney("200000", cart.getSubtotal());
         assertEquals("owned update", cart.getItems().get(0).getNote());
         assertTrue(carts.removeItem(owner.id(), itemId).getItems().isEmpty());
@@ -155,20 +155,20 @@ class CartPromotionIntegrationTest {
 
     @Test
     void voucherRevalidationUsesPersistedCartAfterQuantityChanges() {
-        CartDto cart = carts.addItem(owner.id(), add(3));
+        CartBean cart = carts.addItem(owner.id(), add(3));
         assertTrue(validate("0").isValid());
         String itemId = cart.getItems().get(0).getCartItemId();
-        carts.updateItem(owner.id(), new UpdateCartItemRequest(itemId, 1, null));
+        carts.updateItem(owner.id(), new UpdateCartItemForm(itemId, 1, null));
         assertMoney("50000", carts.getVerifiedSubtotal(owner.id()));
         assertFalse(validate("150000").isValid(), "Stale client subtotal must not preserve the voucher");
-        assertTrue(carts.updateItem(owner.id(), new UpdateCartItemRequest(itemId, 0, null)).getItems().isEmpty());
+        assertTrue(carts.updateItem(owner.id(), new UpdateCartItemForm(itemId, 0, null)).getItems().isEmpty());
         assertFalse(validate("150000").isValid());
     }
 
-    private ProfileResponse register(AccountService accounts) {
+    private ProfileBean register(AccountService accounts) {
         String email = "cart-it-" + UUID.randomUUID().toString().replace("-", "") + "@example.com";
         String phone = "09" + String.format("%08d", ThreadLocalRandom.current().nextInt(100_000_000));
-        ProfileResponse profile = accounts.register(new RegisterRequest(
+        ProfileBean profile = accounts.register(new RegisterForm(
                 "Cart Integration", email, phone, "Integration#123", "Integration#123"));
         accountEmails.put(profile.id(), email);
         return profile;
@@ -176,9 +176,9 @@ class CartPromotionIntegrationTest {
 
     @Test
     void editOptionsRecalculatesTotalsAndPersistsAcrossReloads() {
-        CartDto cart = carts.addItem(owner.id(), new AddToCartRequest(foodId, 2, "old note", List.of()));
+        CartBean cart = carts.addItem(owner.id(), new AddToCartForm(foodId, 2, "old note", List.of()));
         String itemId = cart.getItems().get(0).getCartItemId();
-        UpdateCartItemRequest update = new UpdateCartItemRequest(itemId, 3, " updated note ");
+        UpdateCartItemForm update = new UpdateCartItemForm(itemId, 3, " updated note ");
         update.setOptionIds(List.of(optionId));
         cart = carts.updateItem(owner.id(), update);
         assertEquals(itemId, cart.getItems().get(0).getCartItemId());
@@ -189,7 +189,7 @@ class CartPromotionIntegrationTest {
 
         // Re-saving the same option must not violate the unique item/option constraint.
         carts.updateItem(owner.id(), update);
-        cart = carts.updateItem(owner.id(), new UpdateCartItemRequest(itemId, 2, null));
+        cart = carts.updateItem(owner.id(), new UpdateCartItemForm(itemId, 2, null));
         assertMoney("100000", cart.getSubtotal());
         assertEquals(1, cart.getItems().get(0).getOptions().size());
 
@@ -206,9 +206,9 @@ class CartPromotionIntegrationTest {
 
     @Test
     void invalidOptionEditsDoNotPartiallyChangeCart() {
-        CartDto cart = carts.addItem(owner.id(), add(2));
+        CartBean cart = carts.addItem(owner.id(), add(2));
         String itemId = cart.getItems().get(0).getCartItemId();
-        UpdateCartItemRequest update = new UpdateCartItemRequest(itemId, 3, "must not persist");
+        UpdateCartItemForm update = new UpdateCartItemForm(itemId, 3, "must not persist");
         update.setOptionIds(List.of("missing"));
         assertThrows(com.foodordering.exception.BadRequestException.class, () -> carts.updateItem(owner.id(), update));
         cart = carts.getOrCreateCart(owner.id());
@@ -231,12 +231,12 @@ class CartPromotionIntegrationTest {
         assertEquals(2, carts.getOrCreateCart(owner.id()).getItems().get(0).getQuantity());
     }
 
-    private AddToCartRequest add(int quantity) {
-        return new AddToCartRequest(foodId, quantity, "integration note", List.of(optionId));
+    private AddToCartForm add(int quantity) {
+        return new AddToCartForm(foodId, quantity, "integration note", List.of(optionId));
     }
 
-    private com.foodordering.dto.PromotionValidationResultDto validate(String clientSubtotal) {
-        return promotions.validatePromotion(new ValidatePromotionRequest(promotionCode, money(clientSubtotal)), owner.id());
+    private com.foodordering.bean.PromotionValidationResultBean validate(String clientSubtotal) {
+        return promotions.validatePromotion(new ValidatePromotionForm(promotionCode, money(clientSubtotal)), owner.id());
     }
 
     private static BigDecimal money(String value) {

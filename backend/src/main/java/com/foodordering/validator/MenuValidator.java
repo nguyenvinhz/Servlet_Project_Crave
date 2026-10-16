@@ -1,8 +1,8 @@
 package com.foodordering.validator;
 
-import com.foodordering.dto.CategoryRequest;
-import com.foodordering.dto.FoodOptionRequest;
-import com.foodordering.dto.FoodRequest;
+import com.foodordering.bean.CategoryForm;
+import com.foodordering.bean.FoodOptionForm;
+import com.foodordering.bean.FoodForm;
 import com.foodordering.exception.ValidationException;
 
 import java.math.BigDecimal;
@@ -14,7 +14,7 @@ public final class MenuValidator {
     private MenuValidator() {
     }
 
-    public static void validateCategory(CategoryRequest request) {
+    public static void validateCategory(CategoryForm request) {
         if (request == null) {
             throw new ValidationException("Dữ liệu danh mục không được để trống.");
         }
@@ -37,7 +37,7 @@ public final class MenuValidator {
         }
     }
 
-    public static void validateFood(FoodRequest request) {
+    public static void validateFood(FoodForm request) {
         if (request == null) {
             throw new ValidationException("Dữ liệu món ăn không được để trống.");
         }
@@ -74,7 +74,7 @@ public final class MenuValidator {
         }
     }
 
-    public static void validateFoodOption(FoodOptionRequest request) {
+    public static void validateFoodOption(FoodOptionForm request) {
         if (request == null) {
             throw new ValidationException("Dữ liệu tùy chọn không được để trống.");
         }

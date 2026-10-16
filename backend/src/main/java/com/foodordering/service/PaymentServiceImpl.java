@@ -1,14 +1,14 @@
 package com.foodordering.service;
 
 import com.foodordering.config.DatabaseConfig;
-import com.foodordering.entity.Payment;
+import com.foodordering.model.Payment;
 import com.foodordering.enums.PaymentStatus;
 import com.foodordering.enums.OrderStatus;
-import com.foodordering.exception.ApiException;
+import com.foodordering.exception.BusinessException;
 import com.foodordering.exception.AppException;
 import com.foodordering.exception.ResourceNotFoundException;
 import com.foodordering.exception.BadRequestException;
-import com.foodordering.repository.PaymentRepository;
+import com.foodordering.dao.PaymentDAO;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import jakarta.persistence.EntityTransaction;
@@ -19,15 +19,15 @@ import java.util.UUID;
 
 public class PaymentServiceImpl implements PaymentService {
 
-    private final PaymentRepository paymentRepository;
+    private final PaymentDAO paymentDAO;
     private final EntityManagerFactory emf;
 
-    public PaymentServiceImpl(PaymentRepository paymentRepository) {
-        this(paymentRepository, null);
+    public PaymentServiceImpl(PaymentDAO paymentDAO) {
+        this(paymentDAO, null);
     }
 
-    public PaymentServiceImpl(PaymentRepository paymentRepository, EntityManagerFactory emf) {
-        this.paymentRepository = paymentRepository;
+    public PaymentServiceImpl(PaymentDAO paymentDAO, EntityManagerFactory emf) {
+        this.paymentDAO = paymentDAO;
         this.emf = emf;
     }
 
@@ -86,7 +86,7 @@ public class PaymentServiceImpl implements PaymentService {
             }
             em.merge(payment);
             tx.commit();
-        } catch (ApiException e) {
+        } catch (BusinessException e) {
             if (tx.isActive()) tx.rollback();
             throw e;
         } catch (AppException e) {

@@ -1,73 +1,17 @@
 <%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
-<c:set var="adminPage" value="employees" />
-<c:set var="pageTitle" value="Quản lý nhân viên" />
+<c:set var="adminPage" value="employees"/><c:set var="pageTitle" value="Quản lý nhân viên"/>
 <%@ include file="/WEB-INF/views/admin/components/begin.jspf" %>
-<link rel="stylesheet" href="<c:url value='/assets/css/admin-management.css?v=20261013-palette2' />">
-<main class="admin-content">
-    <header class="management-heading"><div><p class="management-eyebrow">Nhân sự</p><h1>Quản lý nhân viên</h1>
-        <p>Quản lý chức vụ, thông tin liên hệ và trạng thái làm việc của đội ngũ.</p></div>
-        <div class="management-actions"><button type="button" class="button outline" id="managementRefresh">Tải lại</button>
-            <button type="button" class="button primary" id="employeeCreate">＋ Thêm nhân viên</button></div></header>
-    <div id="managementFeedback" class="management-feedback" role="status" aria-live="polite" hidden></div>
-    <section class="admin-card management-summary" aria-label="Thống kê nhân viên">
-        <div><span>Tổng nhân viên</span><strong id="managementTotal">—</strong></div>
-        <div><span>Đang làm việc</span><strong id="managementActive">—</strong></div>
-        <div><span>Đã nghỉ việc</span><strong id="managementInactive">—</strong></div>
-    </section>
-    <div class="admin-toolbar management-toolbar">
-        <label class="management-search"><span class="sr-only">Tìm nhân viên</span><input id="managementSearch" type="search"
-            placeholder="Tìm theo tên, mã nhân viên hoặc email…" autocomplete="off"></label>
-        <label><span class="sr-only">Lọc chức vụ</span><select id="managementRole"><option value="">Mọi chức vụ</option>
-            <option value="ADMIN">Quản trị viên</option><option value="MENU_MANAGER">Quản lý thực đơn</option>
-            <option value="ORDER_STAFF">Xử lý đơn hàng</option><option value="PROMOTION_MANAGER">Quản lý khuyến mãi</option>
-            <option value="HR_MANAGER">Quản lý nhân sự</option></select></label>
-        <label><span class="sr-only">Lọc trạng thái</span><select id="managementStatus"><option value="">Mọi trạng thái</option>
-            <option value="WORKING">Đang làm việc</option><option value="ON_LEAVE">Đã nghỉ việc</option></select></label>
-        <span id="managementCount" class="management-count" aria-live="polite"></span>
-    </div>
-    <section class="admin-card management-table-wrap"><table class="admin-table"><thead><tr>
-        <th>Nhân viên</th><th>Chức vụ</th><th>Số điện thoại</th><th>Email</th><th>Ngày vào làm</th><th>Trạng thái</th><th>Thao tác</th>
-        </tr></thead><tbody id="managementRows"><tr><td colspan="7" class="management-empty">Đang tải nhân viên…</td></tr></tbody></table></section>
-    <dialog id="employeeCreateDialog" class="modal-dialog admin-management-dialog" aria-labelledby="employeeCreateTitle">
-        <form id="employeeCreateForm"><div class="modal-header"><h2 id="employeeCreateTitle">Thêm nhân viên</h2>
-            <button type="button" class="management-close" data-close-dialog aria-label="Đóng">×</button></div>
-            <div class="modal-body management-form"><div class="form-group"><label for="employeeFullName">Họ và tên</label>
-                <input id="employeeFullName" name="fullName" required maxlength="100" autocomplete="name"></div>
-                <div class="form-row"><div class="form-group"><label for="employeeEmail">Email</label>
-                    <input id="employeeEmail" name="email" type="email" required maxlength="100" autocomplete="email"></div>
-                    <div class="form-group"><label for="employeePhone">Số điện thoại</label>
-                        <input id="employeePhone" name="phone" type="tel" required minlength="9" maxlength="15" autocomplete="tel"></div></div>
-                <div class="form-group"><label for="employeePassword">Mật khẩu ban đầu</label>
-                    <input id="employeePassword" name="password" type="password" required minlength="8" maxlength="72" autocomplete="new-password">
-                    <small>Gồm 8–72 ký tự. Cung cấp mật khẩu cho nhân viên để đăng nhập.</small></div>
-                <div class="form-row"><div class="form-group"><label for="employeeRole">Chức vụ</label><select id="employeeRole" name="role" required>
-                    <option value="ORDER_STAFF">Xử lý đơn hàng</option><option value="MENU_MANAGER">Quản lý thực đơn</option>
-                    <option value="PROMOTION_MANAGER">Quản lý khuyến mãi</option><option value="HR_MANAGER">Quản lý nhân sự</option>
-                    <option value="ADMIN" data-admin-only>Quản trị viên</option></select></div>
-                    <div class="form-group"><label for="employeeHireDate">Ngày vào làm</label><input id="employeeHireDate" name="hireDate" type="date" required></div></div>
-                <div class="form-group"><label for="employeeAddress">Địa chỉ</label><input id="employeeAddress" name="address" maxlength="255" autocomplete="street-address"></div>
-                <p id="employeeCreateError" class="management-form-error" role="alert" hidden></p></div>
-            <div class="modal-footer"><button type="button" class="button outline" data-close-dialog>Hủy</button>
-                <button type="submit" class="button primary">Tạo nhân viên</button></div></form>
-    </dialog>
-    <dialog id="employeeRoleDialog" class="modal-dialog admin-management-dialog" aria-labelledby="employeeRoleTitle">
-        <form id="employeeRoleForm"><div class="modal-header"><h2 id="employeeRoleTitle">Đổi chức vụ</h2>
-            <button type="button" class="management-close" data-close-dialog aria-label="Đóng">×</button></div>
-            <div class="modal-body management-form"><p id="employeeRoleName"></p><div class="form-group"><label for="employeeNewRole">Chức vụ mới</label>
-                <select id="employeeNewRole" name="role" required><option value="ORDER_STAFF">Xử lý đơn hàng</option>
-                    <option value="MENU_MANAGER">Quản lý thực đơn</option><option value="PROMOTION_MANAGER">Quản lý khuyến mãi</option>
-                    <option value="HR_MANAGER">Quản lý nhân sự</option><option value="ADMIN" data-admin-only>Quản trị viên</option></select></div>
-                <p id="employeeRoleError" class="management-form-error" role="alert" hidden></p></div>
-            <div class="modal-footer"><button type="button" class="button outline" data-close-dialog>Hủy</button><button type="submit" class="button primary">Lưu chức vụ</button></div></form>
-    </dialog>
-    <dialog id="managementConfirm" class="modal-dialog admin-management-dialog" aria-labelledby="managementConfirmTitle">
-        <form id="managementConfirmForm"><div class="modal-header"><h2 id="managementConfirmTitle">Cập nhật nhân viên</h2>
-            <button type="button" class="management-close" data-close-dialog aria-label="Đóng">×</button></div>
-            <div class="modal-body"><p id="managementConfirmMessage"></p></div>
-            <div class="modal-footer"><button type="button" class="button outline" data-close-dialog>Hủy</button>
-                <button type="submit" class="button primary" id="managementConfirmSubmit">Xác nhận</button></div></form>
-    </dialog>
-</main>
-<script src="<c:url value='/assets/js/admin-management.js' />" defer></script>
+
+<main class="admin-content"><header class="management-heading"><div><p class="management-eyebrow">Nhân sự</p><h1>Quản lý nhân viên</h1><p>Quản lý chức vụ, liên hệ và trạng thái làm việc.</p></div><a class="button primary" href="#employee-create">＋ Thêm nhân viên</a></header>
+<%@ include file="/WEB-INF/views/admin/components/feedback.jspf" %>
+<section class="admin-card management-summary"><div><span>Tổng nhân viên</span><strong>${totalCount}</strong></div><div><span>Đang làm việc</span><strong>${activeCount}</strong></div><div><span>Đã nghỉ việc</span><strong>${inactiveCount}</strong></div></section>
+<form method="get" action="<c:url value='/admin/employees'/>" class="admin-toolbar management-toolbar"><input type="search" name="keyword" aria-label="Tìm nhân viên" value="<c:out value='${param.keyword}'/>" placeholder="Tên, mã, email hoặc số điện thoại"><select name="role" aria-label="Chức vụ"><option value="">Mọi chức vụ</option><c:forEach var="role" items="${roles}"><option value="${role}" ${param.role == role ? 'selected' : ''}><c:out value="${adminLabels[role.toString()]}"/></option></c:forEach></select><select name="status" aria-label="Trạng thái"><option value="">Mọi trạng thái</option><option value="WORKING" ${param.status == 'WORKING' ? 'selected' : ''}>Đang làm việc</option><option value="ON_LEAVE" ${param.status == 'ON_LEAVE' ? 'selected' : ''}>Đã nghỉ việc</option></select><button class="button primary">Lọc</button></form>
+<section class="admin-card management-table-wrap"><table class="admin-table"><thead><tr><th>Nhân viên</th><th>Chức vụ</th><th>Liên hệ</th><th>Địa chỉ</th><th>Ngày vào làm</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>
+<c:forEach var="employee" items="${employees}"><tr><td><strong><c:out value="${employee.fullName()}"/></strong><small class="text-muted"><c:out value="${employee.id()}"/></small></td><td><c:out value="${adminLabels[employee.role().toString()]}"/>
+<c:if test="${employee.id() != sessionScope.userId and (employee.role() != 'ADMIN' or sessionScope.role == 'ADMIN')}"><form method="post" action="<c:url value='/admin/employees'/>"><input type="hidden" name="action" value="role"><input type="hidden" name="id" value="<c:out value='${employee.id()}'/>"><select name="role" aria-label="Đổi chức vụ"><c:forEach var="role" items="${roles}"><option value="${role}" ${employee.role() == role ? 'selected' : ''}><c:out value="${adminLabels[role.toString()]}"/></option></c:forEach></select><button class="button outline">Lưu chức vụ</button></form></c:if></td>
+<td><c:out value="${employee.email()}"/><br><c:out value="${employee.phone()}"/></td><td><c:out value="${employee.address()}"/></td><td><c:out value="${employee.hireDate()}"/></td><td><c:out value="${adminLabels[employee.status().toString()]}"/></td><td><c:if test="${employee.id() != sessionScope.userId and (employee.role() != 'ADMIN' or sessionScope.role == 'ADMIN')}"><form method="post" action="<c:url value='/admin/employees'/>" data-confirm="Cập nhật trạng thái nhân viên này?"><input type="hidden" name="action" value="status"><input type="hidden" name="id" value="<c:out value='${employee.id()}'/>"><input type="hidden" name="status" value="${employee.status() == 'WORKING' ? 'ON_LEAVE' : 'WORKING'}"><button class="button outline">${employee.status() == 'WORKING' ? 'Cho nghỉ việc' : 'Làm việc trở lại'}</button></form></c:if></td></tr></c:forEach><c:if test="${empty employees}"><tr><td colspan="7" class="management-empty">Không tìm thấy nhân viên.</td></tr></c:if></tbody></table></section>
+<section class="admin-card" id="employee-create"><div class="card-header"><h2>Thêm nhân viên</h2></div><form method="post" action="<c:url value='/admin/employees'/>" class="card-body management-form"><input type="hidden" name="action" value="create">
+<div class="form-group"><label for="employee-name">Họ và tên</label><input id="employee-name" name="fullName" required maxlength="100" autocomplete="name"></div><div class="form-row"><div class="form-group"><label for="employee-email">Email</label><input id="employee-email" name="email" type="email" required maxlength="100"></div><div class="form-group"><label for="employee-phone">Điện thoại</label><input id="employee-phone" name="phone" type="tel" required minlength="9" maxlength="15"></div></div>
+<div class="form-group"><label for="employee-password">Mật khẩu ban đầu</label><input id="employee-password" name="password" type="password" required minlength="8" maxlength="72" autocomplete="new-password"></div><div class="form-row"><div class="form-group"><label for="employee-role">Chức vụ</label><select id="employee-role" name="role" required><c:forEach var="role" items="${roles}"><option value="${role}"><c:out value="${adminLabels[role.toString()]}"/></option></c:forEach></select></div><div class="form-group"><label for="employee-hire">Ngày vào làm</label><input id="employee-hire" name="hireDate" type="date" required value="${today}"></div></div><div class="form-group"><label for="employee-address">Địa chỉ</label><input id="employee-address" name="address" maxlength="255"></div><button class="button primary">Tạo nhân viên</button></form></section></main>
 <%@ include file="/WEB-INF/views/admin/components/end.jspf" %>

@@ -1,22 +1,22 @@
 package com.foodordering.service;
 
 import com.foodordering.config.DatabaseConfig;
-import com.foodordering.dto.OrderRequest;
-import com.foodordering.dto.OrderResponse;
-import com.foodordering.dto.OrderSummaryResponse;
-import com.foodordering.entity.*;
+import com.foodordering.bean.OrderForm;
+import com.foodordering.bean.OrderBean;
+import com.foodordering.bean.OrderSummaryBean;
+import com.foodordering.model.*;
 import com.foodordering.enums.ErrorCode;
 import com.foodordering.enums.FulfillmentType;
 import com.foodordering.enums.OrderStatus;
 import com.foodordering.enums.OptionType;
 import com.foodordering.enums.PaymentStatus;
-import com.foodordering.exception.ApiException;
+import com.foodordering.exception.BusinessException;
 import com.foodordering.exception.AppException;
 import com.foodordering.exception.BadRequestException;
 import com.foodordering.exception.ForbiddenException;
 import com.foodordering.exception.ResourceNotFoundException;
-import com.foodordering.repository.CustomerOrderRepository;
-import com.foodordering.repository.PaymentRepository;
+import com.foodordering.dao.OrderDAO;
+import com.foodordering.dao.PaymentDAO;
 import com.foodordering.validator.PromotionValidator;
 import com.foodordering.validator.OrderValidator;
 import com.foodordering.validator.OptionSelectionValidator;
@@ -34,23 +34,23 @@ import java.util.stream.Collectors;
 
 public class CustomerOrderServiceImpl implements CustomerOrderService {
 
-    private final CustomerOrderRepository orderRepository;
-    private final PaymentRepository paymentRepository;
+    private final OrderDAO orderDAO;
+    private final PaymentDAO paymentDAO;
     private final EntityManagerFactory emf;
     private final DeliveryFeeService deliveryFees;
 
-    public CustomerOrderServiceImpl(CustomerOrderRepository orderRepository, PaymentRepository paymentRepository) {
-        this(orderRepository, paymentRepository, null);
+    public CustomerOrderServiceImpl(OrderDAO orderDAO, PaymentDAO paymentDAO) {
+        this(orderDAO, paymentDAO, null);
     }
 
-    public CustomerOrderServiceImpl(CustomerOrderRepository orderRepository, PaymentRepository paymentRepository, EntityManagerFactory emf) {
-        this(orderRepository, paymentRepository, emf, new DeliveryFeeService());
+    public CustomerOrderServiceImpl(OrderDAO orderDAO, PaymentDAO paymentDAO, EntityManagerFactory emf) {
+        this(orderDAO, paymentDAO, emf, new DeliveryFeeService());
     }
 
-    public CustomerOrderServiceImpl(CustomerOrderRepository orderRepository, PaymentRepository paymentRepository,
+    public CustomerOrderServiceImpl(OrderDAO orderDAO, PaymentDAO paymentDAO,
                                     EntityManagerFactory emf, DeliveryFeeService deliveryFees) {
-        this.orderRepository = orderRepository;
-        this.paymentRepository = paymentRepository;
+        this.orderDAO = orderDAO;
+        this.paymentDAO = paymentDAO;
         this.emf = emf;
         this.deliveryFees = deliveryFees;
     }
@@ -64,7 +64,7 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
     }
 
     @Override
-    public OrderResponse createOrder(String customerId, OrderRequest request) {
+    public OrderBean createOrder(String customerId, OrderForm request) {
         OrderValidator.validate(request);
         DeliveryFeeService.Quote deliveryQuote = request.getFulfillmentType() == FulfillmentType.DELIVERY
                 ? deliveryFees.requireDeliverable(request.getDeliveryLatitude(), request.getDeliveryLongitude()) : null;
@@ -207,7 +207,7 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
 
             tx.commit();
             return getOrderById(order.getId());
-        } catch (ApiException e) {
+        } catch (BusinessException e) {
             if (tx.isActive()) tx.rollback();
             throw e;
         } catch (Exception e) {
@@ -219,7 +219,7 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
     }
 
     @Override
-    public OrderResponse getOrderById(String orderId) {
+    public OrderBean getOrderById(String orderId) {
         EntityManager em = getEntityManager();
         try {
             CustomerOrder order = em.find(CustomerOrder.class, orderId);
@@ -235,7 +235,7 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
     }
 
     @Override
-    public List<OrderSummaryResponse> getOrdersByCustomer(String customerId) {
+    public List<OrderSummaryBean> getOrdersByCustomer(String customerId) {
         EntityManager em = getEntityManager();
         try {
             String jpql = "SELECT o FROM CustomerOrder o WHERE o.customer.id = :customerId ORDER BY o.orderedAt DESC";
@@ -254,7 +254,7 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
     }
 
     @Override
-    public List<OrderResponse> getAllOrdersForAdmin() {
+    public List<OrderBean> getAllOrdersForAdmin() {
         EntityManager em = getEntityManager();
         try {
             String jpql = "SELECT o FROM CustomerOrder o ORDER BY o.orderedAt DESC";
@@ -324,7 +324,7 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
             em.persist(history);
 
             tx.commit();
-        } catch (ApiException e) {
+        } catch (BusinessException e) {
             if (tx.isActive()) tx.rollback();
             throw e;
         } catch (AppException e) {
@@ -404,7 +404,7 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
             em.persist(history);
 
             tx.commit();
-        } catch (ApiException e) {
+        } catch (BusinessException e) {
             if (tx.isActive()) tx.rollback();
             throw e;
         } catch (AppException e) {
@@ -418,8 +418,8 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
         }
     }
 
-    private OrderSummaryResponse mapToSummaryResponse(CustomerOrder order) {
-        OrderSummaryResponse res = new OrderSummaryResponse();
+    private OrderSummaryBean mapToSummaryResponse(CustomerOrder order) {
+        OrderSummaryBean res = new OrderSummaryBean();
         res.setOrderId(order.getId());
         res.setOrderedAt(order.getOrderedAt());
         res.setFulfillmentType(order.getFulfillmentType());
@@ -431,8 +431,8 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
         return res;
     }
 
-    private OrderResponse mapToResponse(CustomerOrder order) {
-        OrderResponse res = new OrderResponse();
+    private OrderBean mapToResponse(CustomerOrder order) {
+        OrderBean res = new OrderBean();
         res.setOrderId(order.getId());
         res.setCustomerId(order.getCustomer().getId());
         res.setOrderedAt(order.getOrderedAt());
@@ -451,8 +451,8 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
         res.setStatus(order.getStatus());
 
         if (order.getOrderDetails() != null) {
-            List<OrderResponse.OrderItemResponse> items = order.getOrderDetails().stream().map(detail -> {
-                OrderResponse.OrderItemResponse itemRes = new OrderResponse.OrderItemResponse();
+            List<OrderBean.OrderItemBean> items = order.getOrderDetails().stream().map(detail -> {
+                OrderBean.OrderItemBean itemRes = new OrderBean.OrderItemBean();
                 itemRes.setFoodId(detail.getFoodId());
                 itemRes.setFoodName(detail.getFoodNameSnapshot());
                 itemRes.setFoodNameSnapshot(detail.getFoodNameSnapshot());
@@ -461,7 +461,7 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
                 itemRes.setLineTotal(detail.getUnitPrice().multiply(BigDecimal.valueOf(detail.getQuantity())));
                 itemRes.setNote(detail.getNote());
                 itemRes.setOptions(detail.getOptions().stream().map(option -> {
-                    OrderResponse.OptionSnapshot snapshot = new OrderResponse.OptionSnapshot();
+                    OrderBean.OptionSnapshot snapshot = new OrderBean.OptionSnapshot();
                     snapshot.setOptionName(option.getOptionNameSnapshot());
                     snapshot.setExtraPrice(option.getExtraPriceSnapshot());
                     return snapshot;
@@ -472,7 +472,7 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
         }
 
         if (order.getPayment() != null) {
-            OrderResponse.PaymentSummary paymentRes = new OrderResponse.PaymentSummary();
+            OrderBean.PaymentSummary paymentRes = new OrderBean.PaymentSummary();
             paymentRes.setPaymentId(order.getPayment().getId());
             paymentRes.setMethod(order.getPayment().getPaymentMethod().name());
             paymentRes.setStatus(order.getPayment().getStatus().name());
@@ -481,8 +481,8 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
         }
         
         if (order.getStatusHistories() != null) {
-            List<OrderResponse.StatusHistoryEntry> history = order.getStatusHistories().stream().map(h -> {
-                OrderResponse.StatusHistoryEntry entry = new OrderResponse.StatusHistoryEntry();
+            List<OrderBean.StatusHistoryEntry> history = order.getStatusHistories().stream().map(h -> {
+                OrderBean.StatusHistoryEntry entry = new OrderBean.StatusHistoryEntry();
                 entry.setStatus(h.getStatus().name());
                 entry.setChangedAt(h.getChangedAt());
                 entry.setNote(h.getNote());

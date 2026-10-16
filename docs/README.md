@@ -5,8 +5,8 @@ Tài liệu được chia theo mục đích sử dụng. Xem [README của dự 
 | Nhóm | Nội dung | Tài liệu |
 |---|---|---|
 | `project/` | Phân công, kế hoạch, cấu hình tích hợp và CI/CD | [Phân công nhiệm vụ 3 ngày](project/phan-cong-nhiem-vu-3-ngay.md), [Quy tắc Git/GitHub](project/quy-tac-git-github.md), [CI/CD lên EC2](project/ci-cd-ec2.md), [Thanh toán payOS](project/payos.md), [Xác thực email](project/email-verification.md) |
-| `api/` | Hợp đồng API dạng OpenAPI | [Tài khoản, hồ sơ và địa chỉ](api/api-auth-profile-address.yaml), [Đơn hàng và thanh toán](api/api-order-payment.yaml) |
-| `architecture/` | Cấu trúc mã nguồn và ánh xạ sơ đồ lớp | [Sơ đồ và kiến trúc](architecture/README.md) |
+| `api/` | Hợp đồng JSON cũ, lưu làm tài liệu lịch sử | [Ghi chú chuyển đổi](api/README.md), [Tài khoản, hồ sơ và địa chỉ](api/api-auth-profile-address.yaml), [Đơn hàng và thanh toán](api/api-order-payment.yaml) |
+| `architecture/` | Cấu trúc mã nguồn và ánh xạ sơ đồ lớp | [Sơ đồ và kiến trúc](architecture/README.md), [Servlet/JSP hiện hành](architecture/servlet-jsp.md) |
 | `previews/` | Trang mẫu phát triển, không đóng gói WAR | [Preview](previews/README.md) |
 | `reports/` | Báo cáo công việc và đánh giá theo chức năng | [Mục lục báo cáo](reports/README.md) |
 

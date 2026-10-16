@@ -1,28 +1,28 @@
 package com.foodordering.service;
 
-import com.foodordering.dto.CartConsistencyItemRequest;
-import com.foodordering.dto.CartConsistencyItemResult;
-import com.foodordering.dto.CartConsistencyReport;
-import com.foodordering.dto.CategoryRequest;
-import com.foodordering.dto.CategoryResponse;
-import com.foodordering.dto.FoodDetailResponse;
-import com.foodordering.dto.FoodOptionRequest;
-import com.foodordering.dto.FoodOptionResponse;
-import com.foodordering.dto.FoodOptionValidationResult;
-import com.foodordering.dto.FoodRequest;
-import com.foodordering.dto.FoodSummaryResponse;
-import com.foodordering.entity.Category;
-import com.foodordering.entity.Food;
-import com.foodordering.entity.FoodOption;
+import com.foodordering.bean.CartConsistencyItemForm;
+import com.foodordering.bean.CartConsistencyItemResult;
+import com.foodordering.bean.CartConsistencyReport;
+import com.foodordering.bean.CategoryForm;
+import com.foodordering.bean.CategoryBean;
+import com.foodordering.bean.FoodDetailBean;
+import com.foodordering.bean.FoodOptionForm;
+import com.foodordering.bean.FoodOptionBean;
+import com.foodordering.bean.FoodOptionValidationResult;
+import com.foodordering.bean.FoodForm;
+import com.foodordering.bean.FoodSummaryBean;
+import com.foodordering.model.Category;
+import com.foodordering.model.Food;
+import com.foodordering.model.FoodOption;
 import com.foodordering.enums.FoodStatus;
 import com.foodordering.enums.OptionStatus;
 import com.foodordering.enums.OptionType;
 import com.foodordering.exception.ConflictException;
 import com.foodordering.exception.ResourceNotFoundException;
 import com.foodordering.exception.ValidationException;
-import com.foodordering.repository.CategoryRepository;
-import com.foodordering.repository.FoodOptionRepository;
-import com.foodordering.repository.FoodRepository;
+import com.foodordering.dao.CategoryDAO;
+import com.foodordering.dao.FoodOptionDAO;
+import com.foodordering.dao.FoodDAO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -70,12 +70,12 @@ class MenuServiceTest {
         foodRepo.save(f1);
         foodRepo.save(f2);
 
-        List<CategoryResponse> categories = menuService.getCategories();
+        List<CategoryBean> categories = menuService.getCategories();
 
         assertEquals(2, categories.size());
-        CategoryResponse burgerCat = categories.stream().filter(c -> c.id().equals("DM01")).findFirst().orElseThrow();
+        CategoryBean burgerCat = categories.stream().filter(c -> c.id().equals("DM01")).findFirst().orElseThrow();
         assertEquals(2, burgerCat.foodCount());
-        CategoryResponse drinkCat = categories.stream().filter(c -> c.id().equals("DM02")).findFirst().orElseThrow();
+        CategoryBean drinkCat = categories.stream().filter(c -> c.id().equals("DM02")).findFirst().orElseThrow();
         assertEquals(0, drinkCat.foodCount());
     }
 
@@ -84,7 +84,7 @@ class MenuServiceTest {
         Category category = new Category("DM01", "Pizza", "Bánh pizza các loại");
         categoryRepo.save(category);
 
-        CategoryResponse res = menuService.getCategoryById("DM01");
+        CategoryBean res = menuService.getCategoryById("DM01");
 
         assertNotNull(res);
         assertEquals("Pizza", res.name());
@@ -98,8 +98,8 @@ class MenuServiceTest {
 
     @Test
     void createCategorySucceedsWithValidData() {
-        CategoryRequest req = new CategoryRequest("Món chay", "Thanh đạm");
-        CategoryResponse res = menuService.createCategory(req);
+        CategoryForm req = new CategoryForm("Món chay", "Thanh đạm");
+        CategoryBean res = menuService.createCategory(req);
 
         assertNotNull(res);
         assertEquals("Món chay", res.name());
@@ -110,23 +110,23 @@ class MenuServiceTest {
     @Test
     void createCategoryRejectsDuplicateName() {
         categoryRepo.save(new Category("DM01", "Món chay", "Thanh đạm"));
-        CategoryRequest req = new CategoryRequest("Món chay", "Khác");
+        CategoryForm req = new CategoryForm("Món chay", "Khác");
 
         assertThrows(ConflictException.class, () -> menuService.createCategory(req));
     }
 
     @Test
     void createCategoryRejectsEmptyName() {
-        CategoryRequest req = new CategoryRequest("", "Mô tả");
+        CategoryForm req = new CategoryForm("", "Mô tả");
         assertThrows(ValidationException.class, () -> menuService.createCategory(req));
     }
 
     @Test
     void updateCategorySucceeds() {
         categoryRepo.save(new Category("DM01", "Trà", "Các loại trà"));
-        CategoryRequest req = new CategoryRequest("Trà & Cà phê", "Đồ uống thơm ngon");
+        CategoryForm req = new CategoryForm("Trà & Cà phê", "Đồ uống thơm ngon");
 
-        CategoryResponse updated = menuService.updateCategory("DM01", req);
+        CategoryBean updated = menuService.updateCategory("DM01", req);
         assertEquals("Trà & Cà phê", updated.name());
         assertEquals("Đồ uống thơm ngon", updated.description());
     }
@@ -136,7 +136,7 @@ class MenuServiceTest {
         categoryRepo.save(new Category("DM01", "Trà", "Mô tả 1"));
         categoryRepo.save(new Category("DM02", "Cà phê", "Mô tả 2"));
 
-        CategoryRequest req = new CategoryRequest("Cà phê", "Đổi tên trùng");
+        CategoryForm req = new CategoryForm("Cà phê", "Đổi tên trùng");
         assertThrows(ConflictException.class, () -> menuService.updateCategory("DM01", req));
     }
 
@@ -173,7 +173,7 @@ class MenuServiceTest {
         foodRepo.save(f1);
         foodRepo.save(f2);
 
-        List<FoodSummaryResponse> menu = menuService.getMenu("DM01", null);
+        List<FoodSummaryBean> menu = menuService.getMenu("DM01", null);
 
         assertEquals(1, menu.size());
         assertEquals("Cơm tấm sườn", menu.get(0).name());
@@ -189,7 +189,7 @@ class MenuServiceTest {
         foodRepo.save(f1);
         foodRepo.save(f2);
 
-        List<FoodSummaryResponse> allFoods = menuService.getAllFoodsForAdmin("DM01", null, null);
+        List<FoodSummaryBean> allFoods = menuService.getAllFoodsForAdmin("DM01", null, null);
         assertEquals(2, allFoods.size());
     }
 
@@ -208,11 +208,11 @@ class MenuServiceTest {
         optionRepo.save(opt1);
         optionRepo.save(opt2);
 
-        FoodDetailResponse detailActiveOnly = menuService.getFoodDetail("MA01", true);
+        FoodDetailBean detailActiveOnly = menuService.getFoodDetail("MA01", true);
         assertEquals(1, detailActiveOnly.options().size());
         assertEquals("Size L", detailActiveOnly.options().get(0).name());
 
-        FoodDetailResponse detailAll = menuService.getFoodDetail("MA01", false);
+        FoodDetailBean detailAll = menuService.getFoodDetail("MA01", false);
         assertEquals(2, detailAll.options().size());
     }
 
@@ -221,8 +221,8 @@ class MenuServiceTest {
         Category cat = new Category("DM01", "Món chính", "Món");
         categoryRepo.save(cat);
 
-        FoodRequest req = new FoodRequest("DM01", "Phở bò", BigDecimal.valueOf(50000), "http://img.com/pho.jpg", "Nước dùng ngọt thanh", FoodStatus.AVAILABLE);
-        FoodDetailResponse created = menuService.createFood(req);
+        FoodForm req = new FoodForm("DM01", "Phở bò", BigDecimal.valueOf(50000), "http://img.com/pho.jpg", "Nước dùng ngọt thanh", FoodStatus.AVAILABLE);
+        FoodDetailBean created = menuService.createFood(req);
 
         assertNotNull(created);
         assertEquals("Phở bò", created.name());
@@ -235,13 +235,13 @@ class MenuServiceTest {
         Category cat = new Category("DM01", "Món chính", "Món");
         categoryRepo.save(cat);
 
-        FoodRequest req = new FoodRequest("DM01", "Phở bò", BigDecimal.valueOf(-1000), null, null, FoodStatus.AVAILABLE);
+        FoodForm req = new FoodForm("DM01", "Phở bò", BigDecimal.valueOf(-1000), null, null, FoodStatus.AVAILABLE);
         assertThrows(ValidationException.class, () -> menuService.createFood(req));
     }
 
     @Test
     void createFoodRejectsNonExistentCategory() {
-        FoodRequest req = new FoodRequest("DM99", "Phở bò", BigDecimal.valueOf(50000), null, null, FoodStatus.AVAILABLE);
+        FoodForm req = new FoodForm("DM99", "Phở bò", BigDecimal.valueOf(50000), null, null, FoodStatus.AVAILABLE);
         assertThrows(ResourceNotFoundException.class, () -> menuService.createFood(req));
     }
 
@@ -252,8 +252,8 @@ class MenuServiceTest {
         Food food = new Food("MA01", cat, "Phở bò", BigDecimal.valueOf(50000), null, null, FoodStatus.AVAILABLE);
         foodRepo.save(food);
 
-        FoodRequest req = new FoodRequest("DM01", "Phở bò đặc biệt", BigDecimal.valueOf(65000), null, "Nhiều thịt", FoodStatus.AVAILABLE);
-        FoodDetailResponse updated = menuService.updateFood("MA01", req);
+        FoodForm req = new FoodForm("DM01", "Phở bò đặc biệt", BigDecimal.valueOf(65000), null, "Nhiều thịt", FoodStatus.AVAILABLE);
+        FoodDetailBean updated = menuService.updateFood("MA01", req);
 
         assertEquals("Phở bò đặc biệt", updated.name());
         assertEquals(BigDecimal.valueOf(65000), updated.price());
@@ -266,7 +266,7 @@ class MenuServiceTest {
         Food food = new Food("MA01", cat, "Phở bò", BigDecimal.valueOf(50000), null, null, FoodStatus.AVAILABLE);
         foodRepo.save(food);
 
-        FoodDetailResponse updated = menuService.updateFoodStatus("MA01", FoodStatus.UNAVAILABLE);
+        FoodDetailBean updated = menuService.updateFoodStatus("MA01", FoodStatus.UNAVAILABLE);
         assertEquals(FoodStatus.UNAVAILABLE, updated.status());
     }
 
@@ -292,8 +292,8 @@ class MenuServiceTest {
         Food food = new Food("MA01", cat, "Trà sữa", BigDecimal.valueOf(30000), null, null, FoodStatus.AVAILABLE);
         foodRepo.save(food);
 
-        FoodOptionRequest req = new FoodOptionRequest("MA01", OptionType.SIZE, "Size XL", BigDecimal.valueOf(10000), OptionStatus.ACTIVE);
-        FoodOptionResponse res = menuService.createFoodOption("MA01", req);
+        FoodOptionForm req = new FoodOptionForm("MA01", OptionType.SIZE, "Size XL", BigDecimal.valueOf(10000), OptionStatus.ACTIVE);
+        FoodOptionBean res = menuService.createFoodOption("MA01", req);
 
         assertNotNull(res);
         assertEquals("Size XL", res.name());
@@ -310,7 +310,7 @@ class MenuServiceTest {
         FoodOption opt = new FoodOption("TC01", food, OptionType.SIZE, "Size L", BigDecimal.valueOf(5000), OptionStatus.ACTIVE);
         optionRepo.save(opt);
 
-        FoodOptionRequest req = new FoodOptionRequest("MA01", OptionType.SIZE, "Size L", BigDecimal.valueOf(5000), OptionStatus.ACTIVE);
+        FoodOptionForm req = new FoodOptionForm("MA01", OptionType.SIZE, "Size L", BigDecimal.valueOf(5000), OptionStatus.ACTIVE);
         assertThrows(ConflictException.class, () -> menuService.createFoodOption("MA01", req));
     }
 
@@ -323,8 +323,8 @@ class MenuServiceTest {
         FoodOption opt = new FoodOption("TC01", food, OptionType.SIZE, "Size L", BigDecimal.valueOf(5000), OptionStatus.ACTIVE);
         optionRepo.save(opt);
 
-        FoodOptionRequest req = new FoodOptionRequest("MA01", OptionType.SIZE, "Size L (Cỡ Lớn)", BigDecimal.valueOf(7000), OptionStatus.ACTIVE);
-        FoodOptionResponse updated = menuService.updateFoodOption("TC01", req);
+        FoodOptionForm req = new FoodOptionForm("MA01", OptionType.SIZE, "Size L (Cỡ Lớn)", BigDecimal.valueOf(7000), OptionStatus.ACTIVE);
+        FoodOptionBean updated = menuService.updateFoodOption("TC01", req);
 
         assertEquals("Size L (Cỡ Lớn)", updated.name());
         assertEquals(BigDecimal.valueOf(7000), updated.extraPrice());
@@ -506,7 +506,7 @@ class MenuServiceTest {
         FoodOption opt = new FoodOption("TC01", food, OptionType.TOPPING, "Trân châu", BigDecimal.valueOf(5000), OptionStatus.ACTIVE);
         optionRepo.save(opt);
 
-        FoodOptionResponse res = menuService.updateFoodOptionStatus("TC01", OptionStatus.INACTIVE);
+        FoodOptionBean res = menuService.updateFoodOptionStatus("TC01", OptionStatus.INACTIVE);
         assertNotNull(res);
         assertEquals(OptionStatus.INACTIVE, res.status());
 
@@ -528,7 +528,7 @@ class MenuServiceTest {
         FoodOption opt = new FoodOption("TC01", food, OptionType.TOPPING, "Trứng chần", BigDecimal.valueOf(5000), OptionStatus.ACTIVE);
         optionRepo.save(opt);
 
-        CartConsistencyItemRequest req = new CartConsistencyItemRequest("MA01", BigDecimal.valueOf(55000), List.of("TC01"));
+        CartConsistencyItemForm req = new CartConsistencyItemForm("MA01", BigDecimal.valueOf(55000), List.of("TC01"));
         CartConsistencyReport report = menuService.checkMenuCartConsistency(List.of(req));
 
         assertTrue(report.allConsistent());
@@ -547,7 +547,7 @@ class MenuServiceTest {
         Food food = new Food("MA01", cat, "Bún chả", BigDecimal.valueOf(45000), null, null, FoodStatus.UNAVAILABLE);
         foodRepo.save(food);
 
-        CartConsistencyItemRequest req = new CartConsistencyItemRequest("MA01", BigDecimal.valueOf(45000), List.of());
+        CartConsistencyItemForm req = new CartConsistencyItemForm("MA01", BigDecimal.valueOf(45000), List.of());
         CartConsistencyReport report = menuService.checkMenuCartConsistency(List.of(req));
 
         assertFalse(report.allConsistent());
@@ -561,7 +561,7 @@ class MenuServiceTest {
 
     @Test
     void checkMenuCartConsistencyDetectsDeletedOrUnknownFood() {
-        CartConsistencyItemRequest req = new CartConsistencyItemRequest("MA_DELETED", BigDecimal.valueOf(40000), List.of());
+        CartConsistencyItemForm req = new CartConsistencyItemForm("MA_DELETED", BigDecimal.valueOf(40000), List.of());
         CartConsistencyReport report = menuService.checkMenuCartConsistency(List.of(req));
 
         assertFalse(report.allConsistent());
@@ -581,7 +581,7 @@ class MenuServiceTest {
         FoodOption opt = new FoodOption("TC01", food, OptionType.TOPPING, "Chả cua", BigDecimal.valueOf(10000), OptionStatus.INACTIVE);
         optionRepo.save(opt);
 
-        CartConsistencyItemRequest req = new CartConsistencyItemRequest("MA01", BigDecimal.valueOf(50000), List.of("TC01"));
+        CartConsistencyItemForm req = new CartConsistencyItemForm("MA01", BigDecimal.valueOf(50000), List.of("TC01"));
         CartConsistencyReport report = menuService.checkMenuCartConsistency(List.of(req));
 
         assertFalse(report.allConsistent());
@@ -598,7 +598,7 @@ class MenuServiceTest {
         Food food = new Food("MA01", cat, "Mì Quảng", BigDecimal.valueOf(55000), null, null, FoodStatus.AVAILABLE);
         foodRepo.save(food);
 
-        CartConsistencyItemRequest req = new CartConsistencyItemRequest("MA01", BigDecimal.valueOf(50000), List.of());
+        CartConsistencyItemForm req = new CartConsistencyItemForm("MA01", BigDecimal.valueOf(50000), List.of());
         CartConsistencyReport report = menuService.checkMenuCartConsistency(List.of(req));
 
         assertFalse(report.allConsistent());
@@ -649,7 +649,7 @@ class MenuServiceTest {
     // Fake In-Memory Repositories for testing without database
     // =========================================================
 
-    private static class FakeCategoryRepository implements CategoryRepository {
+    private static class FakeCategoryRepository implements CategoryDAO {
         private final Map<String, Category> data = new HashMap<>();
 
         @Override
@@ -705,7 +705,7 @@ class MenuServiceTest {
         }
     }
 
-    private static class FakeFoodRepository implements FoodRepository {
+    private static class FakeFoodRepository implements FoodDAO {
         private final Map<String, Food> data = new HashMap<>();
 
         @Override
@@ -789,7 +789,7 @@ class MenuServiceTest {
         }
     }
 
-    private static class FakeFoodOptionRepository implements FoodOptionRepository {
+    private static class FakeFoodOptionRepository implements FoodOptionDAO {
         private final Map<String, FoodOption> data = new HashMap<>();
         private boolean failOnDelete = false;
 

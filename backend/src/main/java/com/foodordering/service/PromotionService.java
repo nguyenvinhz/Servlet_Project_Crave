@@ -1,15 +1,14 @@
 package com.foodordering.service;
 
-import com.foodordering.dto.PromotionDto;
-import com.foodordering.dto.PromotionValidationResultDto;
-import com.foodordering.dto.ValidatePromotionRequest;
-import com.foodordering.entity.CustomerOrder;
-import com.foodordering.entity.Promotion;
+import com.foodordering.bean.PromotionBean;
+import com.foodordering.bean.PromotionValidationResultBean;
+import com.foodordering.bean.ValidatePromotionForm;
+import com.foodordering.model.CustomerOrder;
+import com.foodordering.model.Promotion;
 import com.foodordering.enums.DiscountType;
 import com.foodordering.enums.ErrorCode;
 import com.foodordering.exception.PromotionValidationException;
-import com.foodordering.mapper.PromotionMapper;
-import com.foodordering.repository.PromotionRepository;
+import com.foodordering.dao.PromotionDAO;
 import com.foodordering.validator.PromotionValidator;
 
 import java.math.BigDecimal;
@@ -19,34 +18,26 @@ import java.util.List;
 
 public class PromotionService {
 
-    private final PromotionRepository promotionRepository;
+    private final PromotionDAO promotionDAO;
     private final CartService cartService;
-    private final PromotionMapper promotionMapper;
 
     public PromotionService() {
-        this.promotionRepository = new PromotionRepository();
+        this.promotionDAO = new PromotionDAO();
         this.cartService = new CartService();
-        this.promotionMapper = new PromotionMapper();
     }
 
-    public PromotionService(PromotionRepository promotionRepository, CartService cartService) {
-        this.promotionRepository = promotionRepository;
+    public PromotionService(PromotionDAO promotionDAO, CartService cartService) {
+        this.promotionDAO = promotionDAO;
         this.cartService = cartService;
-        this.promotionMapper = new PromotionMapper();
     }
 
-    public PromotionService(PromotionRepository promotionRepository, CartService cartService, PromotionMapper promotionMapper) {
-        this.promotionRepository = promotionRepository;
-        this.cartService = cartService;
-        this.promotionMapper = promotionMapper != null ? promotionMapper : new PromotionMapper();
-    }
 
     /**
-     * Nhận trực tiếp DTO ValidatePromotionRequest từ Servlet/Controller để xử lý xác thực voucher.
+     * Nhận trực tiếp bean ValidatePromotionForm từ Servlet/Controller để xử lý xác thực voucher.
      */
-    public PromotionValidationResultDto validatePromotion(ValidatePromotionRequest request, String customerId) {
+    public PromotionValidationResultBean validatePromotion(ValidatePromotionForm request, String customerId) {
         if (request == null) {
-            return new PromotionValidationResultDto(false, "Dữ liệu yêu cầu không được để trống", ErrorCode.BAD_REQUEST.getCode());
+            return new PromotionValidationResultBean(false, "Dữ liệu yêu cầu không được để trống", ErrorCode.BAD_REQUEST.getCode());
         }
         BigDecimal verifiedSubtotal = customerId != null && !customerId.isBlank()
                 ? cartService.getVerifiedSubtotal(customerId)
@@ -57,9 +48,9 @@ public class PromotionService {
     /**
      * Xác thực voucher cho một đơn hàng cụ thể của khách hàng bằng cách lấy orderTime từ CustomerOrder.
      */
-    public PromotionValidationResultDto validatePromotionForOrder(String code, CustomerOrder order) {
+    public PromotionValidationResultBean validatePromotionForOrder(String code, CustomerOrder order) {
         if (order == null) {
-            return new PromotionValidationResultDto(false, "Đơn hàng không được để trống", ErrorCode.BAD_REQUEST.getCode());
+            return new PromotionValidationResultBean(false, "Đơn hàng không được để trống", ErrorCode.BAD_REQUEST.getCode());
         }
         BigDecimal subtotal = order.getSubtotal();
         LocalDateTime orderTime = order.getOrderTime(); // Lấy orderTime của khách hàng từ CustomerOrder
@@ -72,7 +63,7 @@ public class PromotionService {
      * - Kiểm tra hạn sử dụng theo orderTime, trạng thái kích hoạt, giá trị đơn tối thiểu.
      * - Tính toán chính xác theo loại % (có trần maximum_discount) hoặc số tiền cố định.
      */
-    public PromotionValidationResultDto validatePromotion(String code, String customerId, BigDecimal requestedSubtotal, LocalDateTime orderTime) {
+    public PromotionValidationResultBean validatePromotion(String code, String customerId, BigDecimal requestedSubtotal, LocalDateTime orderTime) {
         BigDecimal subtotal = requestedSubtotal;
         if (subtotal == null || subtotal.compareTo(BigDecimal.ZERO) <= 0) {
             subtotal = customerId != null && !customerId.isBlank()
@@ -82,17 +73,17 @@ public class PromotionService {
         return validatePromotionAtSubtotal(code, subtotal, orderTime);
     }
 
-    private PromotionValidationResultDto validatePromotionAtSubtotal(String code, BigDecimal subtotal, LocalDateTime orderTime) {
+    private PromotionValidationResultBean validatePromotionAtSubtotal(String code, BigDecimal subtotal, LocalDateTime orderTime) {
         try {
             PromotionValidator.validatePromotionCode(code);
         } catch (Exception e) {
-            return new PromotionValidationResultDto(false, e.getMessage(), ErrorCode.BAD_REQUEST.getCode());
+            return new PromotionValidationResultBean(false, e.getMessage(), ErrorCode.BAD_REQUEST.getCode());
         }
 
-        // 1. Tìm thông tin mã khuyến mãi trong DB (Repository trả về Entity)
-        Promotion promotion = promotionRepository.findByCode(code.trim().toUpperCase());
+        // 1. Tìm thông tin mã khuyến mãi trong DB (DAO trả về Entity)
+        Promotion promotion = promotionDAO.findByCode(code.trim().toUpperCase());
         if (promotion == null) {
-            return new PromotionValidationResultDto(false, "Mã khuyến mãi không tồn tại", ErrorCode.PROMOTION_NOT_FOUND.getCode());
+            return new PromotionValidationResultBean(false, "Mã khuyến mãi không tồn tại", ErrorCode.PROMOTION_NOT_FOUND.getCode());
         }
 
         subtotal = subtotal != null ? subtotal : BigDecimal.ZERO;
@@ -102,16 +93,16 @@ public class PromotionService {
         try {
             PromotionValidator.validateApplicable(promotion, subtotal, effectiveOrderTime);
         } catch (PromotionValidationException e) {
-            return new PromotionValidationResultDto(false, e.getMessage(), e.getErrorCode().getCode());
+            return new PromotionValidationResultBean(false, e.getMessage(), e.getErrorCode().getCode());
         }
 
         // 4. Tính toán số tiền được giảm
         BigDecimal discountAmount = calculateDiscount(promotion, subtotal, effectiveOrderTime);
         BigDecimal finalSubtotal = subtotal.subtract(discountAmount).max(BigDecimal.ZERO);
 
-        // Chuyển đổi Entity sang DTO qua mapper thủ công
-        PromotionDto dto = promotionMapper.toDto(promotion);
-        return new PromotionValidationResultDto(true, "Áp dụng mã khuyến mãi thành công", dto, subtotal, discountAmount, finalSubtotal);
+        // Tạo bean hiển thị khuyến mãi
+        PromotionBean dto = new PromotionBean(promotion);
+        return new PromotionValidationResultBean(true, "Áp dụng mã khuyến mãi thành công", dto, subtotal, discountAmount, finalSubtotal);
     }
 
     /**
@@ -123,7 +114,7 @@ public class PromotionService {
         }
 
         // Thử tính qua procedure của MySQL trước để đảm bảo tính đồng nhất 100% với DB trigger
-        BigDecimal procDiscount = promotionRepository.calculateDiscountViaDatabase(promotion.getPromotionId(), subtotal, orderTime);
+        BigDecimal procDiscount = promotionDAO.calculateDiscountViaDatabase(promotion.getPromotionId(), subtotal, orderTime);
         if (procDiscount != null) {
             return procDiscount;
         }
@@ -149,23 +140,23 @@ public class PromotionService {
     /**
      * Lấy danh sách toàn bộ các mã khuyến mãi đang có hiệu lực để hiển thị cho khách hàng chọn.
      */
-    public List<PromotionDto> getActivePromotions() {
-        List<Promotion> promotions = promotionRepository.findAllActive(LocalDateTime.now());
-        return promotionMapper.toDtoList(promotions);
+    public List<PromotionBean> getActivePromotions() {
+        List<Promotion> promotions = promotionDAO.findAllActive(LocalDateTime.now());
+        return promotions.stream().map(PromotionBean::new).toList();
     }
 
     /**
      * Lấy thông tin chi tiết của một mã khuyến mãi theo mã code.
      */
-    public PromotionDto getPromotionByCode(String code) {
-        Promotion p = promotionRepository.findByCode(code);
-        return p != null ? promotionMapper.toDto(p) : null;
+    public PromotionBean getPromotionByCode(String code) {
+        Promotion p = promotionDAO.findByCode(code);
+        return p != null ? new PromotionBean(p) : null;
     }
 
     /**
-     * Phương thức tiện ích chuyển đổi Entity sang DTO (delegate cho PromotionMapper).
+     * Tạo bean khuyến mãi cho JSP.
      */
-    public PromotionDto mapToDto(Promotion p) {
-        return promotionMapper.toDto(p);
+    public PromotionBean mapToBean(Promotion p) {
+        return new PromotionBean(p);
     }
 }

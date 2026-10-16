@@ -1,10 +1,10 @@
 package com.foodordering.validator;
 
-import com.foodordering.dto.AdminPromotionRequest;
+import com.foodordering.bean.AdminPromotionForm;
 import com.foodordering.enums.DiscountType;
 import com.foodordering.enums.PromotionStatus;
 import com.foodordering.exception.ValidationException;
-import com.foodordering.utils.PasswordHasher;
+import com.foodordering.util.PasswordHasher;
 import java.math.BigDecimal;
 import java.util.LinkedHashMap;
 import java.util.Locale;
@@ -14,7 +14,7 @@ public final class AdminPromotionValidator {
     private AdminPromotionValidator() {
     }
 
-    public static AdminPromotionRequest validate(AdminPromotionRequest request) {
+    public static AdminPromotionForm validate(AdminPromotionForm request) {
         if (request == null) throw new ValidationException("Vui lòng cung cấp thông tin khuyến mãi.");
         Map<String, String> errors = new LinkedHashMap<>();
         String code = request.code() == null ? "" : request.code().strip().toUpperCase(Locale.ROOT);
@@ -48,7 +48,7 @@ public final class AdminPromotionValidator {
             errors.put("endAt", "Thời gian kết thúc phải sau thời gian bắt đầu.");
         }
         if (!errors.isEmpty()) throw new ValidationException("Thông tin khuyến mãi không hợp lệ.", errors);
-        return new AdminPromotionRequest(code, name, request.discountType(), request.discountValue(), minimum,
+        return new AdminPromotionForm(code, name, request.discountType(), request.discountValue(), minimum,
                 request.maximumDiscount(), request.startAt().withNano(0), request.endAt().withNano(0),
                 request.status() == null ? PromotionStatus.ACTIVE : request.status());
     }
