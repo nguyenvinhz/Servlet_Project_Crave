@@ -1,12 +1,10 @@
 package com.foodordering.servlet;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.foodordering.config.PayosConfig;
 import jakarta.servlet.http.HttpServlet;
 import com.foodordering.exception.AccountException;
 import com.foodordering.integration.PayosClient;
 import com.foodordering.service.PayosPaymentService;
-import com.foodordering.util.IntegrationJson;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServletRequest;
@@ -40,9 +38,8 @@ public class PayosWebhookServlet extends HttpServlet {
         try {
             byte[] body = request.getInputStream().readNBytes(65537);
             if (body.length > 65536) throw new AccountException("INVALID_REQUEST", "Dữ liệu webhook quá lớn.", 413);
-            JsonNode envelope = IntegrationJson.objectMapper().readTree(body);
             PayosClient verifier = client == null ? PayosConfig.fromEnvironment().client() : client;
-            payments.webhook(verifier.verifyWebhook(envelope));
+            payments.webhook(verifier.verifyWebhookBody(body));
             response.setStatus(200); response.setContentType("application/json"); response.getWriter().write("{\"code\":\"00\",\"desc\":\"success\"}");
         } catch (Exception failure) {
             response.sendError(ServletSupport.status(failure), ServletSupport.message(failure));

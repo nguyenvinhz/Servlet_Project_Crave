@@ -22,7 +22,9 @@ import org.junit.jupiter.api.Test;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.*;
 
 class MenuPromotionServletTest {
@@ -63,6 +65,90 @@ class MenuPromotionServletTest {
         when(request.getRequestDispatcher("/WEB-INF/views/menu/index.jsp")).thenReturn(mock(RequestDispatcher.class));
         new MenuServlet(service, carts).doGet(request, response);
         verifyNoInteractions(carts);
+    }
+
+    @Test
+    void menuKeepsOneSessionReferenceWhenConcurrentLogoutRemovesItFromRequest() throws Exception {
+        MenuService service = mock(MenuService.class);
+        CartService carts = mock(CartService.class);
+        HttpServletRequest request = mock(HttpServletRequest.class);
+        HttpServletResponse response = mock(HttpServletResponse.class);
+        HttpSession session = mock(HttpSession.class);
+        RequestDispatcher dispatcher = mock(RequestDispatcher.class);
+        when(request.getSession(false)).thenReturn(session, null);
+        when(request.getRequestDispatcher("/WEB-INF/views/menu/index.jsp")).thenReturn(dispatcher);
+
+        new MenuServlet(service, carts).doGet(request, response);
+
+        verify(request, times(1)).getSession(false);
+        verify(request, never()).getSession();
+        verify(dispatcher).forward(request, response);
+        verifyNoInteractions(carts);
+    }
+
+    @Test
+    void menuRendersWhenSessionWasInvalidatedBeforeReadingCurrentUser() throws Exception {
+        MenuService service = mock(MenuService.class);
+        CartService carts = mock(CartService.class);
+        HttpServletRequest request = mock(HttpServletRequest.class);
+        HttpServletResponse response = mock(HttpServletResponse.class);
+        HttpSession session = mock(HttpSession.class);
+        RequestDispatcher dispatcher = mock(RequestDispatcher.class);
+        when(request.getSession(false)).thenReturn(session);
+        when(session.getAttribute(SessionAuth.CURRENT_USER)).thenThrow(new IllegalStateException("Session invalidated"));
+        when(request.getRequestDispatcher("/WEB-INF/views/menu/index.jsp")).thenReturn(dispatcher);
+
+        new MenuServlet(service, carts).doGet(request, response);
+
+        verify(dispatcher).forward(request, response);
+        verifyNoInteractions(carts);
+        verify(session, never()).setAttribute(anyString(), any());
+    }
+
+    @Test
+    void logoutDuringCartCountDoesNotWriteBadgeToInvalidatedSessionOrBreakMenu() throws Exception {
+        MenuService service = mock(MenuService.class);
+        CartService carts = mock(CartService.class);
+        HttpServletRequest request = mock(HttpServletRequest.class);
+        HttpServletResponse response = mock(HttpServletResponse.class);
+        HttpSession session = mock(HttpSession.class);
+        RequestDispatcher dispatcher = mock(RequestDispatcher.class);
+        var invalidated = new AtomicBoolean();
+        var customer = new ProfileBean("customer-1", AccountType.CUSTOMER,
+                "Khách", "customer@example.com", "0900000000", null);
+        when(request.getSession(false)).thenReturn(session);
+        when(session.getAttribute(anyString())).thenAnswer(call -> {
+            if (invalidated.get()) throw new IllegalStateException("Session invalidated");
+            return SessionAuth.CURRENT_USER.equals(call.getArgument(0)) ? customer : null;
+        });
+        when(carts.countItems("customer-1")).thenAnswer(call -> {
+            invalidated.set(true);
+            return 5;
+        });
+        when(request.getRequestDispatcher("/WEB-INF/views/menu/index.jsp")).thenReturn(dispatcher);
+
+        new MenuServlet(service, carts).doGet(request, response);
+
+        verify(carts).countItems("customer-1");
+        verify(session, never()).setAttribute(anyString(), any());
+        verify(dispatcher).forward(request, response);
+    }
+
+    @Test
+    void sessionInvalidationHandlingDoesNotHideCartServiceFailures() throws Exception {
+        MenuService service = mock(MenuService.class);
+        CartService carts = mock(CartService.class);
+        HttpServletRequest request = mock(HttpServletRequest.class);
+        HttpServletResponse response = mock(HttpServletResponse.class);
+        HttpSession session = mock(HttpSession.class);
+        when(request.getSession(false)).thenReturn(session);
+        when(session.getAttribute(SessionAuth.CURRENT_USER)).thenReturn(new ProfileBean("customer-1", AccountType.CUSTOMER,
+                "Khách", "customer@example.com", "0900000000", null));
+        when(carts.countItems("customer-1")).thenThrow(new IllegalStateException("Persistence factory unavailable"));
+
+        assertThrows(IllegalStateException.class, () -> new MenuServlet(service, carts).doGet(request, response));
+
+        verify(request, never()).getRequestDispatcher(anyString());
     }
 
     @Test

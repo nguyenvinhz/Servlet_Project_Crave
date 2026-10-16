@@ -134,6 +134,18 @@ public class PayosClient {
         return data;
     }
 
+    /** Parse and verify the exact webhook body before any payment work is performed. */
+    public JsonNode verifyWebhookBody(byte[] body) {
+        if (body == null || body.length == 0 || body.length > MAX_BODY_BYTES) {
+            throw new PayosException("INVALID_WEBHOOK", 400);
+        }
+        try {
+            return verifyWebhook(mapper.readTree(body));
+        } catch (IOException invalid) {
+            throw new PayosException("INVALID_WEBHOOK", 400);
+        }
+    }
+
     /** Only data is signed. The outer success/code fields cannot establish payment success. */
     public JsonNode verifyWebhook(JsonNode envelope) {
         validateWebhookSize(envelope, 0, new int[]{MAX_BODY_BYTES});

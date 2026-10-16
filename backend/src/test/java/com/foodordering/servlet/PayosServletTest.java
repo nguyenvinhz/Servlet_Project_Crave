@@ -8,6 +8,7 @@ import com.foodordering.integration.PayosClient;
 import com.foodordering.security.SessionAuth;
 import com.foodordering.service.PayosPaymentService;
 import com.foodordering.util.IntegrationJson;
+import com.foodordering.integration.PayosException;
 import com.google.zxing.BinaryBitmap;
 import com.google.zxing.LuminanceSource;
 import com.google.zxing.common.HybridBinarizer;
@@ -119,7 +120,7 @@ class PayosServletTest {
         PayosPaymentService payments = mock(PayosPaymentService.class);
         String payload = "{\"data\":{\"orderCode\":123},\"signature\":\"signed\"}";
         var verified = IntegrationJson.objectMapper().readTree("{\"orderCode\":123,\"amount\":10000}");
-        when(client.verifyWebhook(any())).thenReturn(verified);
+        when(client.verifyWebhookBody(any(byte[].class))).thenReturn(verified);
         Exchange exchange = exchange(null, null, payload);
         new PayosWebhookServlet(client, payments).doPost(exchange.request, exchange.response);
         verify(payments).webhook(verified);
@@ -131,14 +132,28 @@ class PayosServletTest {
     void invalidSignaturesAndOversizedWebhookNeverReachPaymentService() throws Exception {
         PayosClient client = mock(PayosClient.class);
         PayosPaymentService payments = mock(PayosPaymentService.class);
-        when(client.verifyWebhook(any())).thenThrow(new AccountException("INVALID_SIGNATURE", "Chữ ký không hợp lệ.", 400));
+        when(client.verifyWebhookBody(any(byte[].class))).thenThrow(new PayosException("INVALID_SIGNATURE", 400));
         Exchange tampered = exchange(null, null, "{}");
         new PayosWebhookServlet(client, payments).doPost(tampered.request, tampered.response);
         verify(tampered.response).sendError(eq(400), anyString());
         Exchange oversized = exchange(null, null, " ".repeat(65537));
         new PayosWebhookServlet(client, payments).doPost(oversized.request, oversized.response);
         verify(oversized.response).sendError(eq(413), anyString());
-        verify(client, times(1)).verifyWebhook(any());
+        verify(client, times(1)).verifyWebhookBody(any(byte[].class));
+        verifyNoInteractions(payments);
+    }
+
+    @Test
+    void malformedWebhookBodiesReturn400BeforePaymentWork() throws Exception {
+        PayosClient verifier = new PayosClient("fixture-client", "fixture-api-key", "fixture-checksum");
+        PayosPaymentService payments = mock(PayosPaymentService.class);
+        PayosWebhookServlet servlet = new PayosWebhookServlet(verifier, payments);
+        for (String body : new String[]{"", "{", "null", "[]", "true", "{\"data\":{\"amount\":1,\"amount\":2}}", "{} {}"}) {
+            Exchange exchange = exchange(null, null, body);
+            servlet.doPost(exchange.request, exchange.response);
+            verify(exchange.response).sendError(eq(400), anyString());
+            verify(exchange.response, never()).setStatus(200);
+        }
         verifyNoInteractions(payments);
     }
 

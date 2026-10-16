@@ -213,6 +213,21 @@ class PayosClientTest {
     }
 
     @Test
+    void parsesVerifiedWebhookBytesWithStrictDuplicateAndTrailingTokenChecks() throws Exception {
+        String valid = signed(webhookData());
+        assertEquals(123, client.verifyWebhookBody(valid.getBytes(StandardCharsets.UTF_8)).path("orderCode").longValue());
+        String duplicateAmount = valid.replace("\"amount\":3000", "\"amount\":1,\"amount\":3000");
+        String duplicateEnvelope = valid.replace("\"code\":\"00\",", "\"code\":\"99\",\"code\":\"00\",");
+        for (String invalid : new String[]{duplicateAmount, duplicateEnvelope, valid + " {}", valid + " false", "{", ""}) {
+            PayosException failure = assertThrows(PayosException.class,
+                    () -> client.verifyWebhookBody(invalid.getBytes(StandardCharsets.UTF_8)));
+            assertEquals(400, failure.getStatusCode());
+            assertFalse(failure.toString().contains("fixture"));
+            assertNull(failure.getCause());
+        }
+    }
+
+    @Test
     void disallowsRedirectingTransportAndInvalidCredentials() {
         assertThrows(IllegalArgumentException.class, () -> new PayosClient("id", "key", "checksum", baseUri,
                 HttpClient.newBuilder().followRedirects(HttpClient.Redirect.ALWAYS).build()));

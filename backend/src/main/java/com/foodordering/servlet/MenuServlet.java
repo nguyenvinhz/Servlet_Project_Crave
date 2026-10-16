@@ -14,6 +14,7 @@ import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpSession;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -45,23 +46,7 @@ public class MenuServlet extends HttpServlet {
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
         try {
-            if (request.getSession(false) != null) {
-                var session = request.getSession(false);
-                if (session.getAttribute(SessionAuth.CURRENT_USER) instanceof ProfileBean user
-                        && user.accountType() == AccountType.CUSTOMER) {
-                    int count = cartService.countItems(user.id());
-                    if (session.getAttribute(SessionAuth.CURRENT_USER) == user) {
-                        session.setAttribute("cartItemCount", count);
-                    }
-                }
-                for (String key : List.of("flashError", "flashMessage")) {
-                    Object message = request.getSession(false).getAttribute(key);
-                    if (message != null) {
-                        request.setAttribute(key, message);
-                        request.getSession(false).removeAttribute(key);
-                    }
-                }
-            }
+            loadSessionData(request);
             if ("/menu/detail".equals(request.getServletPath())) {
                 String id = request.getParameter("id");
                 if (id == null || id.isBlank()) {
@@ -87,6 +72,42 @@ public class MenuServlet extends HttpServlet {
             response.sendError(exception.getStatusCode(), exception.getMessage());
         } catch (BusinessException exception) {
             response.sendError(exception.getHttpStatus(), exception.getMessage());
+        }
+    }
+
+    private void loadSessionData(HttpServletRequest request) {
+        HttpSession session = request.getSession(false);
+        if (session == null) return;
+        Object currentUser;
+        try {
+            currentUser = session.getAttribute(SessionAuth.CURRENT_USER);
+        } catch (IllegalStateException invalidated) {
+            return;
+        }
+        if (currentUser instanceof ProfileBean user && user.accountType() == AccountType.CUSTOMER) {
+            int count = cartService.countItems(user.id());
+            try {
+                synchronized (session) {
+                    if (session.getAttribute(SessionAuth.CURRENT_USER) == user) {
+                        session.setAttribute("cartItemCount", count);
+                    }
+                }
+            } catch (IllegalStateException invalidated) {
+                return;
+            }
+        }
+        try {
+            synchronized (session) {
+                for (String key : List.of("flashError", "flashMessage")) {
+                    Object message = session.getAttribute(key);
+                    if (message != null) {
+                        session.removeAttribute(key);
+                        request.setAttribute(key, message);
+                    }
+                }
+            }
+        } catch (IllegalStateException invalidated) {
+            // A concurrent logout must not prevent this public page from rendering.
         }
     }
 

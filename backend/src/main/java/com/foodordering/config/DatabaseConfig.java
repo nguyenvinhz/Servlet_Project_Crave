@@ -4,6 +4,8 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import jakarta.persistence.Persistence;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -93,17 +95,27 @@ public final class DatabaseConfig {
     }
 
     private static void loadDotEnv() {
-        for (String candidate : new String[]{".env", "../.env", "../../.env"}) {
-            java.nio.file.Path path = java.nio.file.Path.of(candidate);
-            if (java.nio.file.Files.exists(path)) {
+        loadDotEnv(Path.of(".env"), Path.of("../.env"), Path.of("../../.env"));
+    }
+
+    static void loadDotEnv(Path... candidates) {
+        for (Path path : candidates) {
+            if (Files.isRegularFile(path)) {
                 try {
-                    for (String line : java.nio.file.Files.readAllLines(path)) {
+                    for (String line : Files.readAllLines(path)) {
+                        if (line.startsWith("\uFEFF")) line = line.substring(1);
                         line = line.trim();
                         if (line.isEmpty() || line.startsWith("#")) continue;
                         int idx = line.indexOf('=');
                         if (idx > 0) {
                             String key = line.substring(0, idx).trim();
                             String val = line.substring(idx + 1).trim();
+                            // These properties are also read by SMTP/payOS configuration after JPA starts.
+                            // Keep .env quotes out of hostnames, URLs, passwords and checksum keys.
+                            if (val.length() >= 2 && ((val.startsWith("\"") && val.endsWith("\""))
+                                    || (val.startsWith("'") && val.endsWith("'")))) {
+                                val = val.substring(1, val.length() - 1);
+                            }
                             if (System.getProperty(key) == null) {
                                 System.setProperty(key, val);
                             }
