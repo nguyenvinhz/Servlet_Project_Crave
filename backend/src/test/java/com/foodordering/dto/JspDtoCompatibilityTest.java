@@ -3,7 +3,6 @@ package com.foodordering.dto;
 import com.foodordering.enums.FoodStatus;
 import com.foodordering.enums.OptionStatus;
 import com.foodordering.enums.OptionType;
-import com.foodordering.utils.JsonProvider;
 import org.junit.jupiter.api.Test;
 
 import java.beans.Introspector;
@@ -31,10 +30,6 @@ class JspDtoCompatibilityTest {
         assertEquals(option.optionType(), property(option, "optionType"));
         assertEquals(option.extraPrice(), property(option, "extraPrice"));
 
-        var json = JsonProvider.objectMapper().readTree(JsonProvider.objectMapper().writeValueAsString(food));
-        assertEquals("MA01", json.get("id").asText());
-        assertEquals("TC01", json.get("options").get(0).get("id").asText());
-        assertEquals(9, json.size(), "JavaBean accessors must preserve the existing JSON field names");
     }
 
     private Object property(Object bean, String name) throws Exception {

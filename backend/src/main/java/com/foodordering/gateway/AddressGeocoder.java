@@ -1,15 +1,13 @@
 package com.foodordering.gateway;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.foodordering.enums.ErrorCode;
 import com.foodordering.exception.BadRequestException;
-import com.foodordering.utils.JsonProvider;
 import com.foodordering.utils.CoordinateParser;
+import java.io.IOException;
 import java.net.URI;
 import java.net.URLEncoder;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.text.Normalizer;
 import java.time.Duration;
@@ -23,22 +21,30 @@ import java.util.Comparator;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/** Address lookup for checkout. Bounded cache and timeout; never invent a point for a failed search. */
-public class AddressGeocoder {
+/** Photon GeoJSON lookup; the customer confirms the final delivery point. */
+public class AddressGeocoder implements AutoCloseable {
     public record Location(double latitude, double longitude, String label, boolean approximate) {}
     private record Cached(List<Location> locations, long expiresAt) {}
     private static final Pattern HOUSE = Pattern.compile("^(\\d+[\\p{L}\\d/.-]*)\\s+(.+)$");
+    private static final Pattern DATE_STREET = Pattern.compile("(?iu)^(?:[1-9]|[12]\\d|3[01])\\s+th[aá]ng\\s+(?:[1-9]|1[0-2])\\b.*");
     private final URI endpoint;
-    private final HttpClient client;
+    private final MapHttpClient client = new MapHttpClient();
+    private final ObjectMapper json = new ObjectMapper();
     private final Map<String, Cached> cache = new LinkedHashMap<>();
+    private long lastRequestAt;
 
     public AddressGeocoder() {
-        this(URI.create(System.getenv().getOrDefault("CRAVE_GEOCODER_URL", "https://photon.komoot.io/api/")));
+        this(URI.create(setting()));
     }
 
     public AddressGeocoder(URI endpoint) {
         this.endpoint = endpoint;
-        this.client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(3)).build();
+    }
+
+    private static String setting() {
+        String value = System.getenv("CRAVE_GEOCODER_URL");
+        if (value == null || value.isBlank()) value = System.getProperty("CRAVE_GEOCODER_URL");
+        return value == null || value.isBlank() ? "https://photon.komoot.io/api/" : value;
     }
 
     public Location resolve(String address) {
@@ -48,7 +54,8 @@ public class AddressGeocoder {
                 "Địa chỉ khớp nhiều vị trí khác nhau. Vui lòng chọn và xác nhận điểm nhận trên bản đồ.");
         // Legacy resolve never presents a street fallback as the requested house.
         Matcher house = HOUSE.matcher(normalizeInput(address).split(",")[0]);
-        if (house.matches() && !locations.get(0).label().regionMatches(true, 0, house.group(1) + " ", 0, house.group(1).length() + 1)) throw notFound();
+        if (house.matches() && !DATE_STREET.matcher(normalizeInput(address).split(",")[0]).matches()
+                && !locations.get(0).label().regionMatches(true, 0, house.group(1) + " ", 0, house.group(1).length() + 1)) throw notFound();
         return locations.get(0);
     }
 
@@ -61,36 +68,41 @@ public class AddressGeocoder {
             var point = coordinate.get();
             return List.of(new Location(point.latitude(), point.longitude(), point.label(), false));
         }
+        if (latitude != null || longitude != null) CoordinateParser.validate(latitude, longitude);
         String query = normalizeInput(address);
         String key = fold(query) + ":" + latitude + ":" + longitude;
         List<Location> cached = cached(key);
-        if (cached != null) return cached;
+        if (cached != null) {
+            if (cached.isEmpty()) throw notFound();
+            return cached;
+        }
         try {
-            String focus = latitude != null && longitude != null ? "&lat=" + latitude + "&lon=" + longitude : "";
-            List<Location> matches = candidates(query, get(endpoint, "q=" + encode(query) + "&limit=8&countrycode=VN" + focus, 5));
+            String focus = latitude != null ? "&lat=" + latitude + "&lon=" + longitude
+                    + "&bbox=" + (longitude - .2) + "," + (latitude - .2) + "," + (longitude + .2) + "," + (latitude + .2) : "";
+            List<Location> matches = candidates(query, get(endpoint, "q=" + encode(query) + "&limit=8&countrycode=VN" + focus), latitude, longitude);
             if (matches.isEmpty()) {
                 String firstPart = query.split(",")[0];
                 Matcher house = HOUSE.matcher(firstPart);
-                String fallback = house.matches() ? house.group(2) : firstPart;
+                String fallback = house.matches() && !DATE_STREET.matcher(firstPart).matches() ? house.group(2) : firstPart;
                 // Older district/ward names can suppress valid results at the provider.
                 for (String part : query.split(",")) {
                     if (!part.equals(firstPart) && administrativePrefix(part).isEmpty()) fallback += ", " + part.trim();
                 }
                 matches = candidates(query,
-                        get(endpoint, "q=" + encode(fallback) + "&limit=8&countrycode=VN&layer=street" + focus, 5));
+                        get(endpoint, "q=" + encode(fallback) + "&limit=8&countrycode=VN&layer=street" + focus), latitude, longitude);
             }
-            if (matches.isEmpty()) throw notFound();
             remember(key, matches);
+            if (matches.isEmpty()) throw notFound();
             return matches;
         } catch (BadRequestException e) { throw e; }
         catch (InterruptedException e) { Thread.currentThread().interrupt(); throw unavailable(); }
         catch (Exception e) { throw unavailable(); }
     }
 
-    private List<Location> candidates(String query, JsonNode features) {
+    private List<Location> candidates(String query, JsonNode features, Double storeLatitude, Double storeLongitude) {
             String firstPart = query.split(",")[0].trim();
             Matcher houseMatch = HOUSE.matcher(firstPart);
-            boolean hasHouseNumber = houseMatch.matches();
+            boolean hasHouseNumber = houseMatch.matches() && !DATE_STREET.matcher(firstPart).matches();
             String requestedHouse = hasHouseNumber ? houseMatch.group(1) : "";
             String streetQuery = normalize(hasHouseNumber ? houseMatch.group(2) : firstPart);
             List<Location> matches = new ArrayList<>();
@@ -99,7 +111,7 @@ public class AddressGeocoder {
                 String type = properties.path("type").asText();
                 String street = properties.path("street").asText();
                 if (street.isBlank() && type.equals("street")) street = properties.path("name").asText();
-                if (!"VN".equalsIgnoreCase(properties.path("countrycode").asText()) || coordinates.size() < 2) continue;
+                if (!"VN".equalsIgnoreCase(properties.path("countrycode").asText()) || !coordinates.isArray() || coordinates.size() < 2) continue;
                 String normalizedStreet = normalize(street);
                 boolean road = nameMatches(firstPart, street, properties) && type.equals("street");
                 boolean exactHouse = hasHouseNumber && nameMatches(hasHouseNumber ? houseMatch.group(2) : firstPart, street, properties)
@@ -113,6 +125,7 @@ public class AddressGeocoder {
                 double longitude = coordinates.get(0).asDouble(Double.NaN), latitude = coordinates.get(1).asDouble(Double.NaN);
                 if (!Double.isFinite(latitude) || !Double.isFinite(longitude)
                         || latitude < 8 || latitude > 24 || longitude < 102 || longitude > 110) continue;
+                if (storeLatitude != null && (Math.abs(latitude - storeLatitude) > .2 || Math.abs(longitude - storeLongitude) > .2)) continue;
                 String house = properties.path("housenumber").asText();
                 int areaConfidence = areaConfidence(query, properties);
                 if (areaConfidence < 0) continue;
@@ -129,6 +142,8 @@ public class AddressGeocoder {
             matches.sort(Comparator.comparing(Location::approximate));
             // Prefer an actual house over whole-road suggestions, but preserve distinct house matches.
             if (matches.stream().anyMatch(location -> !location.approximate())) matches.removeIf(Location::approximate);
+            if (storeLatitude != null) matches.sort(Comparator.comparingDouble(location -> Math.hypot(
+                    location.latitude() - storeLatitude, (location.longitude() - storeLongitude) * Math.cos(Math.toRadians(storeLatitude)))));
             return List.copyOf(matches);
     }
 
@@ -147,10 +162,13 @@ public class AddressGeocoder {
         List<Location> cached = cached(key);
         if (cached != null) return new Location(latitude, longitude, cached.get(0).label(), cached.get(0).approximate());
         try {
-            JsonNode features = get(endpoint.resolve("../reverse"), "lat=" + latitude + "&lon=" + longitude + "&radius=0.05&limit=1", 3);
+            String path = endpoint.getPath().replaceFirst("/?api/?$", "/reverse");
+            if (path.equals(endpoint.getPath())) path = endpoint.resolve("reverse").getPath();
+            URI reverseEndpoint = new URI(endpoint.getScheme(), endpoint.getAuthority(), path, null, null);
+            JsonNode features = get(reverseEndpoint, "lat=" + latitude + "&lon=" + longitude + "&radius=0.05&limit=1");
             for (JsonNode feature : features) {
                 JsonNode properties = feature.path("properties"), coordinates = feature.path("geometry").path("coordinates");
-                if (!"VN".equalsIgnoreCase(properties.path("countrycode").asText()) || coordinates.size() < 2) continue;
+                if (!"VN".equalsIgnoreCase(properties.path("countrycode").asText()) || !coordinates.isArray() || coordinates.size() < 2) continue;
                 double foundLat = coordinates.get(1).asDouble(Double.NaN), foundLon = coordinates.get(0).asDouble(Double.NaN);
                 double latMeters = (foundLat - latitude) * 111200, lonMeters = (foundLon - longitude) * 111200 * Math.cos(Math.toRadians(latitude));
                 if (!Double.isFinite(latMeters) || !Double.isFinite(lonMeters) || Math.hypot(latMeters, lonMeters) > 75) continue;
@@ -172,14 +190,22 @@ public class AddressGeocoder {
         return new Location(latitude, longitude, point.label(), true);
     }
 
-    private JsonNode get(URI base, String parameters, int seconds) throws Exception {
+    private JsonNode get(URI base, String parameters) throws Exception {
+        // Keep use of the public demo modest even when several customers search at once.
+        synchronized (this) {
+            long delay = 1100 - (System.currentTimeMillis() - lastRequestAt);
+            if (delay > 0) Thread.sleep(delay);
+            lastRequestAt = System.currentTimeMillis();
+        }
         URI uri = URI.create(base + (base.toString().contains("?") ? "&" : "?") + parameters);
-        HttpRequest request = HttpRequest.newBuilder(uri).timeout(Duration.ofSeconds(seconds))
-                .header("User-Agent", "CRAVE-Checkout/1.0").header("Accept", "application/json").GET().build();
-        HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
-        if (response.statusCode() != 200 || response.body().length() > 262144) throw unavailable();
-        return JsonProvider.objectMapper().readTree(response.body()).path("features");
+        var response = client.get(uri, "application/json", 262144);
+        if (response.status() != 200) throw unavailable();
+        JsonNode features = json.readTree(response.body()).path("features");
+        if (!features.isArray()) throw unavailable();
+        return features;
     }
+    @Override
+    public void close() throws IOException { client.close(); }
     private static String encode(String value) { return URLEncoder.encode(value, StandardCharsets.UTF_8); }
     private synchronized List<Location> cached(String key) {
         Cached value = cache.get(key);
@@ -187,7 +213,8 @@ public class AddressGeocoder {
     }
     private synchronized void remember(String key, List<Location> locations) {
         if (cache.size() >= 128) cache.remove(cache.keySet().iterator().next());
-        cache.put(key, new Cached(locations, System.currentTimeMillis() + Duration.ofHours(6).toMillis()));
+        long lifetime = (locations.isEmpty() ? Duration.ofMinutes(2) : Duration.ofHours(6)).toMillis();
+        cache.put(key, new Cached(List.copyOf(locations), System.currentTimeMillis() + lifetime));
     }
 
     private static String normalizeInput(String address) {

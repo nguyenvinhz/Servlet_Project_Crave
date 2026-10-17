@@ -8,7 +8,7 @@ import com.foodordering.entity.Promotion;
 import com.foodordering.enums.DiscountType;
 import com.foodordering.enums.ErrorCode;
 import com.foodordering.enums.PromotionStatus;
-import com.foodordering.repository.PromotionRepository;
+import com.foodordering.dao.PromotionDAO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -20,14 +20,14 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 class PromotionServiceTest {
-    private PromotionRepository repository;
+    private PromotionDAO repository;
     private CartService cartService;
     private PromotionService service;
     private Promotion promotion;
 
     @BeforeEach
     void setUp() {
-        repository = mock(PromotionRepository.class);
+        repository = mock(PromotionDAO.class);
         cartService = mock(CartService.class);
         service = new PromotionService(repository, cartService);
         promotion = new Promotion();

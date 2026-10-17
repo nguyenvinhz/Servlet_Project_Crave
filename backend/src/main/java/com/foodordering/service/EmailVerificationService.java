@@ -12,8 +12,7 @@ import com.foodordering.enums.EmployeeStatus;
 import com.foodordering.exception.AccountException;
 import com.foodordering.mail.SmtpVerificationEmailSender;
 import com.foodordering.mail.VerificationEmailSender;
-import com.foodordering.repository.AccountRepository;
-import com.foodordering.repository.JpaAccountRepository;
+import com.foodordering.dao.AccountDAO;
 import com.foodordering.utils.PasswordHasher;
 
 import javax.crypto.Mac;
@@ -45,7 +44,7 @@ public class EmailVerificationService {
     private static final String RESET = "PASSWORD_RESET";
     private static final String CHANGE = "PASSWORD_CHANGE";
 
-    private final AccountRepository repository;
+    private final AccountDAO repository;
     private final AccountService accounts;
     private final PasswordHasher passwordHasher;
     private final VerificationEmailSender sender;
@@ -54,25 +53,25 @@ public class EmailVerificationService {
     private final SecureRandom random;
 
     public EmailVerificationService() {
-        this(new JpaAccountRepository(), new PasswordHasher(), new SmtpVerificationEmailSender(),
+        this(new AccountDAO(), new PasswordHasher(), new SmtpVerificationEmailSender(),
                 Clock.systemUTC());
     }
 
-    public EmailVerificationService(AccountRepository repository, VerificationEmailSender sender, Clock clock) {
+    public EmailVerificationService(AccountDAO repository, VerificationEmailSender sender, Clock clock) {
         this(repository, new PasswordHasher(), sender, clock);
     }
 
-    public EmailVerificationService(AccountRepository repository, PasswordHasher passwordHasher,
+    public EmailVerificationService(AccountDAO repository, PasswordHasher passwordHasher,
                                     VerificationEmailSender sender, Clock clock) {
         this(repository, passwordHasher, sender, clock, EmailConfig::otpSecret, new SecureRandom());
     }
 
-    public EmailVerificationService(AccountRepository repository, PasswordHasher passwordHasher,
+    public EmailVerificationService(AccountDAO repository, PasswordHasher passwordHasher,
                                     VerificationEmailSender sender, Clock clock, String otpSecret) {
         this(repository, passwordHasher, sender, clock, () -> otpSecret, new SecureRandom());
     }
 
-    EmailVerificationService(AccountRepository repository, PasswordHasher passwordHasher,
+    EmailVerificationService(AccountDAO repository, PasswordHasher passwordHasher,
                              VerificationEmailSender sender, Clock clock,
                              Supplier<String> otpSecret, SecureRandom random) {
         this.repository = Objects.requireNonNull(repository);
@@ -208,7 +207,7 @@ public class EmailVerificationService {
         }
     }
 
-    private Delivery issue(AccountRepository.Session session, String email, String purpose,
+    private Delivery issue(AccountDAO.Session session, String email, String purpose,
                            User user, byte[] key, boolean send) {
         long now = clock.millis();
         String id = challengeId(email, purpose);
@@ -232,7 +231,7 @@ public class EmailVerificationService {
         return new Delivery(id, email, purpose, code, digest, send);
     }
 
-    private EmailVerificationChallenge challenge(AccountRepository.Session session, String email, String purpose) {
+    private EmailVerificationChallenge challenge(AccountDAO.Session session, String email, String purpose) {
         return session.findVerificationChallenge(challengeId(email, purpose), true).orElse(null);
     }
 
@@ -276,7 +275,7 @@ public class EmailVerificationService {
         }
     }
 
-    private <T> T writeRetry(Function<AccountRepository.Session, T> action) {
+    private <T> T writeRetry(Function<AccountDAO.Session, T> action) {
         // The unique challenge key also serializes concurrent first requests, before there is a row to lock.
         for (int attempt = 0; ; attempt++) {
             try {
@@ -313,7 +312,7 @@ public class EmailVerificationService {
         return normalized;
     }
 
-    private static User requireUser(AccountRepository.Session session, String userId) {
+    private static User requireUser(AccountDAO.Session session, String userId) {
         User user = session.findUser(userId, true).orElseThrow(() ->
                 new AccountException("UNAUTHORIZED", "Vui lòng đăng nhập để tiếp tục.", 401));
         AccountService.requireActive(user);

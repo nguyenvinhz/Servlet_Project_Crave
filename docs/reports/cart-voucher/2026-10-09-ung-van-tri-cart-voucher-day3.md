@@ -37,7 +37,8 @@ Nhánh ban đầu chỉ chuyển dữ liệu voucher vào sessionStorage; checko
 
 - Dùng các route hiện có: cart API, `POST /api/promotions/validate`, `POST /api/orders`. Không thêm endpoint.
 - Validation checkout trả `400` với `CART_EMPTY`, `FOOD_NOT_AVAILABLE`, `INVALID_OPTION` hoặc `PROMOTION_*`; lỗi session vẫn trả `401`/`403` theo main.
-- Cập nhật mô tả checkout trong [OpenAPI order/payment](../../api/api-order-payment.yaml).
+- Tại thời điểm báo cáo đã cập nhật OpenAPI order/payment. File JSON contract cũ
+  đã được dọn sau khi chuyển sang [form Servlet hiện tại](../../architecture/servlet-forms.md).
 - Không thay schema, migration, quyền database hoặc credential. Kiểm thử tích hợp chỉ tạo và dọn fixture riêng.
 
 ## Kiểm thử

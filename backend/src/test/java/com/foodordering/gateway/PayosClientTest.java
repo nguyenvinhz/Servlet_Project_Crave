@@ -2,7 +2,7 @@ package com.foodordering.gateway;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.foodordering.utils.JsonProvider;
+import com.foodordering.gateway.PayosJson;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.AfterEach;
@@ -93,7 +93,7 @@ class PayosClientTest {
 
     @Test
     void rejectsTamperingAndMissingSignaturesOnEveryPaymentEndpoint() throws Exception {
-        ObjectNode envelope = JsonProvider.objectMapper().readValue(signed(createData()), ObjectNode.class);
+        ObjectNode envelope = PayosJson.objectMapper().readValue(signed(createData()), ObjectNode.class);
         ((ObjectNode) envelope.path("data")).put("amount", 3001);
         response.set(envelope.toString());
         assertEquals("INVALID_SIGNATURE", assertThrows(PayosException.class,
@@ -101,7 +101,7 @@ class PayosClientTest {
                         "https://shop.example/cancel")).getCode());
         response.set(envelope(informationData(), "a".repeat(64)).toString());
         assertEquals("INVALID_SIGNATURE", assertThrows(PayosException.class, () -> client.getPaymentLink(123)).getCode());
-        response.set(JsonProvider.objectMapper().createObjectNode().put("code", "00")
+        response.set(PayosJson.objectMapper().createObjectNode().put("code", "00")
                 .set("data", informationData()).toString());
         assertEquals("INVALID_SIGNATURE", assertThrows(PayosException.class,
                 () -> client.cancelPaymentLink(123, "Cancel")).getCode());
@@ -180,7 +180,7 @@ class PayosClientTest {
     void verifiesOfficialWebhookVectorAndIgnoresUnsignedEnvelopeFlags() throws Exception {
         // Published interoperability vector: https://payos.vn/docs/tich-hop-webhook/kiem-tra-du-lieu-voi-signature/
         String publicExampleKey = "1a54716c8f0efb2744fb28b6e38b25da7f67a925d98bc1c18bd8faaecadd7675";
-        JsonNode data = JsonProvider.objectMapper().readTree("""
+        JsonNode data = PayosJson.objectMapper().readTree("""
                 {"orderCode":123,"amount":3000,"description":"VQRIO123","accountNumber":"12345678",
                 "reference":"TF230204212323","transactionDateTime":"2023-02-04 18:25:00","currency":"VND",
                 "paymentLinkId":"124c33293c43417ab7879e14c8d9eb18","code":"00","desc":"Thành công",
@@ -202,13 +202,13 @@ class PayosClientTest {
     @Test
     void rejectsInvalidWebhookShapeAndDoesNotConvertSignedFailureToSuccess() throws Exception {
         ObjectNode data = webhookData().put("code", "99");
-        assertEquals("99", client.verifyWebhook(JsonProvider.objectMapper().readTree(signed(data)))
+        assertEquals("99", client.verifyWebhook(PayosJson.objectMapper().readTree(signed(data)))
                 .path("code").textValue());
         assertThrows(PayosException.class, () -> client.verifyWebhook(envelope(data, "short")));
         for (ObjectNode invalid : new ObjectNode[]{webhookData().put("currency", "USD"),
                 webhookData().put("amount", -1), webhookData().put("orderCode", "123")}) {
             assertEquals(400, assertThrows(PayosException.class,
-                    () -> client.verifyWebhook(JsonProvider.objectMapper().readTree(signed(invalid)))).getStatusCode());
+                    () -> client.verifyWebhook(PayosJson.objectMapper().readTree(signed(invalid)))).getStatusCode());
         }
     }
 
@@ -226,7 +226,7 @@ class PayosClientTest {
             clientId.set(exchange.getRequestHeaders().getFirst("x-client-id"));
             apiKey.set(exchange.getRequestHeaders().getFirst("x-api-key"));
             byte[] request = exchange.getRequestBody().readAllBytes();
-            requestBody.set(request.length == 0 ? null : JsonProvider.objectMapper().readTree(request));
+            requestBody.set(request.length == 0 ? null : PayosJson.objectMapper().readTree(request));
             if (httpStatus.get() == 302) exchange.getResponseHeaders().set("Location", baseUri.resolve("redirect").toString());
             byte[] body = response.get().getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().set("Content-Type", "application/json");
@@ -247,25 +247,25 @@ class PayosClientTest {
     }
 
     private static ObjectNode createData() {
-        return JsonProvider.objectMapper().createObjectNode().put("orderCode", 123).put("amount", 3000)
+        return PayosJson.objectMapper().createObjectNode().put("orderCode", 123).put("amount", 3000)
                 .put("currency", "VND").put("paymentLinkId", "link123").put("status", "PENDING")
                 .put("checkoutUrl", "https://pay.payos.vn/web/link123");
     }
 
     private static ObjectNode informationData() {
-        ObjectNode data = JsonProvider.objectMapper().createObjectNode().put("orderCode", 123).put("amount", 3000)
+        ObjectNode data = PayosJson.objectMapper().createObjectNode().put("orderCode", 123).put("amount", 3000)
                 .put("id", "link123").put("status", "PENDING").put("amountPaid", 0).put("amountRemaining", 3000);
         data.putArray("transactions");
         return data;
     }
 
     private static ObjectNode webhookData() {
-        return JsonProvider.objectMapper().createObjectNode().put("orderCode", 123).put("amount", 3000)
+        return PayosJson.objectMapper().createObjectNode().put("orderCode", 123).put("amount", 3000)
                 .put("currency", "VND").put("paymentLinkId", "link123").put("code", "00").put("reference", "TX01");
     }
 
     private static ObjectNode envelope(JsonNode data, String signature) {
-        ObjectNode envelope = JsonProvider.objectMapper().createObjectNode().put("code", "00")
+        ObjectNode envelope = PayosJson.objectMapper().createObjectNode().put("code", "00")
                 .put("success", true).put("signature", signature);
         envelope.set("data", data);
         return envelope;
@@ -282,11 +282,11 @@ class PayosClientTest {
 
     private static String sortedArray(JsonNode data) {
         if (!data.isArray()) return data.toString();
-        var sorted = JsonProvider.objectMapper().createArrayNode();
+        var sorted = PayosJson.objectMapper().createArrayNode();
         for (JsonNode element : data) {
             java.util.TreeMap<String, JsonNode> fields = new java.util.TreeMap<>();
             element.fields().forEachRemaining(entry -> fields.put(entry.getKey(), entry.getValue()));
-            ObjectNode value = JsonProvider.objectMapper().createObjectNode();
+            ObjectNode value = PayosJson.objectMapper().createObjectNode();
             fields.forEach(value::set);
             sorted.add(value);
         }

@@ -17,13 +17,14 @@
         </div>
 
         <div id="form-error" class="form-error" role="alert" aria-live="polite" ${empty error ? 'hidden' : ''}>
-            <c:out value="${error}"/>
+            <c:out value="${error}"/><c:forEach var="fieldError" items="${fieldErrors}"><p class="field-hint"><c:out value="${fieldError.value}"/></p></c:forEach>
         </div>
-        <div id="form-success" class="form-success" role="status" aria-live="polite" hidden></div>
+        <div id="form-success" class="form-success" role="status" aria-live="polite" ${empty message ? 'hidden' : ''}><c:out value="${message}"/></div>
 
-        <form id="loginForm" action="<c:url value='/api/auth/login'/>" method="post" data-method="POST">
+        <form id="loginForm" action="<c:url value='/auth/login/submit'/>" method="post">
+            <input type="hidden" name="returnTo" value="<c:out value='${param.returnTo}'/>">
             <label for="email">Email</label>
-            <input id="email" name="email" type="email" autocomplete="email"
+            <input id="email" name="email" type="email" value="<c:out value='${param.email}'/>" autocomplete="email"
                    maxlength="100" placeholder="ban@example.com" required>
 
             <label for="password">Mật khẩu</label>

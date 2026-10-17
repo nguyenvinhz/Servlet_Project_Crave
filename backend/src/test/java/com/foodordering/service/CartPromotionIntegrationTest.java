@@ -14,7 +14,7 @@ import com.foodordering.entity.Promotion;
 import com.foodordering.enums.DiscountType;
 import com.foodordering.enums.OptionType;
 import com.foodordering.exception.ResourceNotFoundException;
-import com.foodordering.repository.JpaAccountRepository;
+import com.foodordering.dao.AccountDAO;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import org.junit.jupiter.api.AfterAll;
@@ -62,7 +62,7 @@ class CartPromotionIntegrationTest {
 
     @BeforeEach
     void createFixtures() {
-        AccountService accounts = new AccountService(new JpaAccountRepository(emf));
+        AccountService accounts = new AccountService(new AccountDAO(emf));
         owner = register(accounts);
         other = register(accounts);
         try (EntityManager em = emf.createEntityManager()) {

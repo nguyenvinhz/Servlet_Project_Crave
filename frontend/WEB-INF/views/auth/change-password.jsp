@@ -13,21 +13,22 @@
         <div class="card-heading">
             <p class="eyebrow">Tài khoản Crave</p>
             <h2 id="change-title">Đổi mật khẩu</h2>
-            <p id="password-account" class="field-hint" role="status">Đang kiểm tra tài khoản...</p>
+            <p id="password-account" class="field-hint" role="status"><c:out value="${sessionScope.currentUser.email}"/></p>
         </div>
-        <div id="form-error" class="form-error" role="alert" aria-live="polite" hidden></div>
-        <div id="form-success" class="form-success" role="status" aria-live="polite" hidden></div>
+        <div id="form-error" class="form-error" role="alert" aria-live="polite" ${empty error ? 'hidden' : ''}><c:out value="${error}"/><c:forEach var="fieldError" items="${fieldErrors}"><p class="field-hint"><c:out value="${fieldError.value}"/></p></c:forEach></div>
+        <div id="form-success" class="form-success" role="status" aria-live="polite" ${empty message ? 'hidden' : ''}><c:out value="${message}"/></div>
         <button id="password-session-retry" class="button outline" type="button" hidden>Thử tải lại tài khoản</button>
-        <form id="changePasswordForm" action="<c:url value='/api/auth/password/change'/>" method="post"
-              data-code-url="<c:url value='/api/auth/password/change/code'/>">
-            <fieldset id="password-change-fields" disabled>
+        <form id="changePasswordForm" action="<c:url value='${otpRequested ? "/auth/password/change/submit" : "/auth/password/change/code"}'/>" method="post"
+              data-code-url="<c:url value='/auth/password/change/code'/>">
+            <input type="hidden" name="otpActive" value="${otpRequested ? 'true' : 'false'}">
+            <fieldset id="password-change-fields">
                 <legend class="visually-hidden">Xác nhận và đổi mật khẩu</legend>
                 <label for="currentPassword">Mật khẩu hiện tại</label>
                 <input id="currentPassword" name="currentPassword" type="password" autocomplete="current-password"
-                       minlength="8" maxlength="72" required>
-                <fieldset id="otp-fields" class="otp-fields" data-otp-fields hidden disabled>
+                       minlength="8" maxlength="72" ${otpRequested ? '' : 'required'}>
+                <fieldset id="otp-fields" class="otp-fields" data-otp-fields ${otpRequested ? '' : 'hidden disabled'}>
                     <legend>Xác nhận và tạo mật khẩu mới</legend>
-                    <p id="otp-summary" class="field-hint"></p>
+                    <p id="otp-summary" class="field-hint">Nhập mã trong email để tiếp tục.</p>
                     <label for="verificationCode">Mã xác nhận</label>
                     <input id="verificationCode" name="verificationCode" class="otp-input" type="text"
                            inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" minlength="6"
@@ -47,11 +48,11 @@
                         </div>
                     </div>
                     <div class="otp-actions">
-                        <button id="otp-resend" class="button outline" type="button">Gửi lại mã</button>
+                        <button id="otp-resend" class="button outline" type="submit" formaction="<c:url value='/auth/password/change/code'/>" formnovalidate>Gửi lại mã</button>
                         <button id="otp-edit" class="button outline" type="button">Nhập lại mật khẩu hiện tại</button>
                     </div>
                 </fieldset>
-                <button id="otp-submit" class="button primary" type="submit">Gửi mã xác nhận</button>
+                <button id="otp-submit" class="button primary" type="submit">${otpRequested ? 'Xác nhận mật khẩu mới' : 'Gửi mã xác nhận'}</button>
             </fieldset>
         </form>
         <p class="card-footnote">Sau khi đổi mật khẩu, bạn sẽ đăng nhập lại bằng mật khẩu mới.</p>

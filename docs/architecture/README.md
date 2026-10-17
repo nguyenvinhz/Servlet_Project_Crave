@@ -19,7 +19,7 @@ khi tính giảm giá, tùy chọn món và thanh toán.
 | Thanh toán | `Payment`, `PaymentMethod`, `PaymentStatus` | Thanh toán gắn với đơn; hoàn tiền giữ thời điểm thanh toán gốc |
 
 Các FK `promotion_id`, `assigned_employee_id`, `food_id` và `changed_by_employee_id`
-được ánh xạ thành quan hệ JPA bên cạnh thuộc tính ID tương thích API hiện có.
+được ánh xạ thành quan hệ JPA bên cạnh thuộc tính ID thuận tiện cho form và JSP.
 Các bảng nối tùy chọn giữ giá tại thời điểm đặt, giúp đơn cũ không thay đổi khi thực đơn đổi giá.
 
 ## Cây thư mục
@@ -28,14 +28,11 @@ Các bảng nối tùy chọn giữ giá tại thời điểm đặt, giúp đơ
 backend/
   pom.xml
   src/main/java/com/foodordering/
-    api/                 API JSON
-    servlet/             Servlet API đơn hàng và thanh toán
-      page/              Toàn bộ servlet hiển thị JSP
+    servlet/             Servlet xử lý form và hiển thị JSP
     service/             Nghiệp vụ, kiểm tra quyền theo tài khoản, transaction
-    repository/          Truy cập JPA và database
+    dao/                 Các lớp JPA cụ thể, không tách interface/Impl
     entity/              Domain/JPA theo sơ đồ lớp
-    dto/                 Dữ liệu request/response, không trả mật khẩu/hash
-    mapper/              Chuyển entity thành DTO
+    dto/                 Bean dữ liệu form và JSP, không chứa mật khẩu/hash hiển thị
     validator/           Quy tắc dữ liệu đầu vào
     security/            Session và phân quyền
     config/              Persistence pool và vòng đời ứng dụng
@@ -63,9 +60,10 @@ scripts/
   deploy-ec2.sh          Triển khai WAR lên EC2
 docs/
   architecture/          Diagram và ánh xạ lớp
-  previews/              Trang mẫu phát triển, nằm ngoài WAR
-  api/, project/, reports/
+  project/, reports/     Cấu hình, kế hoạch và báo cáo
 ```
 
 `backend/target/`, `.runtime/`, `node_modules/` và cấu hình `.env` là dữ liệu cục bộ,
 không đưa lên Git. WAR chỉ chứa frontend chạy thật, lớp ứng dụng và thư viện runtime.
+
+Luồng hiện tại: form → Servlet → service → DAO/JPA; Servlet forward JSP hoặc redirect sau khi lưu. Không dùng Spring hoặc lớp mapper riêng; chức năng thông thường không dùng JSON. SMTP, payOS, CI/CD và Map dùng giao thức, định dạng và thư viện theo yêu cầu nhà cung cấp, kể cả JSON hoặc SDK khi cần. Xem [hợp đồng form](servlet-forms.md).

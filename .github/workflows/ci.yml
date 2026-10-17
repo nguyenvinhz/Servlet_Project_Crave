@@ -8,9 +8,16 @@ on:
       artifact-name:
         description: Tested WAR artifact from this workflow run
         value: ${{ jobs.build-test.outputs.artifact-name }}
+      war-sha256:
+        description: SHA-256 of the WAR that passed all checks
+        value: ${{ jobs.build-test.outputs.war-sha256 }}
 
 permissions:
   contents: read
+
+defaults:
+  run:
+    shell: bash
 
 jobs:
   build-test:
@@ -19,6 +26,7 @@ jobs:
     timeout-minutes: 20
     outputs:
       artifact-name: crave-war
+      war-sha256: ${{ steps.war-digest.outputs.sha256 }}
     env:
       TZ: Asia/Ho_Chi_Minh
       DB_USER: root
@@ -74,6 +82,18 @@ jobs:
           printf 'DB_URL=jdbc:mysql://127.0.0.1:%s/crave?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Ho_Chi_Minh&characterEncoding=UTF-8\n' \
             "$MYSQL_PORT" >> "$GITHUB_ENV"
 
+      - name: Verify repeatable production migrations in the disposable database
+        env:
+          MYSQL_CONTAINER_ID: ${{ job.services.mysql.id }}
+        run: |
+          for pass in 1 2; do
+            cat database/migrations/2026-10-13-payos-payment.sql \
+              database/migrations/2026-10-13-email-verification.sql \
+              database/migrations/2026-10-15-delivery-location.sql | \
+              docker exec -i -e MYSQL_PWD="$DB_PASSWORD" "$MYSQL_CONTAINER_ID" \
+                mysql --user=root --default-character-set=utf8mb4 --database=crave
+          done
+
       - name: Build WAR and run all backend tests
         run: mvn --batch-mode --no-transfer-progress --file backend/pom.xml -Pdev clean verify
 
@@ -88,30 +108,18 @@ jobs:
       - name: Check frontend JavaScript syntax
         run: |
           find frontend/assets/js -type f -name '*.js' -print0 | xargs -0 -r -n 1 node --check
-          node --check tests/frontend/account-browser-smoke.cjs
-          node --check tests/frontend/admin-management-browser-smoke.cjs
-          node --check tests/frontend/admin-orders-dashboard-browser-smoke.cjs
-          node --check tests/frontend/payos-payment-browser-smoke.cjs
-          node --check tests/frontend/cart-checkout-browser-smoke.cjs
+          node --check tests/frontend/servlet-form-browser-smoke.cjs
+          node --check tests/frontend/delivery-map-browser-smoke.cjs
           node --check tests/runtime/http-smoke.cjs
           node --check tests/runtime/smtp-fixture.cjs
 
       - name: Verify deployment and rollback script
         run: |
+          bash -n scripts/deploy-ec2.sh tests/scripts/deploy-ec2-test.sh
           bash tests/scripts/deploy-ec2-test.sh
           python3 tests/scripts/register-payos-webhook-test.py
 
-      - name: Run browser smoke tests
-        run: |
-          export CHROME_PATH="$(command -v google-chrome)"
-          "$CHROME_PATH" --version
-          node tests/frontend/account-browser-smoke.cjs
-          node tests/frontend/admin-management-browser-smoke.cjs
-          node tests/frontend/admin-orders-dashboard-browser-smoke.cjs
-          node tests/frontend/payos-payment-browser-smoke.cjs
-          node tests/frontend/cart-checkout-browser-smoke.cjs
-
-      - name: Run packaged WAR HTTP smoke tests
+      - name: Run packaged WAR form and browser smoke tests
         env:
           CRAVE_SMOKE_BASE_URL: http://127.0.0.1:8081/crave
           CRAVE_SMOKE_ADMIN_EMAIL: ci-runtime@crave.example
@@ -148,7 +156,7 @@ jobs:
           server_pid=''
           smtp_pid=''
           runtime_log='backend/target/runtime-smoke-tomcat.log'
-          health_file='backend/target/runtime-health.json'
+          health_file='backend/target/runtime-health.txt'
           cleanup() {
             if [[ -n "$server_pid" ]] && kill -0 "$server_pid" 2>/dev/null; then
               kill "$server_pid" || true
@@ -182,8 +190,8 @@ jobs:
               cat "$runtime_log"
               exit 1
             fi
-            if curl --fail --silent --max-time 2 "$CRAVE_SMOKE_BASE_URL/api/health" > "$health_file" \
-              && node -e "const p=JSON.parse(require('node:fs').readFileSync(process.argv[1],'utf8'));process.exit(p.success && p.data?.database==='UP' ? 0 : 1)" "$health_file"; then
+            if curl --fail --silent --max-time 2 "$CRAVE_SMOKE_BASE_URL/health" > "$health_file" \
+              && node -e "const p=require('node:fs').readFileSync(process.argv[1],'utf8').trim().split(String.fromCharCode(10)).map(x=>x.trim()).join('|');process.exit(p==='application=UP|database=UP' ? 0 : 1)" "$health_file"; then
               ready=1
               break
             fi
@@ -195,12 +203,25 @@ jobs:
             exit 1
           fi
           node tests/runtime/http-smoke.cjs
+          export CHROME_PATH="$(command -v google-chrome)"
+          "$CHROME_PATH" --version
+          node tests/frontend/servlet-form-browser-smoke.cjs
+          node tests/frontend/delivery-map-browser-smoke.cjs
+
+      - name: Record tested WAR checksum
+        id: war-digest
+        working-directory: backend/target
+        run: |
+          sha256sum crave.war > crave.war.sha256
+          printf 'sha256=%s\n' "$(cut -d ' ' -f 1 crave.war.sha256)" >> "$GITHUB_OUTPUT"
 
       - name: Upload tested WAR
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: crave-war
-          path: backend/target/crave.war
+          path: |
+            backend/target/crave.war
+            backend/target/crave.war.sha256
           if-no-files-found: error
           retention-days: 7
 
@@ -220,7 +241,10 @@ jobs:
           name: runtime-smoke-diagnostics
           path: |
             backend/target/runtime-smoke-tomcat.log
-            backend/target/runtime-health.json
+            backend/target/runtime-smoke-smtp.log
+            backend/target/runtime-health.txt
+            .runtime/form-browser/*.png
+            .runtime/map-browser/*.png
           if-no-files-found: ignore
           retention-days: 7
 

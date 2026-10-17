@@ -10,8 +10,8 @@ import com.foodordering.enums.PaymentMethod;
 import com.foodordering.exception.BadRequestException;
 import com.foodordering.exception.ForbiddenException;
 import com.foodordering.exception.ResourceNotFoundException;
-import com.foodordering.repository.CustomerOrderRepository;
-import com.foodordering.repository.PaymentRepository;
+import com.foodordering.dao.CustomerOrderDAO;
+import com.foodordering.dao.PaymentDAO;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import jakarta.persistence.EntityTransaction;
@@ -27,17 +27,17 @@ import static org.mockito.Mockito.*;
 
 class CustomerOrderServiceTest {
 
-    private CustomerOrderRepository orderRepository;
-    private PaymentRepository paymentRepository;
+    private CustomerOrderDAO orderRepository;
+    private PaymentDAO paymentRepository;
     private EntityManagerFactory emf;
     private EntityManager em;
     private EntityTransaction tx;
-    private CustomerOrderServiceImpl orderService;
+    private CustomerOrderService orderService;
 
     @BeforeEach
     void setUp() {
-        orderRepository = mock(CustomerOrderRepository.class);
-        paymentRepository = mock(PaymentRepository.class);
+        orderRepository = mock(CustomerOrderDAO.class);
+        paymentRepository = mock(PaymentDAO.class);
         emf = mock(EntityManagerFactory.class);
         em = mock(EntityManager.class);
         tx = mock(EntityTransaction.class);
@@ -46,7 +46,7 @@ class CustomerOrderServiceTest {
         when(em.getTransaction()).thenReturn(tx);
         when(tx.isActive()).thenReturn(true);
 
-        orderService = new CustomerOrderServiceImpl(orderRepository, paymentRepository, emf);
+        orderService = new CustomerOrderService(orderRepository, paymentRepository, emf);
     }
 
     @Test
@@ -65,7 +65,7 @@ class CustomerOrderServiceTest {
 
     @Test
     void outsideRadiusCannotCreateAnOrderEvenWithoutCallingQuoteApi() {
-        CustomerOrderServiceImpl service = new CustomerOrderServiceImpl(orderRepository, paymentRepository, emf,
+        CustomerOrderService service = new CustomerOrderService(orderRepository, paymentRepository, emf,
                 new DeliveryFeeService(new DeliveryFeeService.Store("Fixture store", 10.89, 106.76)));
         OrderRequest request = new OrderRequest();
         request.setReceiverName("Customer");

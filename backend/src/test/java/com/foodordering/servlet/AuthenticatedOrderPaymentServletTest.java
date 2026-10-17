@@ -1,36 +1,28 @@
 package com.foodordering.servlet;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.foodordering.dto.OrderRequest;
 import com.foodordering.dto.OrderResponse;
+import com.foodordering.dto.OrderSummaryResponse;
 import com.foodordering.dto.ProfileResponse;
-import com.foodordering.enums.AccountType;
-import com.foodordering.enums.EmployeeRole;
-import com.foodordering.enums.ErrorCode;
-import com.foodordering.enums.OrderStatus;
-import com.foodordering.enums.PaymentStatus;
+import com.foodordering.enums.*;
 import com.foodordering.exception.ApiException;
 import com.foodordering.exception.BadRequestException;
 import com.foodordering.exception.PromotionValidationException;
 import com.foodordering.security.SessionAuth;
 import com.foodordering.service.CustomerOrderService;
 import com.foodordering.service.PaymentService;
-import com.foodordering.utils.JsonProvider;
-import jakarta.servlet.ReadListener;
-import jakarta.servlet.ServletInputStream;
-import jakarta.servlet.ServletRequest;
-import jakarta.servlet.ServletResponse;
+import com.foodordering.service.PayosPaymentService;
+import jakarta.servlet.RequestDispatcher;
+import jakarta.servlet.ServletConfig;
+import jakarta.servlet.ServletContext;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
-import java.io.ByteArrayInputStream;
-import java.io.PrintWriter;
-import java.io.StringWriter;
-import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -39,413 +31,361 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
+/** Session authorization remains required after moving HTTP payloads to native forms and JSP. */
 class AuthenticatedOrderPaymentServletTest {
     private static final ProfileResponse CUSTOMER = new ProfileResponse("KH01", AccountType.CUSTOMER,
             "Customer", "customer@example.com", "0901234567", null);
-    private static final String CHECKOUT = "{\"receiverName\":\"Customer\",\"receiverPhone\":\"0901234567\","
-            + "\"fulfillmentType\":\"PICKUP\",\"paymentMethod\":\"CASH\"}";
-    private static final String ORDER_STATUS = "{\"status\":\"PREPARING\",\"note\":\"Confirmed\"}";
-    private static final String PAYMENT_STATUS = "{\"status\":\"SUCCESS\",\"transactionRef\":\"TX01\"}";
-
     private CustomerOrderService orders;
     private PaymentService payments;
+    private PayosPaymentService payos;
     private OrderServlet customerServlet;
+    private OrdersPageServlet pageServlet;
     private AdminOrderServlet adminServlet;
     private PaymentServlet paymentServlet;
 
-    @BeforeEach
-    void setUp() throws Exception {
+    @BeforeEach void setUp() throws Exception {
         orders = mock(CustomerOrderService.class);
         payments = mock(PaymentService.class);
+        payos = mock(PayosPaymentService.class);
         customerServlet = new OrderServlet(orders);
+        pageServlet = new OrdersPageServlet(orders, payos);
         adminServlet = new AdminOrderServlet(orders);
         paymentServlet = new PaymentServlet(payments);
-        customerServlet.init();
-        adminServlet.init();
-        paymentServlet.init();
+        for (HttpServlet servlet : new HttpServlet[]{customerServlet, pageServlet, adminServlet, paymentServlet}) {
+            ServletConfig config = mock(ServletConfig.class);
+            when(config.getServletContext()).thenReturn(mock(ServletContext.class));
+            servlet.init(config);
+        }
+        var field = OrderServlet.class.getDeclaredField("payos");
+        field.setAccessible(true);
+        field.set(customerServlet, payos);
     }
 
-    @Test
-    void orderAndPaymentRoutesRequirePrincipalBeforeReadingPayload() throws Exception {
-        for (Route route : routes()) {
-            Exchange exchange = request(route, null, "{invalid");
-            when(exchange.request.getHeader("X-Customer-Id")).thenReturn("KH99");
-            when(exchange.request.getHeader("X-Employee-Id")).thenReturn("NV99");
-            when(exchange.request.getParameter("customerId")).thenReturn("KH99");
-            when(exchange.request.getParameter("employeeId")).thenReturn("NV99");
-
-            exchange.send(route.servlet);
-
-            exchange.assertError(401, "UNAUTHORIZED");
+    @Test void mutationsRequirePrincipalBeforeReadingFormOrCreatingSession() throws Exception {
+        for (HttpServlet servlet : mutations()) {
+            Exchange exchange = exchange(null);
+            spoofIdentity(exchange);
+            exchange.send(servlet);
+            verify(exchange.response).sendError(eq(401), anyString());
             verify(exchange.request, never()).getInputStream();
+            verify(exchange.request, never()).getSession();
             verify(exchange.request, never()).getSession(true);
         }
-        verifyNoInteractions(orders, payments);
+        verifyNoInteractions(orders, payments, payos);
     }
 
-    @Test
-    void legacySessionIdsCannotAuthenticateOrderOrPaymentRequests() throws Exception {
-        for (Route route : routes()) {
-            Exchange exchange = request(route, null, "{}");
-            HttpSession legacy = mock(HttpSession.class);
-            when(exchange.request.getSession(false)).thenReturn(legacy);
-            when(legacy.getAttribute("customerId")).thenReturn("KH01");
-            when(legacy.getAttribute("employeeId")).thenReturn("NV01");
-            when(legacy.getAttribute("accountType")).thenReturn("EMPLOYEE");
-            when(legacy.getAttribute("role")).thenReturn("ADMIN");
-
-            exchange.send(route.servlet);
-
-            exchange.assertError(401, "UNAUTHORIZED");
+    @Test void legacySessionIdsCannotAuthenticateOrderOrPaymentForms() throws Exception {
+        for (HttpServlet servlet : mutations()) {
+            Exchange exchange = exchange(null);
+            exchange.sessionValues.putAll(Map.of("customerId", "KH01", "employeeId", "NV01",
+                    "accountType", "EMPLOYEE", "role", "ADMIN"));
+            exchange.send(servlet);
+            verify(exchange.response).sendError(eq(401), anyString());
         }
         verifyNoInteractions(orders, payments);
     }
 
-    @Test
-    void customerOrdersRejectEmployeePrincipals() throws Exception {
-        for (String method : new String[]{"GET", "POST"}) {
-            Route route = new Route(customerServlet, method, "/api/orders", null);
-            Exchange exchange = request(route, employee(EmployeeRole.ADMIN), CHECKOUT);
-
-            exchange.send(route.servlet);
-
-            exchange.assertError(403, "FORBIDDEN");
+    @Test void customerPageRequiresCustomerPrincipalBeforeLoadingOrders() throws Exception {
+        for (ProfileResponse principal : new ProfileResponse[]{null, employee(EmployeeRole.ADMIN)}) {
+            Exchange exchange = exchange(principal);
+            pageServlet.doGet(exchange.request, exchange.response);
+            verify(exchange.response).sendError(eq(principal == null ? 401 : 403), anyString());
+            verifyNoInteractions(exchange.dispatcher);
         }
-        verifyNoInteractions(orders);
+        verifyNoInteractions(orders, payos);
     }
 
-    @Test
-    void orderListUsesCustomerPrincipalInsteadOfClientOrLegacyIds() throws Exception {
-        when(orders.getOrdersByCustomer("KH01")).thenReturn(List.of());
-        Route route = new Route(customerServlet, "GET", "/api/orders", null);
-        Exchange exchange = request(route, CUSTOMER, "");
-        spoofIdentity(exchange);
-
+    @Test void employeeCannotPlaceCustomerOrder() throws Exception {
+        Exchange exchange = exchange(employee(EmployeeRole.ADMIN));
+        checkout(exchange);
         exchange.send(customerServlet);
+        verify(exchange.response).sendError(eq(403), anyString());
+        verifyNoInteractions(orders, payos);
+    }
 
-        exchange.assertStatus(200);
-        assertTrue(exchange.json().path("success").asBoolean());
+    @Test void orderListUsesSessionCustomerAndForwardsDataToJsp() throws Exception {
+        OrderSummaryResponse summary = new OrderSummaryResponse();
+        summary.setOrderId("DH01");
+        List<OrderSummaryResponse> result = List.of(summary);
+        when(orders.getOrdersByCustomer("KH01")).thenReturn(result);
+        Exchange exchange = exchange(CUSTOMER);
+        spoofIdentity(exchange);
+        pageServlet.doGet(exchange.request, exchange.response);
         verify(orders).getOrdersByCustomer("KH01");
         verify(orders, never()).getOrdersByCustomer("KH99");
+        assertSame(result, exchange.attributes.get("orders"));
+        verify(exchange.request).getRequestDispatcher("/WEB-INF/views/order/orders.jsp");
+        verify(exchange.dispatcher).forward(exchange.request, exchange.response);
     }
 
-    @Test
-    void checkoutUsesCustomerPrincipalInsteadOfClientOrLegacyIds() throws Exception {
-        OrderResponse created = order("DH01", "KH01");
-        when(orders.createOrder(eq("KH01"), any(OrderRequest.class))).thenReturn(created);
-        Route route = new Route(customerServlet, "POST", "/api/orders", null);
-        Exchange exchange = request(route, CUSTOMER, CHECKOUT);
+    @Test void checkoutBindsFormAndPromotionFromAuthenticatedSession() throws Exception {
+        when(orders.createOrder(eq("KH01"), any())).thenReturn(order("DH01", "KH01"));
+        Exchange exchange = exchange(CUSTOMER);
+        checkout(exchange);
         spoofIdentity(exchange);
-
+        exchange.parameters.put("promotionId", "FORGED");
+        exchange.sessionValues.put("selectedPromotionId", "PROMO-SESSION");
+        exchange.sessionValues.put("selectedPromotionCode", "SAVE10");
         exchange.send(customerServlet);
-
-        exchange.assertStatus(201);
-        assertEquals("DH01", exchange.json().path("data").path("orderId").asText());
-        verify(orders).createOrder(eq("KH01"), any(OrderRequest.class));
-        verify(orders, never()).createOrder(eq("KH99"), any());
+        ArgumentCaptor<OrderRequest> form = ArgumentCaptor.forClass(OrderRequest.class);
+        verify(orders).createOrder(eq("KH01"), form.capture());
+        assertEquals("Customer", form.getValue().getReceiverName());
+        assertEquals("0901234567", form.getValue().getReceiverPhone());
+        assertEquals(FulfillmentType.PICKUP, form.getValue().getFulfillmentType());
+        assertEquals(PaymentMethod.CASH, form.getValue().getPaymentMethod());
+        assertEquals("PROMO-SESSION", form.getValue().getPromotionId());
+        assertFalse(exchange.sessionValues.containsKey("selectedPromotionId"));
+        assertFalse(exchange.sessionValues.containsKey("selectedPromotionCode"));
+        assertEquals(0, exchange.sessionValues.get("cartItemCount"));
+        verify(exchange.response).sendRedirect("/crave/orders/DH01");
+        verify(exchange.request, never()).getInputStream();
+        verifyNoInteractions(payos);
     }
 
-    @Test
-    void checkoutReturnsDomainBadRequestsWithTheirOriginalErrorCodes() throws Exception {
+    @Test void deliveryCoordinatesAndOnlinePaymentUseServerCreatedOrder() throws Exception {
+        when(orders.createOrder(eq("KH01"), any())).thenReturn(order("DH01", "KH01"));
+        Exchange exchange = exchange(CUSTOMER);
+        checkout(exchange);
+        exchange.parameters.putAll(Map.of("fulfillmentType", "DELIVERY", "paymentMethod", "BANK_TRANSFER",
+                "deliveryLatitude", "10.775", "deliveryLongitude", "106.701", "deliveryAddress", "12 Main Street"));
+        exchange.send(customerServlet);
+        ArgumentCaptor<OrderRequest> form = ArgumentCaptor.forClass(OrderRequest.class);
+        verify(orders).createOrder(eq("KH01"), form.capture());
+        assertEquals(10.775, form.getValue().getDeliveryLatitude());
+        assertEquals(106.701, form.getValue().getDeliveryLongitude());
+        assertEquals("12 Main Street", form.getValue().getDeliveryAddress());
+        verify(payos).create("DH01", "KH01");
+        verify(exchange.response).sendRedirect("/crave/orders/DH01");
+    }
+
+    @Test void domainCheckoutErrorsKeepPromotionAndDisplayOriginalMessage() throws Exception {
         for (ApiException failure : List.of(new BadRequestException(ErrorCode.CART_EMPTY),
                 new BadRequestException(ErrorCode.INVALID_OPTION),
                 new PromotionValidationException(ErrorCode.PROMOTION_EXPIRED))) {
-            doThrow(failure).when(orders).createOrder(eq("KH01"), any(OrderRequest.class));
-            Route route = new Route(customerServlet, "POST", "/api/orders", null);
-            Exchange exchange = request(route, CUSTOMER, CHECKOUT);
-
+            doThrow(failure).when(orders).createOrder(eq("KH01"), any());
+            Exchange exchange = exchange(CUSTOMER);
+            checkout(exchange);
+            exchange.sessionValues.put("selectedPromotionId", "PROMO-SESSION");
             exchange.send(customerServlet);
-
-            exchange.assertError(400, failure.getErrorCode().getCode());
+            assertEquals(failure.getMessage(), exchange.sessionValues.get("orderError"));
+            assertEquals("PROMO-SESSION", exchange.sessionValues.get("selectedPromotionId"));
+            verify(exchange.response).sendRedirect("/crave/checkout");
         }
     }
 
-    @Test
-    void checkoutRejectsCustomerIdentityInJsonPayload() throws Exception {
-        Route route = new Route(customerServlet, "POST", "/api/orders", null);
-        Exchange exchange = request(route, CUSTOMER, "{\"customerId\":\"KH99\"}");
-
-        exchange.send(customerServlet);
-
-        exchange.assertError(400, "INVALID_REQUEST");
-        verifyNoInteractions(orders);
+    @Test void missingInvalidEnumsOrCoordinatesCannotCreateOrder() throws Exception {
+        List<Map<String, String>> invalidForms = List.of(Map.of(), Map.of("fulfillmentType", "INVALID"),
+                Map.of("paymentMethod", "INVALID"),
+                Map.of("fulfillmentType", "DELIVERY", "deliveryLatitude", "not-a-number"));
+        for (Map<String, String> invalid : invalidForms) {
+            Exchange exchange = exchange(CUSTOMER);
+            if (!invalid.isEmpty()) checkout(exchange);
+            exchange.parameters.putAll(invalid);
+            exchange.send(customerServlet);
+            assertNotNull(exchange.sessionValues.get("orderError"));
+            verify(exchange.response).sendRedirect("/crave/checkout");
+        }
+        verifyNoInteractions(orders, payos);
     }
 
-    @Test
-    void orderDetailRequiresOwnershipAndDoesNotExposeForeignOrderData() throws Exception {
+    @Test void foreignOrUnownedOrderIsNeverExposedToJsp() throws Exception {
         for (String owner : new String[]{"KH02", null}) {
             OrderResponse foreign = order("DH99", owner);
             foreign.setDeliveryAddress("private address");
             when(orders.getOrderById("DH99")).thenReturn(foreign);
-            Route route = new Route(customerServlet, "GET", "/api/orders", "/DH99");
-            Exchange exchange = request(route, CUSTOMER, "");
+            Exchange exchange = exchange(CUSTOMER);
+            when(exchange.request.getPathInfo()).thenReturn("/DH99");
             spoofIdentity(exchange);
-
-            exchange.send(customerServlet);
-
-            exchange.assertError(403, "FORBIDDEN");
-            assertTrue(exchange.json().path("data").isMissingNode() || exchange.json().path("data").isNull());
-            assertFalse(exchange.body.toString().contains("private address"));
+            pageServlet.doGet(exchange.request, exchange.response);
+            verify(exchange.response).sendError(eq(403), anyString());
+            assertFalse(exchange.attributes.containsKey("order"));
+            verifyNoInteractions(exchange.dispatcher, payos);
         }
     }
 
-    @Test
-    void ownerCanViewOwnOrderDetail() throws Exception {
-        when(orders.getOrderById("DH01")).thenReturn(order("DH01", "KH01"));
-        Route route = new Route(customerServlet, "GET", "/api/orders", "/DH01");
-        Exchange exchange = request(route, CUSTOMER, "");
-
-        exchange.send(customerServlet);
-
-        exchange.assertStatus(200);
-        assertEquals("KH01", exchange.json().path("data").path("customerId").asText());
+    @Test void ownerCanViewOrderDetail() throws Exception {
+        OrderResponse order = order("DH01", "KH01");
+        when(orders.getOrderById("DH01")).thenReturn(order);
+        Exchange exchange = exchange(CUSTOMER);
+        when(exchange.request.getPathInfo()).thenReturn("/DH01");
+        pageServlet.doGet(exchange.request, exchange.response);
+        assertSame(order, exchange.attributes.get("order"));
+        assertEquals(false, exchange.attributes.get("onlinePayment"));
+        verify(exchange.request).getRequestDispatcher("/WEB-INF/views/order/order-detail.jsp");
+        verify(exchange.dispatcher).forward(exchange.request, exchange.response);
     }
 
-    @Test
-    void orderAndPaymentAdminRoutesRejectCustomersAndUnrelatedEmployeeRoles() throws Exception {
+    @Test void cancellationUsesSessionOwnerAndSynchronizesGatewayAfterService() throws Exception {
+        Exchange exchange = exchange(CUSTOMER);
+        when(exchange.request.getServletPath()).thenReturn("/orders/cancel");
+        exchange.parameters.putAll(Map.of("orderId", "DH01", "reason", "Changed plans"));
+        spoofIdentity(exchange);
+        exchange.send(customerServlet);
+        var calls = inOrder(orders, payos);
+        calls.verify(orders).cancelOrder("DH01", "KH01", "Changed plans");
+        calls.verify(payos).cancelForOrder("DH01");
+        verify(exchange.response).sendRedirect("/crave/orders/DH01");
+    }
+
+    @Test void unrelatedRolesCannotMutateOrderOrPayment() throws Exception {
         for (ProfileResponse user : new ProfileResponse[]{CUSTOMER, employee(EmployeeRole.MENU_MANAGER),
                 employee(EmployeeRole.PROMOTION_MANAGER), employee(EmployeeRole.HR_MANAGER), employee(null)}) {
-            for (Route route : adminRoutes()) {
-                Exchange exchange = request(route, user, "{invalid");
-
-                exchange.send(route.servlet);
-
-                exchange.assertError(403, "FORBIDDEN");
-                verify(exchange.request, never()).getInputStream();
+            for (HttpServlet servlet : new HttpServlet[]{adminServlet, paymentServlet}) {
+                Exchange exchange = exchange(user);
+                exchange.send(servlet);
+                verify(exchange.response).sendError(eq(403), anyString());
+                verify(exchange.request, never()).getSession();
             }
         }
         verifyNoInteractions(orders, payments);
     }
 
-    @Test
-    void orderStaffAndAdminsCanReadOrdersAndRecordTheirAuthenticatedEmployeeId() throws Exception {
-        when(orders.getAllOrdersForAdmin()).thenReturn(List.of());
+    @Test void authorizedStaffUseSessionEmployeeForStatusChanges() throws Exception {
         for (EmployeeRole role : new EmployeeRole[]{EmployeeRole.ORDER_STAFF, EmployeeRole.ADMIN}) {
-            ProfileResponse user = employee(role);
-            Exchange list = request(new Route(adminServlet, "GET", "/api/admin/orders", null), user, "");
-            list.send(adminServlet);
-            list.assertStatus(200);
-
-            Exchange update = request(new Route(adminServlet, "PATCH", "/api/admin/orders", "/DH01/status"),
-                    user, ORDER_STATUS);
+            Exchange update = exchange(employee(role));
             spoofIdentity(update);
+            update.parameters.putAll(Map.of("orderId", "DH01", "status", "PREPARING", "note", "Confirmed"));
             update.send(adminServlet);
-            update.assertStatus(200);
-
-            Exchange payment = request(new Route(paymentServlet, "PATCH", "/api/admin/payments", "/TT01/status"),
-                    user, PAYMENT_STATUS);
+            assertNotNull(update.sessionValues.get("adminOrderMessage"));
+            Exchange payment = exchange(employee(role));
             spoofIdentity(payment);
+            payment.parameters.putAll(Map.of("orderId", "DH01", "paymentId", "TT01", "status", "SUCCESS", "transactionRef", "TX01"));
             payment.send(paymentServlet);
-            payment.assertStatus(200);
+            assertNotNull(payment.sessionValues.get("adminOrderMessage"));
         }
         verify(orders, times(2)).updateOrderStatus("DH01", OrderStatus.PREPARING, "NV01", "Confirmed");
         verify(orders, never()).updateOrderStatus(anyString(), any(), eq("NV99"), any());
         verify(payments, times(2)).updatePaymentStatus("TT01", PaymentStatus.SUCCESS, "TX01");
     }
 
-    @Test
-    void adminStatusMutationsRejectEmployeeIdentityInJsonPayload() throws Exception {
-        for (Route route : adminRoutes()) {
-            if (!"PATCH".equals(route.method)) {
-                continue;
-            }
-            Exchange exchange = request(route, employee(EmployeeRole.ORDER_STAFF),
-                    "{\"employeeId\":\"NV99\",\"status\":\"SUCCESS\"}");
-
-            exchange.send(route.servlet);
-
-            exchange.assertError(400, "INVALID_REQUEST");
-        }
-        verifyNoInteractions(orders, payments);
-    }
-
-    @Test
-    void nullOrMalformedCheckoutBodyReturns400WithoutCreatingOrder() throws Exception {
-        for (String payload : new String[]{"null", "{invalid", ""}) {
-            Exchange exchange = request(new Route(customerServlet, "POST", "/api/orders", null), CUSTOMER, payload);
-
-            exchange.send(customerServlet);
-
-            exchange.assertError(400, "INVALID_REQUEST");
-        }
-        verifyNoInteractions(orders);
-    }
-
-    @Test
-    void nullMissingOrInvalidAdminStatusReturns400BeforeCallingServices() throws Exception {
-        for (Route route : adminRoutes()) {
-            if (!"PATCH".equals(route.method)) {
-                continue;
-            }
-            for (String payload : new String[]{"null", "{}", "{\"status\":null}", "{\"status\":\"\"}",
-                    "{\"status\":\"NO_SUCH_STATUS\"}", "{invalid", ""}) {
-                Exchange exchange = request(route, employee(EmployeeRole.ORDER_STAFF), payload);
-
-                exchange.send(route.servlet);
-
-                exchange.assertError(400, "INVALID_REQUEST");
-            }
-        }
-        verifyNoInteractions(orders, payments);
-    }
-
-    @Test
-    void malformedAdminStatusPathsCannotTargetAnUnintendedResource() throws Exception {
+    @Test void missingOrInvalidStatusCannotCallAdminServices() throws Exception {
         for (HttpServlet servlet : new HttpServlet[]{adminServlet, paymentServlet}) {
-            for (String path : new String[]{"/status", "//status", "/DH01/extra/status", "/DH01//status", "/DH01"}) {
-                Exchange exchange = request(new Route(servlet, "PATCH", "/api/admin/orders", path),
-                        employee(EmployeeRole.ORDER_STAFF), ORDER_STATUS);
-
+            for (String status : new String[]{null, "", "NO_SUCH_STATUS"}) {
+                Exchange exchange = exchange(employee(EmployeeRole.ORDER_STAFF));
+                exchange.parameters.put("status", status);
                 exchange.send(servlet);
-
-                exchange.assertError(400, "INVALID_REQUEST");
-                verify(exchange.request, never()).getInputStream();
+                assertNotNull(exchange.sessionValues.get("adminOrderError"));
             }
         }
         verifyNoInteractions(orders, payments);
     }
 
-    @Test
-    void changedLoginAfterFilterAuthorizationRejectsEveryOrderAndPaymentOperation() throws Exception {
-        for (Route route : routes()) {
-            ProfileResponse original = route.servlet == customerServlet ? CUSTOMER : employee(EmployeeRole.ORDER_STAFF);
-            Exchange exchange = request(route, original, "{}");
+    @Test void changedLoginAfterFilterAuthorizationRejectsEveryMutation() throws Exception {
+        for (HttpServlet servlet : mutations()) {
+            ProfileResponse user = servlet == customerServlet ? CUSTOMER : employee(EmployeeRole.ORDER_STAFF);
+            Exchange exchange = exchange(user);
             SessionAuth.capture(exchange.request);
-            // Even a repeat login as the same account is a different authentication revision.
-            SessionAuth.store(exchange.session, original);
-
-            exchange.send(route.servlet);
-
-            exchange.assertError(401, "UNAUTHORIZED");
+            SessionAuth.store(exchange.session, user);
+            exchange.send(servlet);
+            verify(exchange.response).sendError(eq(401), anyString());
             verify(exchange.session, never()).invalidate();
         }
-        verifyNoInteractions(orders, payments);
+        verifyNoInteractions(orders, payments, payos);
     }
 
-    @Test
-    void logoutAfterFilterAuthorizationRejectsEveryOrderAndPaymentOperation() throws Exception {
-        for (Route route : routes()) {
-            ProfileResponse user = route.servlet == customerServlet ? CUSTOMER : employee(EmployeeRole.ORDER_STAFF);
-            Exchange exchange = request(route, user, "{}");
+    @Test void logoutAfterFilterAuthorizationRejectsEveryMutation() throws Exception {
+        for (HttpServlet servlet : mutations()) {
+            Exchange exchange = exchange(servlet == customerServlet ? CUSTOMER : employee(EmployeeRole.ORDER_STAFF));
             SessionAuth.capture(exchange.request);
             when(exchange.request.getSession(false)).thenReturn(null);
-
-            exchange.send(route.servlet);
-
-            exchange.assertError(401, "UNAUTHORIZED");
-            verify(exchange.request, never()).getSession(true);
+            exchange.send(servlet);
+            verify(exchange.response).sendError(eq(401), anyString());
+            verify(exchange.request, never()).getSession();
         }
-        verifyNoInteractions(orders, payments);
+        verifyNoInteractions(orders, payments, payos);
     }
 
-    @Test
-    void serviceFailuresUseSanitizedSharedJsonEnvelope() throws Exception {
+    @Test void unexpectedFailuresDoNotExposeDatabaseDetails() throws Exception {
         when(orders.getOrdersByCustomer("KH01")).thenThrow(new IllegalStateException("jdbc private-host secret"));
-        Exchange customer = request(new Route(customerServlet, "GET", "/api/orders", null), CUSTOMER, "");
-        customer.send(customerServlet);
-        customer.assertError(500, "INTERNAL_SERVER_ERROR");
-        assertFalse(customer.body.toString().contains("private-host"));
-        assertFalse(customer.body.toString().contains("secret"));
-
+        Exchange page = exchange(CUSTOMER);
+        pageServlet.doGet(page.request, page.response);
+        ArgumentCaptor<String> error = ArgumentCaptor.forClass(String.class);
+        verify(page.response).sendError(eq(500), error.capture());
+        assertFalse(error.getValue().contains("secret"));
+        assertFalse(error.getValue().contains("private-host"));
+        verifyNoInteractions(page.dispatcher);
         doThrow(new IllegalStateException("jdbc private-host secret")).when(payments)
                 .updatePaymentStatus("TT01", PaymentStatus.SUCCESS, "TX01");
-        Exchange payment = request(new Route(paymentServlet, "PATCH", "/api/admin/payments", "/TT01/status"),
-                employee(EmployeeRole.ORDER_STAFF), PAYMENT_STATUS);
-        payment.send(paymentServlet);
-        payment.assertError(500, "INTERNAL_SERVER_ERROR");
-        assertFalse(payment.body.toString().contains("secret"));
+        Exchange form = exchange(employee(EmployeeRole.ORDER_STAFF));
+        form.parameters.putAll(Map.of("paymentId", "TT01", "status", "SUCCESS", "transactionRef", "TX01"));
+        form.send(paymentServlet);
+        String message = (String) form.sessionValues.get("adminOrderError");
+        assertNotNull(message);
+        assertFalse(message.contains("secret"));
+        assertFalse(message.contains("private-host"));
     }
 
-    private List<Route> adminRoutes() {
-        return List.of(new Route(adminServlet, "GET", "/api/admin/orders", null),
-                new Route(adminServlet, "PATCH", "/api/admin/orders", "/DH01/status"),
-                new Route(paymentServlet, "PATCH", "/api/admin/payments", "/TT01/status"));
+    @Test void onlineOrderGatewayFailureKeepsDetailPageWithoutInternalErrorDetails() throws Exception {
+        OrderResponse order = order("DH01", "KH01");
+        OrderResponse.PaymentSummary payment = new OrderResponse.PaymentSummary();
+        payment.setMethod("BANK_TRANSFER");
+        payment.setStatus("PENDING");
+        order.setPayment(payment);
+        when(orders.getOrderById("DH01")).thenReturn(order);
+        when(payos.status("DH01", "KH01")).thenThrow(new IllegalStateException("jdbc private-host password=secret"));
+        Exchange exchange = exchange(CUSTOMER);
+        when(exchange.request.getPathInfo()).thenReturn("/DH01");
+
+        pageServlet.doGet(exchange.request, exchange.response);
+
+        String message = (String) exchange.attributes.get("payosError");
+        assertNotNull(message);
+        assertFalse(message.isBlank());
+        assertFalse(message.contains("secret"));
+        assertFalse(message.contains("private-host"));
+        assertSame(order, exchange.attributes.get("order"));
+        assertEquals(true, exchange.attributes.get("onlinePayment"));
+        verify(exchange.dispatcher).forward(exchange.request, exchange.response);
     }
 
-    private List<Route> routes() {
-        return List.of(new Route(customerServlet, "GET", "/api/orders", null),
-                new Route(customerServlet, "POST", "/api/orders", null),
-                adminRoutes().get(0), adminRoutes().get(1), adminRoutes().get(2));
-    }
-
+    private List<HttpServlet> mutations() { return List.of(customerServlet, adminServlet, paymentServlet); }
     private static ProfileResponse employee(EmployeeRole role) {
         return new ProfileResponse("NV01", AccountType.EMPLOYEE, "Employee", "employee@example.com", "0901234568", role);
     }
-
     private static OrderResponse order(String id, String customerId) {
-        OrderResponse response = new OrderResponse();
-        response.setOrderId(id);
-        response.setCustomerId(customerId);
-        return response;
+        OrderResponse order = new OrderResponse(); order.setOrderId(id); order.setCustomerId(customerId); return order;
     }
-
+    private void checkout(Exchange exchange) {
+        exchange.parameters.putAll(Map.of("fulfillmentType", "PICKUP", "receiverName", " Customer ",
+                "receiverPhone", "0901234567", "paymentMethod", "CASH"));
+    }
     private void spoofIdentity(Exchange exchange) {
         when(exchange.request.getHeader("X-Customer-Id")).thenReturn("KH99");
         when(exchange.request.getHeader("X-Employee-Id")).thenReturn("NV99");
-        when(exchange.request.getParameter("customerId")).thenReturn("KH99");
-        when(exchange.request.getParameter("employeeId")).thenReturn("NV99");
-        when(exchange.session.getAttribute("customerId")).thenReturn("KH99");
-        when(exchange.session.getAttribute("employeeId")).thenReturn("NV99");
+        exchange.parameters.putAll(Map.of("customerId", "KH99", "employeeId", "NV99"));
+        exchange.sessionValues.putAll(Map.of("customerId", "KH99", "employeeId", "NV99"));
     }
-
-    private Exchange request(Route route, ProfileResponse principal, String payload) throws Exception {
+    private Exchange exchange(ProfileResponse principal) {
         HttpServletRequest request = mock(HttpServletRequest.class);
         HttpServletResponse response = mock(HttpServletResponse.class);
-        HttpSession session = principal == null ? null : mock(HttpSession.class);
-        StringWriter body = new StringWriter();
-        when(request.getMethod()).thenReturn(route.method);
-        when(request.getServletPath()).thenReturn(route.path);
-        when(request.getPathInfo()).thenReturn(route.pathInfo);
-        when(request.getProtocol()).thenReturn("HTTP/1.1");
+        HttpSession session = mock(HttpSession.class);
+        RequestDispatcher dispatcher = mock(RequestDispatcher.class);
+        Map<String, Object> attributes = new HashMap<>(), sessionValues = new HashMap<>();
+        Map<String, String> parameters = new HashMap<>();
+        if (principal != null) sessionValues.put(SessionAuth.CURRENT_USER, principal);
+        when(request.getContextPath()).thenReturn("/crave");
+        when(request.getSession()).thenReturn(session);
         when(request.getSession(false)).thenReturn(session);
-        ByteArrayInputStream bytes = new ByteArrayInputStream(payload.getBytes(StandardCharsets.UTF_8));
-        when(request.getInputStream()).thenReturn(new ServletInputStream() {
-            @Override public boolean isFinished() { return bytes.available() == 0; }
-            @Override public boolean isReady() { return true; }
-            @Override public void setReadListener(ReadListener listener) { }
-            @Override public int read() { return bytes.read(); }
-        });
-        if (session != null) {
-            Map<String, Object> attributes = new HashMap<>();
-            attributes.put(SessionAuth.CURRENT_USER, principal);
-            when(session.getAttribute(anyString())).thenAnswer(call -> attributes.get(call.getArgument(0)));
-            doAnswer(call -> {
-                attributes.put(call.getArgument(0), call.getArgument(1));
-                return null;
-            }).when(session).setAttribute(anyString(), any());
-        }
-        Map<String, Object> attributes = new HashMap<>();
+        when(request.getServletPath()).thenReturn("/orders/create");
+        when(request.getParameter(anyString())).thenAnswer(call -> parameters.get(call.getArgument(0)));
         when(request.getAttribute(anyString())).thenAnswer(call -> attributes.get(call.getArgument(0)));
-        doAnswer(call -> {
-            attributes.put(call.getArgument(0), call.getArgument(1));
-            return null;
-        }).when(request).setAttribute(anyString(), any());
-        when(response.getWriter()).thenReturn(new PrintWriter(body));
-        return new Exchange(request, response, session, body);
+        doAnswer(call -> { attributes.put(call.getArgument(0), call.getArgument(1)); return null; })
+                .when(request).setAttribute(anyString(), any());
+        when(session.getAttribute(anyString())).thenAnswer(call -> sessionValues.get(call.getArgument(0)));
+        doAnswer(call -> { sessionValues.put(call.getArgument(0), call.getArgument(1)); return null; })
+                .when(session).setAttribute(anyString(), any());
+        doAnswer(call -> { sessionValues.remove(call.getArgument(0)); return null; })
+                .when(session).removeAttribute(anyString());
+        when(request.getRequestDispatcher(anyString())).thenReturn(dispatcher);
+        return new Exchange(request, response, session, dispatcher, attributes, sessionValues, parameters);
     }
-
-    private record Route(HttpServlet servlet, String method, String path, String pathInfo) {
-    }
-
     private record Exchange(HttpServletRequest request, HttpServletResponse response, HttpSession session,
-                            StringWriter body) {
+                            RequestDispatcher dispatcher, Map<String, Object> attributes,
+                            Map<String, Object> sessionValues, Map<String, String> parameters) {
         void send(HttpServlet servlet) throws Exception {
-            servlet.service((ServletRequest) request, (ServletResponse) response);
-        }
-
-        void assertStatus(int status) {
-            verify(response).setStatus(status);
-        }
-
-        JsonNode json() throws Exception {
-            return JsonProvider.objectMapper().readTree(body.toString());
-        }
-
-        void assertError(int status, String code) throws Exception {
-            assertStatus(status);
-            assertFalse(json().path("success").asBoolean());
-            assertEquals(code, json().path("error").path("code").asText());
-            verify(response).setContentType("application/json");
+            if (servlet instanceof OrderServlet order) order.doPost(request, response);
+            else if (servlet instanceof AdminOrderServlet admin) admin.doPost(request, response);
+            else ((PaymentServlet) servlet).doPost(request, response);
         }
     }
 }

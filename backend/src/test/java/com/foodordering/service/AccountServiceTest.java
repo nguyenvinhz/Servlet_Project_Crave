@@ -15,8 +15,7 @@ import com.foodordering.enums.CustomerStatus;
 import com.foodordering.enums.EmployeeRole;
 import com.foodordering.enums.EmployeeStatus;
 import com.foodordering.exception.AccountException;
-import com.foodordering.repository.AccountRepository;
-import com.foodordering.utils.JsonProvider;
+import com.foodordering.dao.AccountDAO;
 import com.foodordering.utils.PasswordHasher;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -68,10 +67,13 @@ class AccountServiceTest {
         assertEquals(10, registered.id().length());
         assertTrue(repository.users.get(registered.id()).getPasswordHash().startsWith("pbkdf2_sha256$600000$"));
         assertEquals(registered, service.login(new LoginRequest("VINH@example.com", "Secret#123", true)));
-        String json = JsonProvider.objectMapper().writeValueAsString(registered);
-        assertFalse(json.contains("password"));
-        assertFalse(json.contains("Secret#123"));
-        assertFalse(json.contains("role"));
+        // JSP receives this DTO directly, so its public properties must never expose credentials.
+        for (var component : ProfileResponse.class.getRecordComponents()) {
+            assertFalse(component.getName().toLowerCase().contains("password"));
+            assertFalse(component.getName().toLowerCase().contains("hash"));
+        }
+        assertFalse(registered.toString().contains("Secret#123"));
+        assertFalse(registered.toString().contains(repository.users.get(registered.id()).getPasswordHash()));
         assertEquals(401, assertThrows(AccountException.class,
                 () -> service.login(new LoginRequest(registered.email(), "Wrong#123", false))).getStatusCode());
         ((Customer) repository.users.get(registered.id())).setStatus(CustomerStatus.LOCKED);
@@ -92,7 +94,7 @@ class AccountServiceTest {
 
     @Test
     void malformedContactTextIsRejectedBeforeHashingOrDatabaseAccess() {
-        AccountRepository guardedRepository = mock(AccountRepository.class);
+        AccountDAO guardedRepository = mock(AccountDAO.class);
         PasswordHasher hasher = mock(PasswordHasher.class);
         AccountService guarded = new AccountService(guardedRepository, hasher);
 
@@ -118,7 +120,7 @@ class AccountServiceTest {
 
     @Test
     void malformedAddressTextIsRejectedBeforePersistenceOrDefaultChanges() {
-        AccountRepository guardedRepository = mock(AccountRepository.class);
+        AccountDAO guardedRepository = mock(AccountDAO.class);
         AccountService guarded = new AccountService(guardedRepository);
 
         for (String invalid : List.of("Địa chỉ " + (char) 0xD800, "Địa chỉ " + (char) 0xDC00,
@@ -364,7 +366,7 @@ class AccountServiceTest {
                 EmployeeRole.ADMIN, null, LocalDate.of(2026, 1, 1), status);
     }
 
-    private static class MemoryRepository implements AccountRepository, AccountRepository.Session {
+    private static class MemoryRepository extends AccountDAO implements AccountDAO.Session {
         private final Map<String, User> users = new LinkedHashMap<>();
         private final Map<String, Address> addresses = new LinkedHashMap<>();
         private boolean locked;

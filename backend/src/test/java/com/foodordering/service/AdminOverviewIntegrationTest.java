@@ -2,8 +2,8 @@ package com.foodordering.service;
 
 import com.foodordering.config.DatabaseConfig;
 import com.foodordering.exception.ValidationException;
-import com.foodordering.repository.CustomerOrderRepositoryImpl;
-import com.foodordering.repository.PaymentRepositoryImpl;
+import com.foodordering.dao.CustomerOrderDAO;
+import com.foodordering.dao.PaymentDAO;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
 
@@ -25,7 +25,7 @@ class AdminOverviewIntegrationTest {
     @SuppressWarnings("unchecked")
     void dailyAndStatusBreakdownsReconcileWithDatabaseTotals() {
         var service = new AdminOverviewService(DatabaseConfig.getEntityManagerFactory(),
-                new CustomerOrderServiceImpl(new CustomerOrderRepositoryImpl(), new PaymentRepositoryImpl()));
+                new CustomerOrderService(new CustomerOrderDAO(), new PaymentDAO()));
         LocalDate to = LocalDate.now();
         LocalDate from = to.minusDays(90);
         Map<String, Object> result = service.overview(from, to);

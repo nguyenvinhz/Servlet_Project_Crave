@@ -3,6 +3,9 @@
 <%@ taglib prefix="fmt" uri="jakarta.tags.fmt" %>
 <fmt:setLocale value="vi_VN" />
 <%@ include file="/WEB-INF/views/components/header.jspf" %>
+<input type="hidden" id="pageCartCount" value="<c:out value='${sessionScope.cartItemCount}'/>">
+<div id="cartFlash" hidden data-message="<c:out value='${sessionScope.cartMessage}'/>" data-type="<c:out value='${sessionScope.cartMessageType}'/>"></div>
+<c:remove var="cartMessage" scope="session"/><c:remove var="cartMessageType" scope="session"/>
 
 <main id="main-content" class="page-container product-detail-page">
     <c:if test="${empty food}">
@@ -69,7 +72,11 @@
                     <p id="foodDesc"><c:out value="${not empty food.description ? food.description : 'Món ăn thơm ngon được chế biến từ những nguyên liệu tươi mới nhất mỗi ngày.'}"/></p>
                 </div>
 
-                <form id="orderCustomizationForm" class="customization-form" data-food-id="<c:out value='${food.id}'/>" onsubmit="event.preventDefault(); handleAddToCart();">
+                <form id="orderCustomizationForm" class="customization-form" method="post" action="<c:url value='/cart/action'/>" data-food-id="<c:out value='${food.id}'/>" onsubmit="event.preventDefault(); handleAddToCart();">
+                    <input type="hidden" name="action" value="add">
+                    <input type="hidden" name="foodId" value="<c:out value='${food.id}'/>">
+                    <input type="hidden" name="returnTo" value="/menu/detail?id=<c:out value='${food.id}'/>">
+                    <input type="hidden" name="note" value="">
                     <c:if test="${not empty food.options}">
                         <section class="options-container" id="foodOptionsContainer">
                             <h3 class="options-title">Tùy chọn cho món ăn</h3>
@@ -226,6 +233,6 @@
     </c:if>
 </main>
 
-<script src="<c:url value='/assets/js/menu-detail.js'/>"></script>
+<script src="<c:url value='/assets/js/menu-detail.js?v=20261017-forms1'/>"></script>
 
 <%@ include file="/WEB-INF/views/components/footer.jspf" %>

@@ -1,4 +1,44 @@
 services:
+  # Local development starts only MySQL. Enable production to run the packaged WAR.
+  app:
+    profiles: [production]
+    image: ${CRAVE_TOMCAT_IMAGE:-tomcat:10.1-jdk17-temurin}
+    container_name: crave-app
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      TZ: Asia/Ho_Chi_Minh
+      JAVA_OPTS: -Dfile.encoding=UTF-8 -Duser.timezone=Asia/Ho_Chi_Minh
+      DB_URL: jdbc:mysql://mysql:3306/crave?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Ho_Chi_Minh&characterEncoding=UTF-8
+      DB_USER: ${CRAVE_DB_USER:-crave_app}
+      DB_PASSWORD: ${CRAVE_DB_PASSWORD:?Set CRAVE_DB_PASSWORD in .env}
+      PAYOS_CLIENT_ID: ${PAYOS_CLIENT_ID:-}
+      PAYOS_API_KEY: ${PAYOS_API_KEY:-}
+      PAYOS_CHECKSUM_KEY: ${PAYOS_CHECKSUM_KEY:-}
+      PAYOS_PUBLIC_BASE_URL: ${PAYOS_PUBLIC_BASE_URL:-}
+      EMAIL_SMTP_HOST: ${EMAIL_SMTP_HOST:-smtp.gmail.com}
+      EMAIL_SMTP_PORT: ${EMAIL_SMTP_PORT:-587}
+      EMAIL_SMTP_USERNAME: ${EMAIL_SMTP_USERNAME:-}
+      EMAIL_SMTP_PASSWORD: ${EMAIL_SMTP_PASSWORD:-}
+      EMAIL_FROM: ${EMAIL_FROM:-}
+      EMAIL_SMTP_STARTTLS: ${EMAIL_SMTP_STARTTLS:-true}
+      EMAIL_OTP_SECRET: ${EMAIL_OTP_SECRET:-}
+      CRAVE_STORE_ADDRESS: ${CRAVE_STORE_ADDRESS:-}
+      CRAVE_STORE_LATITUDE: ${CRAVE_STORE_LATITUDE:-}
+      CRAVE_STORE_LONGITUDE: ${CRAVE_STORE_LONGITUDE:-}
+      CRAVE_GEOCODER_URL: ${CRAVE_GEOCODER_URL:-https://photon.komoot.io/api/}
+    ports:
+      - "${CRAVE_HTTP_PORT:-8080}:8080"
+    volumes:
+      - type: bind
+        source: ./backend/target/crave.war
+        target: /usr/local/tomcat/webapps/crave.war
+        read_only: true
+        bind:
+          create_host_path: false
+
   mysql:
     image: mysql:8.4
     container_name: crave-mysql
@@ -9,7 +49,7 @@ services:
       MYSQL_USER: ${CRAVE_DB_USER:-crave_app}
       MYSQL_PASSWORD: ${CRAVE_DB_PASSWORD:?Set CRAVE_DB_PASSWORD in .env}
     ports:
-      - "3306:3306"
+      - "127.0.0.1:3306:3306"
     command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
     volumes:
       - crave-mysql-data:/var/lib/mysql

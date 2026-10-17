@@ -1,120 +1,81 @@
 package com.foodordering.servlet;
 
-import com.foodordering.api.BaseApiServlet;
-import com.foodordering.dto.ApiResponse;
-import com.foodordering.dto.ProfileResponse;
+import com.foodordering.dao.CustomerOrderDAO;
+import com.foodordering.dao.PaymentDAO;
+import com.foodordering.dto.OrderRequest;
+import com.foodordering.enums.FulfillmentType;
+import com.foodordering.enums.PaymentMethod;
+import com.foodordering.exception.AppException;
+import com.foodordering.exception.ApiException;
 import com.foodordering.security.SessionAuth;
-import jakarta.servlet.ServletException;
+import com.foodordering.service.CustomerOrderService;
+import com.foodordering.service.PayosPaymentService;
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.util.List;
-import java.util.Objects;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 
-import com.foodordering.dto.CancelOrderRequest;
-import com.foodordering.dto.OrderRequest;
-import com.foodordering.dto.OrderResponse;
-import com.foodordering.dto.OrderSummaryResponse;
-import com.foodordering.service.CustomerOrderService;
-import com.foodordering.service.CustomerOrderServiceImpl;
-import com.foodordering.service.PayosPaymentService;
-import com.foodordering.repository.CustomerOrderRepositoryImpl;
-import com.foodordering.repository.PaymentRepositoryImpl;
-
-@WebServlet(name = "OrderServlet", urlPatterns = "/api/orders/*")
-public class OrderServlet extends BaseApiServlet {
-
-    private CustomerOrderService orderService;
-    private PayosPaymentService payosPayments;
-
-    public OrderServlet() {
+@WebServlet(name = "OrderServlet", urlPatterns = {"/orders/create", "/orders/cancel"})
+public class OrderServlet extends BaseServlet {
+    private CustomerOrderService orders;
+    private PayosPaymentService payos;
+    public OrderServlet() { }
+    public OrderServlet(CustomerOrderService orders) { this.orders = orders; }
+    @Override public void init() {
+        if (orders == null) orders = new CustomerOrderService(new CustomerOrderDAO(), new PaymentDAO());
+        if (payos == null) payos = new PayosPaymentService();
     }
-
-    public OrderServlet(CustomerOrderService orderService) {
-        this.orderService = Objects.requireNonNull(orderService);
-    }
-
-    @Override
-    public void init() throws ServletException {
-        if (orderService == null) {
-            orderService = new CustomerOrderServiceImpl(new CustomerOrderRepositoryImpl(), new PaymentRepositoryImpl());
-        }
-        if (payosPayments == null) payosPayments = new PayosPaymentService();
-    }
-
-    @Override
-    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+    @Override protected void doPost(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        String destination = "/checkout";
         try {
-            ProfileResponse customer = SessionAuth.requireCustomer(req);
-            String customerId = customer.id();
-            
-            // Xử lý route chi tiết đơn hàng /api/orders/{id} hoặc danh sách
-            String pathInfo = req.getPathInfo();
-            if (pathInfo != null && pathInfo.length() > 1) {
-                String orderId = pathInfo.substring(1);
-                OrderResponse order = orderService.getOrderById(orderId);
-                if (!customerId.equals(order.getCustomerId())) {
-                    writeJson(resp, HttpServletResponse.SC_FORBIDDEN, ApiResponse.error("Bạn không có quyền xem đơn hàng này", "FORBIDDEN"));
-                    return;
-                }
-                writeJson(resp, HttpServletResponse.SC_OK, ApiResponse.success(order));
+            String customerId = SessionAuth.requireCustomer(request).id();
+            if ("/orders/cancel".equals(request.getServletPath())) {
+                String orderId = parameter(request, "orderId");
+                destination = "/orders/" + URLEncoder.encode(orderId, StandardCharsets.UTF_8);
+                orders.cancelOrder(orderId, customerId, parameter(request, "reason"));
+                try { if (payos != null) payos.cancelForOrder(orderId); }
+                catch (RuntimeException unavailable) { log("Chưa đồng bộ được hủy link payOS."); }
+                request.getSession().setAttribute("orderMessage", "Đã hủy đơn hàng.");
             } else {
-                List<OrderSummaryResponse> orders = orderService.getOrdersByCustomer(customerId);
-                writeJson(resp, HttpServletResponse.SC_OK, ApiResponse.success(orders));
-            }
-        } catch (Exception e) {
-            handleError(resp, e);
-        }
-    }
-
-    @Override
-    protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws IOException {
-        try {
-            ProfileResponse customer = SessionAuth.requireCustomer(req);
-            String customerId = customer.id();
-
-            String pathInfo = req.getPathInfo();
-            if (pathInfo != null && pathInfo.matches("^/[^/]+/cancel$")) {
-                String[] parts = pathInfo.split("/");
-                String orderId = parts[1];
-                String reason = null;
-                try {
-                    String body = req.getReader().lines().collect(java.util.stream.Collectors.joining());
-                    if (body != null && !body.trim().isEmpty()) {
-                        CancelOrderRequest cancelReq = com.foodordering.utils.JsonProvider.objectMapper().readValue(body, CancelOrderRequest.class);
-                        if (cancelReq != null) {
-                            reason = cancelReq.getReason();
-                        }
-                    }
-                } catch (Exception ignored) {
+                OrderRequest form = new OrderRequest();
+                form.setFulfillmentType(FulfillmentType.valueOf(parameter(request, "fulfillmentType")));
+                form.setReceiverName(parameter(request, "receiverName"));
+                form.setReceiverPhone(parameter(request, "receiverPhone"));
+                form.setDeliveryAddress(parameter(request, "deliveryAddress"));
+                form.setCustomerNote(parameter(request, "customerNote"));
+                form.setPaymentMethod(PaymentMethod.valueOf(parameter(request, "paymentMethod")));
+                if (form.getFulfillmentType() == FulfillmentType.DELIVERY) {
+                    form.setDeliveryLatitude(number(request, "deliveryLatitude"));
+                    form.setDeliveryLongitude(number(request, "deliveryLongitude"));
                 }
-                orderService.cancelOrder(orderId, customerId, reason);
-                cancelPayosLink(orderId);
-                writeJson(resp, HttpServletResponse.SC_OK, ApiResponse.success("Đã hủy đơn hàng thành công"));
+                form.setPromotionId((String) request.getSession().getAttribute("selectedPromotionId"));
+                var order = orders.createOrder(customerId, form);
+                request.getSession().removeAttribute("selectedPromotionId");
+                request.getSession().removeAttribute("selectedPromotionCode");
+                request.getSession().setAttribute("cartItemCount", 0);
+                destination = "/orders/" + URLEncoder.encode(order.getOrderId(), StandardCharsets.UTF_8);
+                if (form.getPaymentMethod() != PaymentMethod.CASH) {
+                    try { payos.create(order.getOrderId(), customerId); }
+                    catch (RuntimeException unavailable) { log("Chưa tạo được link payOS; khách có thể thử lại trên chi tiết đơn."); }
+                }
+            }
+        } catch (AppException | ApiException | IllegalArgumentException failure) {
+            if (failure instanceof AppException account && (account.getStatusCode() == 401 || account.getStatusCode() == 403)) {
+                response.sendError(account.getStatusCode(), account.getMessage());
                 return;
             }
-
-            OrderRequest request = readJson(req, OrderRequest.class);
-            if (request == null) {
-                badRequest(resp, "Vui lòng cung cấp thông tin đặt hàng.");
-                return;
-            }
-            OrderResponse response = orderService.createOrder(customerId, request);
-            
-            writeJson(resp, HttpServletResponse.SC_CREATED, ApiResponse.success(response));
-        } catch (Exception e) {
-            handleError(resp, e);
+            request.getSession().setAttribute("orderError", failure instanceof IllegalArgumentException
+                    ? "Vui lòng kiểm tra hình thức nhận món, phương thức thanh toán và điểm nhận hàng." : failure.getMessage());
+        } catch (RuntimeException failure) {
+            log("Không xử lý được đơn hàng.", failure);
+            request.getSession().setAttribute("orderError", "Chưa xử lý được đơn hàng. Vui lòng kiểm tra và thử lại.");
         }
+        redirect(request, response, destination);
     }
-
-    private void cancelPayosLink(String orderId) {
-        if (payosPayments == null) return;
-        try {
-            payosPayments.cancelForOrder(orderId);
-        } catch (RuntimeException unavailable) {
-            // The local cancellation has committed. A subsequent status request retries the gateway cancellation.
-            log("Chưa đồng bộ được hủy link payOS; sẽ thử lại khi kiểm tra trạng thái.");
-        }
+    private static Double number(HttpServletRequest request, String name) {
+        String value = request.getParameter(name);
+        return value == null || value.isBlank() ? null : Double.valueOf(value);
     }
 }

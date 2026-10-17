@@ -4,6 +4,7 @@
 <c:set var="pageTitle" value="Danh mục"/>
 <%@ include file="/WEB-INF/views/admin/components/begin.jspf" %>
 
+<c:if test="${not empty sessionScope.adminError or not empty sessionScope.adminSuccess}"><div id="adminFlash" hidden data-message="<c:out value='${not empty sessionScope.adminError ? sessionScope.adminError : sessionScope.adminSuccess}'/>" data-type="${not empty sessionScope.adminError ? 'error' : 'success'}"></div><c:remove var="adminError" scope="session"/><c:remove var="adminSuccess" scope="session"/></c:if>
 <main class="admin-content page-container admin-page">
     <header class="admin-header">
         <div class="admin-header-title">
@@ -94,19 +95,19 @@
             <h3 id="categoryModalTitle">Thêm danh mục mới</h3>
             <button type="button" class="modal-close" onclick="closeCategoryModal()" aria-label="Đóng hộp thoại">&times;</button>
         </div>
-        <form id="categoryForm" onsubmit="event.preventDefault(); submitCategoryForm();">
-            <input type="hidden" id="categoryModalId" value="">
+        <form id="categoryForm" method="post" action="<c:url value='/admin/categories/action'/>"><input type="hidden" name="action" value="create">
+            <input type="hidden" id="categoryModalId" name="id" value="">
             <div class="modal-body">
                 <div id="categoryFormAlert" class="alert-box" style="display: none;"></div>
 
                 <div class="form-group">
                     <label for="catNameInput">Tên danh mục *</label>
-                    <input type="text" id="catNameInput" placeholder="Ví dụ: Đồ uống, Món chính..." required maxlength="100">
+                    <input type="text" id="catNameInput" name="name" placeholder="Ví dụ: Đồ uống, Món chính..." required maxlength="100">
                 </div>
 
                 <div class="form-group">
                     <label for="catDescInput">Mô tả danh mục</label>
-                    <textarea id="catDescInput" rows="3" placeholder="Mô tả các món thuộc danh mục này..." maxlength="255"></textarea>
+                    <textarea id="catDescInput" name="description" rows="3" placeholder="Mô tả các món thuộc danh mục này..." maxlength="255"></textarea>
                 </div>
             </div>
             <div class="modal-footer">
@@ -120,6 +121,6 @@
 <!-- Toast Feedback Container -->
 <div class="toast-container" id="toastContainer"></div>
 
-<script src="<c:url value='/assets/js/menu-admin.js'/>"></script>
+<script src="<c:url value='/assets/js/menu-admin.js?v=20261017-forms1'/>"></script>
 
 <%@ include file="/WEB-INF/views/admin/components/end.jspf" %>

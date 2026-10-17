@@ -1,103 +1,53 @@
 package com.foodordering.servlet;
 
-import com.foodordering.api.BaseApiServlet;
-import com.foodordering.dto.ApiResponse;
+import com.foodordering.dao.CustomerOrderDAO;
+import com.foodordering.dao.PaymentDAO;
 import com.foodordering.enums.EmployeeRole;
+import com.foodordering.enums.OrderStatus;
 import com.foodordering.security.SessionAuth;
-import jakarta.servlet.ServletException;
+import com.foodordering.service.CustomerOrderService;
+import com.foodordering.service.PayosPaymentService;
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.util.List;
-import java.util.Objects;
-import com.foodordering.dto.OrderResponse;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 
-import com.foodordering.dto.UpdateOrderStatusRequest;
-import com.foodordering.enums.OrderStatus;
-import com.foodordering.service.CustomerOrderService;
-import com.foodordering.service.CustomerOrderServiceImpl;
-import com.foodordering.service.PayosPaymentService;
-import com.foodordering.repository.CustomerOrderRepositoryImpl;
-import com.foodordering.repository.PaymentRepositoryImpl;
-
-@WebServlet(name = "AdminOrderServlet", urlPatterns = "/api/admin/orders/*")
-public class AdminOrderServlet extends BaseApiServlet {
-
-    private CustomerOrderService orderService;
-    private PayosPaymentService payosPayments;
-
-    public AdminOrderServlet() {
+@WebServlet(name = "AdminOrderServlet", urlPatterns = "/admin/orders/action")
+public class AdminOrderServlet extends BaseServlet {
+    private CustomerOrderService orders;
+    private PayosPaymentService payos;
+    public AdminOrderServlet() { }
+    public AdminOrderServlet(CustomerOrderService orders) { this.orders = orders; }
+    @Override public void init() {
+        if (orders == null) orders = new CustomerOrderService(new CustomerOrderDAO(), new PaymentDAO());
+        if (payos == null) payos = new PayosPaymentService();
     }
-
-    public AdminOrderServlet(CustomerOrderService orderService) {
-        this.orderService = Objects.requireNonNull(orderService);
-    }
-
-    @Override
-    public void init() throws ServletException {
-        if (orderService == null) {
-            orderService = new CustomerOrderServiceImpl(new CustomerOrderRepositoryImpl(), new PaymentRepositoryImpl());
-        }
-        if (payosPayments == null) payosPayments = new PayosPaymentService();
-    }
-
-    @Override
-    protected void service(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-        if ("PATCH".equalsIgnoreCase(req.getMethod())) {
-            doPatch(req, resp);
-        } else {
-            super.service(req, resp);
-        }
-    }
-
-    private String requireEmployee(HttpServletRequest req) {
-        return SessionAuth.requireEmployee(req, EmployeeRole.ORDER_STAFF).id();
-    }
-
-    @Override
-    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+    @Override protected void doPost(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        String orderId = parameter(request, "orderId");
         try {
-            requireEmployee(req);
-            List<OrderResponse> orders = orderService.getAllOrdersForAdmin();
-            writeJson(resp, HttpServletResponse.SC_OK, ApiResponse.success(orders));
-        } catch (Exception e) {
-            handleError(resp, e);
-        }
-    }
-
-    protected void doPatch(HttpServletRequest req, HttpServletResponse resp) throws IOException {
-        try {
-            String employeeId = requireEmployee(req);
-
-            String pathInfo = req.getPathInfo();
-            if (pathInfo == null || !pathInfo.matches("/[^/]+/status")) {
-                badRequest(resp, "Đường dẫn cập nhật đơn hàng không hợp lệ.");
+            String employeeId = SessionAuth.requireEmployee(request, EmployeeRole.ORDER_STAFF).id();
+            OrderStatus status = OrderStatus.valueOf(parameter(request, "status"));
+            orders.updateOrderStatus(orderId, status, employeeId, parameter(request, "note"));
+            if (status == OrderStatus.CANCELLED) {
+                try { payos.cancelForOrder(orderId); }
+                catch (RuntimeException unavailable) { log("Chưa đồng bộ được hủy link payOS."); }
+            }
+            request.getSession().setAttribute("adminOrderMessage", "Đã cập nhật trạng thái đơn hàng.");
+        } catch (RuntimeException failure) {
+            if (failure instanceof com.foodordering.exception.AppException account
+                    && (account.getStatusCode() == 401 || account.getStatusCode() == 403)) {
+                response.sendError(account.getStatusCode(), account.getMessage());
                 return;
             }
-            String orderId = pathInfo.substring(1, pathInfo.length() - "/status".length());
-            
-            UpdateOrderStatusRequest updateReq = readJson(req, UpdateOrderStatusRequest.class);
-            if (updateReq == null || updateReq.getStatus() == null || updateReq.getStatus().isBlank()) {
-                badRequest(resp, "Vui lòng chọn trạng thái đơn hàng.");
-                return;
-            }
-            OrderStatus status;
-            try { status = OrderStatus.valueOf(updateReq.getStatus()); }
-            catch (IllegalArgumentException invalid) { badRequest(resp, "Trạng thái đơn hàng không hợp lệ."); return; }
-            
-            orderService.updateOrderStatus(orderId, status, employeeId, updateReq.getNote());
-            if (status == OrderStatus.CANCELLED && payosPayments != null) {
-                try {
-                    payosPayments.cancelForOrder(orderId);
-                } catch (RuntimeException unavailable) {
-                    log("Chưa đồng bộ được hủy link payOS; sẽ thử lại khi kiểm tra trạng thái.");
-                }
-            }
-            
-            writeJson(resp, HttpServletResponse.SC_OK, ApiResponse.success("Cập nhật trạng thái thành công"));
-        } catch (Exception e) {
-            handleError(resp, e);
+            if (failure instanceof com.foodordering.exception.AppException
+                    || failure instanceof com.foodordering.exception.ApiException
+                    || failure instanceof IllegalArgumentException)
+                request.getSession().setAttribute("adminOrderError", failure instanceof IllegalArgumentException
+                        ? "Trạng thái đơn hàng không hợp lệ." : failure.getMessage());
+            else { log("Không cập nhật được đơn hàng.", failure); request.getSession().setAttribute("adminOrderError", "Chưa cập nhật được đơn hàng."); }
         }
+        redirect(request, response, "/admin/orders?detail=" + URLEncoder.encode(orderId, StandardCharsets.UTF_8));
     }
 }

@@ -6,8 +6,8 @@ import com.foodordering.entity.CartItem;
 import com.foodordering.enums.ErrorCode;
 import com.foodordering.exception.BadRequestException;
 import com.foodordering.exception.ResourceNotFoundException;
-import com.foodordering.repository.CartItemRepository;
-import com.foodordering.repository.CartRepository;
+import com.foodordering.dao.CartItemDAO;
+import com.foodordering.dao.CartDAO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import java.util.List;
@@ -15,8 +15,8 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class CartCustomizationServiceTest {
-    private final CartRepository carts = mock(CartRepository.class);
-    private final CartItemRepository items = mock(CartItemRepository.class);
+    private final CartDAO carts = mock(CartDAO.class);
+    private final CartItemDAO items = mock(CartItemDAO.class);
     private final CartService service = new CartService(carts, items);
     private final UpdateCartItemRequest request = new UpdateCartItemRequest("CI01", 2, " less spicy ");
 

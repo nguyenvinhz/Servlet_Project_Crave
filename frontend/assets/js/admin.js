@@ -10,19 +10,10 @@
         const el = document.createElement('div'); el.className = `toast show toast-${type}`; el.textContent = message;
         host.appendChild(el); setTimeout(() => el.remove(), 4500);
     }
-    async function request(path, options = {}) {
-        let response;
-        try { response = await fetch(ctx + path, {...options,credentials:'same-origin',headers:{Accept:'application/json',...(options.body ? {'Content-Type':'application/json'} : {}),...options.headers}}); }
-        catch { throw new Error('Không thể kết nối máy chủ. Vui lòng thử lại.'); }
-        if (response.status === 401) { window.location.href = ctx + '/auth/login?reason=session-expired'; throw new Error('Phiên đăng nhập đã hết hạn.'); }
-        let payload;
-        try { payload = await response.json(); } catch { throw new Error('Máy chủ trả về dữ liệu không hợp lệ.'); }
-        if (!response.ok || !payload.success) {
-            const error = new Error(payload.error?.message || payload.message || 'Không thể thực hiện thao tác.');
-            error.details = payload.error?.fieldErrors || payload.error?.details;
-            throw error;
-        }
-        return payload.data;
+    function submit(path, fields = {}) {
+        const form=document.createElement('form');form.method='post';form.action=ctx+path;
+        Object.entries(fields).forEach(([name,value])=>{const input=document.createElement('input');input.type='hidden';input.name=name;input.value=value??'';form.appendChild(input);});
+        document.body.appendChild(form);form.submit();
     }
     function date(value, time = true) {
         if (!value) return '—';
@@ -34,7 +25,7 @@
         const tone = ['SUCCESS','COMPLETED','ACTIVE','WORKING','AVAILABLE'].includes(status) ? 'green' : ['FAILED','CANCELLED','LOCKED','UNAVAILABLE'].includes(status) ? 'red' : ['DELIVERING','REFUNDED'].includes(status) ? 'blue' : 'orange';
         return `<span class="badge ${tone}">${escape(labels[status] || status || '—')}</span>`;
     }
-    window.CraveAdmin = {ctx,request,escape,date,badge,toast,labels,money:value => Number(value || 0).toLocaleString('vi-VN') + ' ₫'};
+    window.CraveAdmin = {ctx,submit,escape,date,badge,toast,labels,money:value => Number(value || 0).toLocaleString('vi-VN') + ' ₫'};
     document.addEventListener('DOMContentLoaded',() => {
         const toggle = document.getElementById('sidebarToggle');
         try { if (localStorage.getItem('crave.admin.collapsed') === 'true') document.body.classList.add('collapsed'); } catch { /* Sidebar remains usable when storage is blocked. */ }
@@ -43,7 +34,7 @@
         const mobileToggle = document.getElementById('mobileSidebarToggle');
         mobileToggle?.addEventListener('click',() => {const open = document.body.classList.toggle('sidebar-open'); mobileToggle.setAttribute('aria-expanded',String(open));});
         document.addEventListener('click',event => {if(document.body.classList.contains('sidebar-open') && !event.target.closest('.admin-sidebar,#mobileSidebarToggle')) {document.body.classList.remove('sidebar-open');mobileToggle?.setAttribute('aria-expanded','false');}});
-        document.getElementById('adminLogout')?.addEventListener('click',async () => {try {await request('/api/auth/logout',{method:'POST'});window.location.href=ctx+'/auth/login';} catch(error){toast(error.message,'error');}});
+        const flash=document.getElementById('adminFlash');if(flash)toast(flash.dataset.message,flash.dataset.type);
         document.addEventListener('keydown',event => {if(event.key==='Escape')document.querySelectorAll('.modal-backdrop').forEach(modal=>{modal.style.display='none';modal.hidden=true;});});
     });
 })();

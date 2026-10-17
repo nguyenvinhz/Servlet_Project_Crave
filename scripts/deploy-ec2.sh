@@ -51,8 +51,8 @@ war_path=$war_directory/crave.war
 [[ -f $war_path && -s $war_path && ! -L $war_path ]] || fail 'Existing deployed backend/target/crave.war is required for rollback.'
 [[ $artifact != "$war_path" ]] || fail 'Stage the incoming WAR outside the deployed WAR path.'
 
-health_url=${HEALTH_URL:-http://127.0.0.1:8080/crave/api/health}
-[[ $health_url =~ ^http://(127\.0\.0\.1|localhost):[0-9]+/crave/api/health$ ]] || fail 'HEALTH_URL must address the local /crave/api/health endpoint.'
+health_url=${HEALTH_URL:-http://127.0.0.1:8080/crave/health}
+[[ $health_url =~ ^http://(127\.0\.0\.1|localhost):[0-9]+/crave/(api/)?health$ ]] || fail 'HEALTH_URL must address the local /crave/health endpoint or its legacy alias.'
 health_timeout=${HEALTH_TIMEOUT_SECONDS:-180}
 health_interval=${HEALTH_INTERVAL_SECONDS:-5}
 [[ $health_timeout =~ ^[1-9][0-9]*$ && $health_interval =~ ^[1-9][0-9]*$ ]] || fail 'Health timeout and interval must be positive integers.'
@@ -72,7 +72,8 @@ fi
 base_compose=(env -u PAYOS_CLIENT_ID -u PAYOS_API_KEY -u PAYOS_CHECKSUM_KEY -u PAYOS_PUBLIC_BASE_URL
   -u EMAIL_SMTP_HOST -u EMAIL_SMTP_PORT -u EMAIL_SMTP_USERNAME -u EMAIL_SMTP_PASSWORD
   -u EMAIL_FROM -u EMAIL_SMTP_STARTTLS -u EMAIL_OTP_SECRET
-  "${docker_command[@]}" compose --project-directory "$deploy_root" --file "$compose_file")
+  -u CRAVE_STORE_ADDRESS -u CRAVE_STORE_LATITUDE -u CRAVE_STORE_LONGITUDE -u CRAVE_GEOCODER_URL
+  "${docker_command[@]}" compose --project-directory "$deploy_root" --profile production --file "$compose_file")
 compose=("${base_compose[@]}")
 "${base_compose[@]}" version >/dev/null
 
@@ -113,21 +114,34 @@ recreate_app() {
 }
 
 wait_for_health() {
-  local deadline=$((SECONDS + health_timeout)) response
+  local rollback=${1:-false} deadline=$((SECONDS + health_timeout)) response endpoint
+  local endpoints=("$health_url")
+  if [[ $rollback == true && $health_url == */crave/health ]]; then
+    endpoints+=("${health_url%/health}/api/health")
+  fi
   while (( SECONDS < deadline )); do
-    if response=$(curl --fail --silent --show-error --connect-timeout 2 --max-time 5 "$health_url" 2>/dev/null) &&
-      printf '%s' "$response" | python3 -c '
+    for endpoint in "${endpoints[@]}"; do
+      if response=$(curl --fail --silent --show-error --connect-timeout 2 --max-time 5 "$endpoint" 2>/dev/null) &&
+        printf '%s' "$response" | python3 -c '
 import json, sys
 try:
-    body = json.load(sys.stdin)
-    data = body.get("data", {})
-    healthy = body.get("success") is True and data.get("application") == "UP" and data.get("database") == "UP"
+    response = sys.stdin.read().strip()
+    if response.startswith("{"):
+        # Keep rollback compatible with the previous WAR health response.
+        body = json.loads(response)
+        data = body.get("data", {})
+        healthy = body.get("success") is True and data.get("application") == "UP" and data.get("database") == "UP"
+    else:
+        lines = response.splitlines()
+        data = dict(line.split("=", 1) for line in lines)
+        healthy = len(lines) == 2 and data == {"application": "UP", "database": "UP"}
 except (ValueError, AttributeError, TypeError):
     healthy = False
 sys.exit(0 if healthy else 1)
 '; then
-      return 0
-    fi
+        return 0
+      fi
+    done
     sleep "$health_interval"
   done
   return 1
@@ -149,7 +163,7 @@ finish() {
   if [[ $rollback_needed == true && $status -ne 0 ]]; then
     set +e
     log 'Deployment failed. Restoring the previous WAR and application configuration.'
-    if atomic_copy "$backup_path" "$war_path" && restore_override && recreate_app && wait_for_health; then
+    if atomic_copy "$backup_path" "$war_path" && restore_override && recreate_app && wait_for_health true; then
       log 'Rollback completed; the previous application is healthy.'
     else
       log 'Rollback did not become healthy. Check the app container on EC2.' >&2

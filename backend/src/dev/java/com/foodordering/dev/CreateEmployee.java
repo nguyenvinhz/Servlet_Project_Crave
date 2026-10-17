@@ -5,7 +5,6 @@ import com.foodordering.dto.EmployeeCreateRequest;
 import com.foodordering.entity.Employee;
 import com.foodordering.enums.EmployeeRole;
 import com.foodordering.utils.PasswordHasher;
-import com.foodordering.utils.JsonUtils;
 import com.foodordering.validator.AdminAccountValidator;
 
 import java.time.LocalDate;
@@ -21,14 +20,12 @@ public final class CreateEmployee {
     }
 
     public static void main(String[] args) {
-        if (args.length == 2 && "--encoded-json".equals(args[0])) {
-            String json = new String(Base64.getDecoder().decode(args[1]), StandardCharsets.UTF_8);
-            BootstrapArguments decoded = JsonUtils.fromJson(json, BootstrapArguments.class);
-            if (decoded == null || decoded.email() == null || decoded.fullName() == null || decoded.phone() == null) {
-                throw new IllegalArgumentException("Thông tin tài khoản không hợp lệ.");
+        if (args.length == 5 && "--base64".equals(args[0])) {
+            String[] decoded = new String[4];
+            for (int index = 0; index < decoded.length; index++) {
+                decoded[index] = new String(Base64.getDecoder().decode(args[index + 1]), StandardCharsets.UTF_8);
             }
-            args = new String[]{decoded.email(), decoded.fullName(), decoded.phone(),
-                    decoded.role() == null ? "ADMIN" : decoded.role()};
+            args = decoded;
         }
         if (args.length < 3 || args.length > 4) {
             throw new IllegalArgumentException("Cách dùng: CreateEmployee email họ-tên số-điện-thoại [chức-vụ]");
@@ -72,6 +69,4 @@ public final class CreateEmployee {
         }
     }
 
-    private record BootstrapArguments(String email, String fullName, String phone, String role) {
-    }
 }

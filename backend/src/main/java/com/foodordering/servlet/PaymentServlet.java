@@ -1,78 +1,43 @@
 package com.foodordering.servlet;
 
-import com.foodordering.api.BaseApiServlet;
-import com.foodordering.dto.ApiResponse;
+import com.foodordering.dao.PaymentDAO;
 import com.foodordering.enums.EmployeeRole;
+import com.foodordering.enums.PaymentStatus;
 import com.foodordering.security.SessionAuth;
-import jakarta.servlet.ServletException;
+import com.foodordering.service.PaymentService;
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.util.Objects;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 
-import com.foodordering.dto.UpdatePaymentStatusRequest;
-import com.foodordering.enums.PaymentStatus;
-import com.foodordering.service.PaymentService;
-import com.foodordering.service.PaymentServiceImpl;
-import com.foodordering.repository.PaymentRepositoryImpl;
-
-@WebServlet(name = "PaymentServlet", urlPatterns = "/api/admin/payments/*")
-public class PaymentServlet extends BaseApiServlet {
-
-    private PaymentService paymentService;
-
-    public PaymentServlet() {
-    }
-
-    public PaymentServlet(PaymentService paymentService) {
-        this.paymentService = Objects.requireNonNull(paymentService);
-    }
-
-    @Override
-    public void init() throws ServletException {
-        if (paymentService == null) {
-            paymentService = new PaymentServiceImpl(new PaymentRepositoryImpl());
-        }
-    }
-
-    @Override
-    protected void service(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-        if ("PATCH".equalsIgnoreCase(req.getMethod())) {
-            doPatch(req, resp);
-        } else {
-            super.service(req, resp);
-        }
-    }
-
-    protected void doPatch(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+@WebServlet(name = "PaymentServlet", urlPatterns = "/admin/orders/payment")
+public class PaymentServlet extends BaseServlet {
+    private PaymentService payments;
+    public PaymentServlet() { }
+    public PaymentServlet(PaymentService payments) { this.payments = payments; }
+    @Override public void init() { if (payments == null) payments = new PaymentService(new PaymentDAO()); }
+    @Override protected void doPost(HttpServletRequest request, HttpServletResponse response) throws IOException {
         try {
-            SessionAuth.requireEmployee(req, EmployeeRole.ORDER_STAFF);
-
-            String pathInfo = req.getPathInfo();
-            if (pathInfo == null || !pathInfo.matches("/[^/]+/status")) {
-                badRequest(resp, "Đường dẫn cập nhật thanh toán không hợp lệ.");
+            SessionAuth.requireEmployee(request, EmployeeRole.ORDER_STAFF);
+            payments.updatePaymentStatus(parameter(request, "paymentId"),
+                    PaymentStatus.valueOf(parameter(request, "status")), parameter(request, "transactionRef"));
+            request.getSession().setAttribute("adminOrderMessage", "Đã cập nhật thanh toán.");
+        } catch (RuntimeException failure) {
+            if (failure instanceof com.foodordering.exception.AppException account
+                    && (account.getStatusCode() == 401 || account.getStatusCode() == 403)) {
+                response.sendError(account.getStatusCode(), account.getMessage());
                 return;
             }
-            
-            // Format URL: /api/admin/payments/{paymentId}/status
-            String[] segments = pathInfo.substring(1).split("/");
-            String paymentId = segments[0];
-            
-            UpdatePaymentStatusRequest updateReq = readJson(req, UpdatePaymentStatusRequest.class);
-            if (updateReq == null || updateReq.getStatus() == null || updateReq.getStatus().isBlank()) {
-                badRequest(resp, "Vui lòng chọn trạng thái thanh toán.");
-                return;
-            }
-            PaymentStatus status;
-            try { status = PaymentStatus.valueOf(updateReq.getStatus()); }
-            catch (IllegalArgumentException invalid) { badRequest(resp, "Trạng thái thanh toán không hợp lệ."); return; }
-            
-            paymentService.updatePaymentStatus(paymentId, status, updateReq.getTransactionRef());
-            
-            writeJson(resp, HttpServletResponse.SC_OK, ApiResponse.success("Cập nhật trạng thái thanh toán thành công"));
-        } catch (Exception e) {
-            handleError(resp, e);
+            if (failure instanceof com.foodordering.exception.AppException
+                    || failure instanceof com.foodordering.exception.ApiException
+                    || failure instanceof IllegalArgumentException)
+                request.getSession().setAttribute("adminOrderError", failure instanceof IllegalArgumentException
+                        ? "Trạng thái thanh toán không hợp lệ." : failure.getMessage());
+            else { log("Không cập nhật được thanh toán.", failure); request.getSession().setAttribute("adminOrderError", "Chưa cập nhật được thanh toán."); }
         }
+        redirect(request, response, "/admin/orders?detail="
+                + URLEncoder.encode(parameter(request, "orderId"), StandardCharsets.UTF_8));
     }
 }

@@ -15,7 +15,6 @@ import com.foodordering.enums.EmployeeStatus;
 import com.foodordering.enums.PromotionStatus;
 import com.foodordering.exception.ConflictException;
 import com.foodordering.exception.ForbiddenException;
-import com.foodordering.utils.JsonProvider;
 import com.foodordering.utils.PasswordHasher;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
@@ -101,9 +100,14 @@ class AdminManagementIntegrationTest {
         assertEquals(CustomerStatus.ACTIVE, customer.status());
         assertEquals(0, customer.orderCount());
         assertEquals(0, BigDecimal.ZERO.compareTo(customer.totalSpent()));
-        String json = JsonProvider.objectMapper().writeValueAsString(accounts.listEmployees());
-        assertFalse(json.contains("passwordHash"));
-        assertFalse(json.contains("pbkdf2_sha256"));
+        var employees = accounts.listEmployees();
+        assertTrue(employees.stream().anyMatch(employee -> employee.id().equals(staffId)));
+        for (var component : AdminEmployeeResponse.class.getRecordComponents()) {
+            assertFalse(component.getName().toLowerCase().contains("password"));
+            assertFalse(component.getName().toLowerCase().contains("hash"));
+        }
+        assertFalse(employees.toString().contains(passwordHash));
+        assertFalse(employees.toString().contains("pbkdf2_sha256"));
 
         assertEquals(CustomerStatus.LOCKED, accounts.updateCustomerStatus(hrId, customerId, CustomerStatus.LOCKED).status());
         try (EntityManager em = emf.createEntityManager()) {

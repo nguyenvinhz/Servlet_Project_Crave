@@ -3,8 +3,8 @@ package com.foodordering.service;
 import com.foodordering.config.DatabaseConfig;
 import com.foodordering.enums.OrderStatus;
 import com.foodordering.exception.ValidationException;
-import com.foodordering.repository.CustomerOrderRepositoryImpl;
-import com.foodordering.repository.PaymentRepositoryImpl;
+import com.foodordering.dao.CustomerOrderDAO;
+import com.foodordering.dao.PaymentDAO;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 
@@ -24,7 +24,7 @@ public class AdminOverviewService {
 
     public AdminOverviewService() {
         this(DatabaseConfig.getEntityManagerFactory(),
-                new CustomerOrderServiceImpl(new CustomerOrderRepositoryImpl(), new PaymentRepositoryImpl()));
+                new CustomerOrderService(new CustomerOrderDAO(), new PaymentDAO()));
     }
 
     public AdminOverviewService(EntityManagerFactory emf, CustomerOrderService orders) {

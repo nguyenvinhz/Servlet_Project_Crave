@@ -20,9 +20,9 @@ import com.foodordering.enums.OptionType;
 import com.foodordering.exception.ConflictException;
 import com.foodordering.exception.ResourceNotFoundException;
 import com.foodordering.exception.ValidationException;
-import com.foodordering.repository.CategoryRepository;
-import com.foodordering.repository.FoodOptionRepository;
-import com.foodordering.repository.FoodRepository;
+import com.foodordering.dao.CategoryDAO;
+import com.foodordering.dao.FoodOptionDAO;
+import com.foodordering.dao.FoodDAO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -649,7 +649,8 @@ class MenuServiceTest {
     // Fake In-Memory Repositories for testing without database
     // =========================================================
 
-    private static class FakeCategoryRepository implements CategoryRepository {
+    private static class FakeCategoryRepository extends CategoryDAO {
+        private FakeCategoryRepository() { super(null); }
         private final Map<String, Category> data = new HashMap<>();
 
         @Override
@@ -705,7 +706,8 @@ class MenuServiceTest {
         }
     }
 
-    private static class FakeFoodRepository implements FoodRepository {
+    private static class FakeFoodRepository extends FoodDAO {
+        private FakeFoodRepository() { super(null); }
         private final Map<String, Food> data = new HashMap<>();
 
         @Override
@@ -789,7 +791,8 @@ class MenuServiceTest {
         }
     }
 
-    private static class FakeFoodOptionRepository implements FoodOptionRepository {
+    private static class FakeFoodOptionRepository extends FoodOptionDAO {
+        private FakeFoodOptionRepository() { super(null); }
         private final Map<String, FoodOption> data = new HashMap<>();
         private boolean failOnDelete = false;
 

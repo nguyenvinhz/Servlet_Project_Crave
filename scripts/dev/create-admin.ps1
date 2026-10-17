@@ -25,9 +25,10 @@ try {
     $dependencyClasspath = (Get-Content -Raw -Encoding UTF8 backend/target/operator-classpath.txt).Trim()
     # Encode Unicode arguments because the Windows JVM may use an ANSI native code page.
     # The password stays in the environment and is never part of the command line.
-    $accountJson = @{ email = $Email; fullName = $FullName; phone = $Phone; role = $Role } | ConvertTo-Json -Compress
-    $encodedAccount = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($accountJson))
-    & java '-Dfile.encoding=UTF-8' -cp "backend/target/test-classes;backend/target/classes;$dependencyClasspath" com.foodordering.dev.CreateEmployee --encoded-json $encodedAccount
+    [string[]]$encodedArguments = @($Email, $FullName, $Phone, $Role) | ForEach-Object {
+        [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($_))
+    }
+    & java '-Dfile.encoding=UTF-8' -cp "backend/target/test-classes;backend/target/classes;$dependencyClasspath" com.foodordering.dev.CreateEmployee --base64 @encodedArguments
     if ($LASTEXITCODE -ne 0) { throw 'Không tạo được tài khoản nhân viên.' }
 } finally {
     $env:CRAVE_ADMIN_PASSWORD = $previousPassword

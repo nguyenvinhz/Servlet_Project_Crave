@@ -3,6 +3,9 @@
 <%@ taglib prefix="fmt" uri="jakarta.tags.fmt" %>
 <fmt:setLocale value="vi_VN" />
 <%@ include file="/WEB-INF/views/components/header.jspf" %>
+<input type="hidden" id="pageCartCount" value="<c:out value='${sessionScope.cartItemCount}'/>">
+<div id="cartFlash" hidden data-message="<c:out value='${sessionScope.cartMessage}'/>" data-type="<c:out value='${sessionScope.cartMessageType}'/>"></div>
+<c:remove var="cartMessage" scope="session"/><c:remove var="cartMessageType" scope="session"/>
 
 <main class="page-container home-menu-page" id="main-content">
     <section class="crave-hero-banner" aria-labelledby="hero-title">

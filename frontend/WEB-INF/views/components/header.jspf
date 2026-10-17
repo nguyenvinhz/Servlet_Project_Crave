@@ -61,7 +61,7 @@
                     <circle cx="20" cy="21" r="1"></circle>
                     <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
                 </svg>
-                <span class="cart-badge-count">0</span>
+                <span class="cart-badge-count"><c:out value="${empty sessionScope.cartItemCount ? 0 : sessionScope.cartItemCount}"/></span>
             </a>
             </c:if>
             <c:choose>
@@ -87,7 +87,7 @@
                             </c:if>
                             <a class="user-dropdown-link customer-dropdown-item" href="<c:url value='/customer/profile'/>">Tài khoản của tôi</a>
                             <a class="user-dropdown-link customer-dropdown-item" href="<c:url value='/auth/change-password'/>">Đổi mật khẩu</a>
-                            <form id="logoutForm" class="logout-form" action="<c:url value='/api/auth/logout'/>" method="post" style="margin: 0; padding: 0;">
+                            <form id="logoutForm" class="logout-form" action="<c:url value='/auth/logout'/>" method="post" style="margin: 0; padding: 0;">
                                 <button class="user-dropdown-logout customer-dropdown-item customer-logout-btn" id="customerLogoutBtn" type="submit">Đăng xuất</button>
                             </form>
                         </div>

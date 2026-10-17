@@ -7,50 +7,38 @@ import com.foodordering.dto.CartItemOptionDto;
 import com.foodordering.dto.UpdateCartItemRequest;
 import com.foodordering.entity.Cart;
 import com.foodordering.entity.CartItem;
+import com.foodordering.entity.CartItemOption;
+import com.foodordering.entity.Food;
+import com.foodordering.entity.FoodOption;
 import com.foodordering.enums.ErrorCode;
 import com.foodordering.exception.BadRequestException;
 import com.foodordering.exception.ResourceNotFoundException;
-import com.foodordering.mapper.CartItemMapper;
-import com.foodordering.mapper.CartMapper;
-import com.foodordering.repository.CartItemRepository;
-import com.foodordering.repository.CartRepository;
+import com.foodordering.dao.CartItemDAO;
+import com.foodordering.dao.CartDAO;
 import com.foodordering.validator.CartValidator;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
 public class CartService {
 
-    private final CartRepository cartRepository;
-    private final CartItemRepository cartItemRepository;
-    private final CartMapper cartMapper;
-    private final CartItemMapper cartItemMapper;
+    private final CartDAO cartRepository;
+    private final CartItemDAO cartItemRepository;
 
     public CartService() {
-        this.cartRepository = new CartRepository();
-        this.cartItemRepository = new CartItemRepository();
-        this.cartMapper = new CartMapper();
-        this.cartItemMapper = new CartItemMapper();
+        this.cartRepository = new CartDAO();
+        this.cartItemRepository = new CartItemDAO();
     }
 
-    public CartService(CartRepository cartRepository, CartItemRepository cartItemRepository) {
+    public CartService(CartDAO cartRepository, CartItemDAO cartItemRepository) {
         this.cartRepository = cartRepository;
         this.cartItemRepository = cartItemRepository;
-        this.cartMapper = new CartMapper();
-        this.cartItemMapper = new CartItemMapper();
-    }
-
-    public CartService(CartRepository cartRepository, CartItemRepository cartItemRepository,
-                       CartMapper cartMapper, CartItemMapper cartItemMapper) {
-        this.cartRepository = cartRepository;
-        this.cartItemRepository = cartItemRepository;
-        this.cartMapper = cartMapper != null ? cartMapper : new CartMapper();
-        this.cartItemMapper = cartItemMapper != null ? cartItemMapper : new CartItemMapper();
     }
 
     /**
-     * Lấy hoặc tạo giỏ hàng cho khách hàng, chuyển đổi Entity sang DTO qua CartMapper.
+     * Lấy hoặc tạo giỏ hàng và chuẩn bị dữ liệu hiển thị cho khách hàng.
      */
     public CartDto getOrCreateCart(String customerId) {
         CartValidator.validateCustomerId(customerId);
@@ -59,7 +47,7 @@ public class CartService {
             cart = cartRepository.createCart(customerId);
         }
         List<CartItem> items = cartItemRepository.findItemsByCartId(cart.getCartId());
-        CartDto cartDto = cartMapper.toDto(cart, items);
+        CartDto cartDto = createCartDto(cart, items);
         calculateCartTotals(cartDto);
         return cartDto;
     }
@@ -183,6 +171,65 @@ public class CartService {
     public BigDecimal getVerifiedSubtotal(String customerId) {
         CartDto cart = getOrCreateCart(customerId);
         return cart.getSubtotal();
+    }
+
+    private CartDto createCartDto(Cart cart, List<CartItem> items) {
+        if (cart == null) {
+            return null;
+        }
+        CartDto dto = new CartDto();
+        dto.setCartId(cart.getCartId());
+        dto.setCustomerId(cart.getCustomer() != null ? cart.getCustomer().getId() : cart.getCustomerId());
+
+        List<CartItemDto> itemDtos = new ArrayList<>();
+        if (items != null) {
+            for (CartItem item : items) {
+                if (item == null) {
+                    continue;
+                }
+                CartItemDto itemDto = new CartItemDto();
+                itemDto.setCartItemId(item.getCartItemId());
+                itemDto.setCartId(item.getCart() != null ? item.getCart().getCartId() : item.getCartId());
+                itemDto.setQuantity(item.getQuantity());
+                itemDto.setNote(item.getNote());
+
+                Food food = item.getFood();
+                if (food != null) {
+                    itemDto.setFoodId(food.getFoodId());
+                    itemDto.setFoodName(food.getName());
+                    itemDto.setImageUrl(food.getImageUrl());
+                    itemDto.setBasePrice(food.getBasePrice() != null ? food.getBasePrice() : BigDecimal.ZERO);
+                } else {
+                    itemDto.setFoodId(item.getFoodId());
+                    itemDto.setBasePrice(BigDecimal.ZERO);
+                }
+
+                List<CartItemOptionDto> optionDtos = new ArrayList<>();
+                if (item.getItemOptions() != null) {
+                    for (CartItemOption itemOption : item.getItemOptions()) {
+                        if (itemOption == null) {
+                            continue;
+                        }
+                        CartItemOptionDto optionDto = new CartItemOptionDto();
+                        FoodOption option = itemOption.getOption();
+                        if (option != null) {
+                            optionDto.setOptionId(option.getOptionId());
+                            optionDto.setName(option.getName());
+                            optionDto.setOptionType(option.getOptionType() != null ? option.getOptionType().name() : null);
+                            optionDto.setExtraPrice(option.getExtraPrice() != null ? option.getExtraPrice() : BigDecimal.ZERO);
+                        } else {
+                            optionDto.setOptionId(itemOption.getOptionId());
+                            optionDto.setExtraPrice(BigDecimal.ZERO);
+                        }
+                        optionDtos.add(optionDto);
+                    }
+                }
+                itemDto.setOptions(optionDtos);
+                itemDtos.add(itemDto);
+            }
+        }
+        dto.setItems(itemDtos);
+        return dto;
     }
 
     /**

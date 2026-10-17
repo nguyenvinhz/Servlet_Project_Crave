@@ -14,9 +14,8 @@ import com.foodordering.enums.AccountType;
 import com.foodordering.enums.CustomerStatus;
 import com.foodordering.enums.EmployeeStatus;
 import com.foodordering.exception.AccountException;
-import com.foodordering.repository.AccountRepository;
-import com.foodordering.repository.AccountRepository.Session;
-import com.foodordering.repository.JpaAccountRepository;
+import com.foodordering.dao.AccountDAO;
+import com.foodordering.dao.AccountDAO.Session;
 import com.foodordering.utils.PasswordHasher;
 
 import java.util.ArrayList;
@@ -29,18 +28,18 @@ import java.util.function.Predicate;
 
 public class AccountService {
 
-    private final AccountRepository repository;
+    private final AccountDAO repository;
     private final PasswordHasher passwordHasher;
 
     public AccountService() {
-        this(new JpaAccountRepository(), new PasswordHasher());
+        this(new AccountDAO(), new PasswordHasher());
     }
 
-    public AccountService(AccountRepository repository) {
+    public AccountService(AccountDAO repository) {
         this(repository, new PasswordHasher());
     }
 
-    public AccountService(AccountRepository repository, PasswordHasher passwordHasher) {
+    public AccountService(AccountDAO repository, PasswordHasher passwordHasher) {
         this.repository = repository;
         this.passwordHasher = passwordHasher;
     }

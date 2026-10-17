@@ -103,6 +103,8 @@ printf '%s\n' "$*" >> "$TEST_CASE_DIRECTORY/docker.calls"
 shift
 [[ $1 == --project-directory && $2 == "$TEST_DEPLOY_DIRECTORY" ]] || exit 91
 shift 2
+[[ $1 == --profile && $2 == production ]] || exit 91
+shift 2
 [[ $1 == --file && $2 == "$TEST_DEPLOY_DIRECTORY/compose.yaml" ]] || exit 92
 compose_files=()
 while [[ ${1:-} == --file ]]; do
@@ -169,19 +171,32 @@ cat > "$test_root/bin/curl" <<'SH'
 #!/usr/bin/env bash
 set -Eeuo pipefail
 printf '%s\n' "$*" >> "$TEST_CASE_DIRECTORY/curl.calls"
-[[ "$*" == '--fail --silent --show-error --connect-timeout 2 --max-time 5 http://127.0.0.1:8080/crave/api/health' ]] || exit 95
+[[ "$*" == '--fail --silent --show-error --connect-timeout 2 --max-time 5 http://127.0.0.1:8080/crave/health' ||
+   "$*" == '--fail --silent --show-error --connect-timeout 2 --max-time 5 http://127.0.0.1:8080/crave/api/health' ]] || exit 95
 count=0
 [[ ! -f $TEST_CASE_DIRECTORY/recreate.count ]] || read -r count < "$TEST_CASE_DIRECTORY/recreate.count"
+if [[ $TEST_LEGACY_ROLLBACK == 1 && $count != 1 && ${@: -1} != */api/health ]]; then
+  exit 22
+fi
 if [[ $count == 1 ]]; then
   case "$TEST_HEALTH" in
     malformed) printf '{invalid-json'; exit 0 ;;
     database-down) printf '{"success":true,"data":{"application":"UP","database":"DOWN"}}'; exit 0 ;;
     application-down) printf '{"success":true,"data":{"application":"DOWN","database":"UP"}}'; exit 0 ;;
     failure-body) printf '{"success":false,"data":{"application":"UP","database":"UP"}}'; exit 0 ;;
+    text-database-down) printf 'application=UP\ndatabase=DOWN\n'; exit 0 ;;
+    text-application-down) printf 'application=DOWN\ndatabase=UP\n'; exit 0 ;;
+    text-missing-database) printf 'application=UP\n'; exit 0 ;;
+    text-duplicate) printf 'application=UP\ndatabase=DOWN\ndatabase=UP\n'; exit 0 ;;
+    text-unknown) printf 'application=UP\ndatabase=UP\nother=UP\n'; exit 0 ;;
     http-failure) exit 22 ;;
   esac
 fi
-printf '{"success":true,"data":{"application":"UP","database":"UP"},"error":null}'
+if [[ $count != 1 || $TEST_HEALTH == healthy-json ]]; then
+  printf '{"success":true,"data":{"application":"UP","database":"UP"},"error":null}'
+else
+  printf 'application=UP\ndatabase=UP\n'
+fi
 SH
 
 cat > "$test_root/bin/install" <<'SH'
@@ -252,6 +267,7 @@ PY
   export TEST_CASE_DIRECTORY="$case_directory" TEST_DEPLOY_DIRECTORY="$deploy_directory"
   export TEST_CONFIG=valid TEST_HEALTH=healthy TEST_UP_FAIL_ON=0 TEST_INTERRUPT_ON=0 TEST_INSTALL_FAIL_ON=0
   export TEST_MIGRATION_FAIL=0 TEST_DATABASE_SERVICE=mysql TEST_MIGRATION="$test_migration"
+  export TEST_LEGACY_ROLLBACK=0
   export DEPLOY_PATH="$deploy_directory" COMPOSE_FILE=compose.yaml APP_SERVICE=app DB_SERVICE=mysql
   export PAYOS_CLIENT_ID=fixture-client-id PAYOS_API_KEY=fixture-api-key PAYOS_CHECKSUM_KEY=fixture-checksum-key
   export PAYOS_PUBLIC_BASE_URL=https://crave-fixture.example/crave
@@ -261,7 +277,7 @@ PY
   export TEST_EXPECTED_PUBLIC_BASE_URL=''
   unset CRAVE_STORE_ADDRESS CRAVE_STORE_LATITUDE CRAVE_STORE_LONGITUDE CRAVE_GEOCODER_URL
   export PAYOS_EXPAND=incorrect-compose-interpolation PAYOS_BAD=incorrect-compose-fallback
-  export HEALTH_URL=http://127.0.0.1:8080/crave/api/health HEALTH_TIMEOUT_SECONDS=1 HEALTH_INTERVAL_SECONDS=1
+  export HEALTH_URL=http://127.0.0.1:8080/crave/health HEALTH_TIMEOUT_SECONDS=1 HEALTH_INTERVAL_SECONDS=1
   export GITHUB_WORKSPACE="$test_root/workspace"
   incoming_war=$case_directory/incoming.war
 }
@@ -392,12 +408,70 @@ assert_migration_before_recreation
 assert_payos_overlay
 pass_case
 
+new_case success-legacy-json-health
+export TEST_HEALTH=healthy-json
+run_deploy 0
+same_file "$incoming_war" "$deploy_directory/backend/target/crave.war"
+assert_recreates 1
+contains_log 'Deployment succeeded.'
+pass_case
+
+new_case default-servlet-health-endpoint
+unset HEALTH_URL
+run_deploy 0
+assert_recreates 1
+grep -Fq 'http://127.0.0.1:8080/crave/health' "$case_directory/curl.calls" || fail 'Default health check did not use the Servlet endpoint.'
+pass_case
+
+new_case configured-legacy-health-alias
+export HEALTH_URL=http://127.0.0.1:8080/crave/api/health
+run_deploy 0
+assert_recreates 1
+pass_case
+
+new_case rollback-checks-legacy-health-endpoint
+export TEST_HEALTH=database-down TEST_LEGACY_ROLLBACK=1
+run_deploy 1
+assert_old_war
+assert_recreates 2
+contains_log 'Rollback completed; the previous application is healthy.'
+grep -Fq 'http://127.0.0.1:8080/crave/api/health' "$case_directory/curl.calls" || fail 'Rollback did not check the legacy health endpoint.'
+pass_case
+
 new_case configured-delivery-origin
 export CRAVE_STORE_ADDRESS='Configured demo store' CRAVE_STORE_LATITUDE=10.89 CRAVE_STORE_LONGITUDE=106.76
 export CRAVE_GEOCODER_URL='https://photon.komoot.io/api/'
 run_deploy 0
 assert_migration_before_recreation
 assert_payos_overlay
+pass_case
+
+new_case empty-workflow-delivery-settings-preserve-server-env
+python3 - "$deploy_directory/compose.yaml" <<'PY'
+import json, sys
+with open(sys.argv[1], encoding="utf-8") as source:
+    config = json.load(source)
+config["services"]["app"]["environment"].update({
+    name: "${" + name + "}" for name in ("CRAVE_STORE_ADDRESS", "CRAVE_STORE_LATITUDE", "CRAVE_STORE_LONGITUDE", "CRAVE_GEOCODER_URL")
+})
+with open(sys.argv[1], "w", encoding="utf-8") as output:
+    json.dump(config, output)
+PY
+cp -- "$deploy_directory/compose.yaml" "$case_directory/reference/compose.yaml"
+printf 'CRAVE_STORE_ADDRESS=Existing store\nCRAVE_STORE_LATITUDE=10.8\nCRAVE_STORE_LONGITUDE=106.7\nCRAVE_GEOCODER_URL=https://nominatim.openstreetmap.org/search\n' >> "$deploy_directory/.env"
+cp -- "$deploy_directory/.env" "$case_directory/reference/.env"
+export CRAVE_STORE_ADDRESS='' CRAVE_STORE_LATITUDE='' CRAVE_STORE_LONGITUDE='' CRAVE_GEOCODER_URL=''
+run_deploy 0
+assert_recreates 1
+python3 - "$case_directory/recreated-environments.jsonl" <<'PY'
+import json, sys
+with open(sys.argv[1], encoding="utf-8") as source:
+    environment = json.loads(source.readline())
+assert environment["CRAVE_STORE_ADDRESS"] == "Existing store"
+assert environment["CRAVE_STORE_LATITUDE"] == "10.8"
+assert environment["CRAVE_STORE_LONGITUDE"] == "106.7"
+assert environment["CRAVE_GEOCODER_URL"] == "https://nominatim.openstreetmap.org/search"
+PY
 pass_case
 
 for invalid_setting in missing-longitude nonfinite-latitude invalid-geocoder; do
@@ -414,7 +488,7 @@ for invalid_setting in missing-longitude nonfinite-latitude invalid-geocoder; do
   pass_case
 done
 
-for health in malformed database-down application-down failure-body http-failure; do
+for health in malformed database-down application-down failure-body text-database-down text-application-down text-missing-database text-duplicate text-unknown http-failure; do
   new_case "rollback-$health"
   export TEST_HEALTH="$health"
   run_deploy 1

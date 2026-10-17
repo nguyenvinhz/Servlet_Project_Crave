@@ -1,6 +1,5 @@
 package com.foodordering.filter;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.foodordering.config.SessionConfigurationListener;
 import com.foodordering.dto.ProfileResponse;
 import com.foodordering.enums.AccountType;
@@ -8,7 +7,6 @@ import com.foodordering.enums.EmployeeRole;
 import com.foodordering.exception.AccountException;
 import com.foodordering.security.SessionAuth;
 import com.foodordering.service.AccountService;
-import com.foodordering.utils.JsonProvider;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletContext;
 import jakarta.servlet.ServletContextEvent;
@@ -19,8 +17,8 @@ import jakarta.servlet.http.HttpSession;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import java.io.PrintWriter;
-import java.io.StringWriter;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -28,9 +26,10 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -70,7 +69,7 @@ class AuthenticationFilterTest {
             when(exchange.request.getServletPath()).thenReturn(path.contains(";") ? "/api/promotions;ignored" : "/api/promotions");
             when(exchange.request.getPathInfo()).thenReturn(path.endsWith("validate") ? "/validate" : null);
             exchange.send();
-            exchange.assertError(401, "UNAUTHORIZED");
+            exchange.assertError(401);
             verifyNoInteractions(exchange.chain);
         }
         verifyNoInteractions(accounts);
@@ -97,7 +96,7 @@ class AuthenticationFilterTest {
 
         exchange.send();
 
-        exchange.assertError(403, "FORBIDDEN");
+        exchange.assertError(403);
         verifyNoInteractions(exchange.chain);
     }
 
@@ -115,13 +114,13 @@ class AuthenticationFilterTest {
     }
 
     @Test
-    void protectedApisRejectAnonymousRequestsWith401Json() throws Exception {
+    void legacyProtectedRoutesRejectAnonymousRequestsWithHtmlErrors() throws Exception {
         for (String path : new String[]{"/api/profile", "/api/addresses", "/api/addresses/DC01",
                 "/api/orders", "/api/orders/DH01", "/api/cart", "/api/payments/TT01", "/api/admin/foods",
                 "/api/payos/orders/DH01", "/api/payos/orders/DH01/qr"}) {
             Exchange exchange = request("GET", path, null);
             exchange.send();
-            exchange.assertError(401, "UNAUTHORIZED");
+            exchange.assertError(401);
             verifyNoInteractions(exchange.chain);
         }
         verifyNoInteractions(accounts);
@@ -133,7 +132,7 @@ class AuthenticationFilterTest {
                 "/api/addresses;ignored/DC01", "/api/orders;jsessionid=attacker/DH01"}) {
             Exchange exchange = request("GET", path, null);
             exchange.send();
-            exchange.assertError(401, "UNAUTHORIZED");
+            exchange.assertError(401);
             verifyNoInteractions(exchange.chain);
         }
         verifyNoInteractions(accounts);
@@ -152,7 +151,7 @@ class AuthenticationFilterTest {
         Exchange browser = request("POST", "/api/payos/orders/DH01", CUSTOMER);
         when(browser.request.getHeader("Origin")).thenReturn("https://attacker.invalid");
         browser.send();
-        browser.assertError(403, "FORBIDDEN");
+        browser.assertError(403);
         verifyNoInteractions(browser.chain);
     }
 
@@ -161,14 +160,14 @@ class AuthenticationFilterTest {
         when(accounts.getProfile("KH01")).thenReturn(CUSTOMER);
         Exchange customer = request("GET", "/api/admin;ignored/foods", CUSTOMER);
         customer.send();
-        customer.assertError(403, "FORBIDDEN");
+        customer.assertError(403);
         verifyNoInteractions(customer.chain);
 
         ProfileResponse orderStaff = employee(EmployeeRole.ORDER_STAFF);
         when(accounts.getProfile("NV01")).thenReturn(orderStaff);
         Exchange wrongRole = request("GET", "/api/admin;ignored/foods", orderStaff);
         wrongRole.send();
-        wrongRole.assertError(403, "FORBIDDEN");
+        wrongRole.assertError(403);
         verifyNoInteractions(wrongRole.chain);
     }
 
@@ -177,7 +176,7 @@ class AuthenticationFilterTest {
         Exchange anonymous = request("GET", "/public/../api/admin/foods", null);
         when(anonymous.request.getServletPath()).thenReturn("/api/admin/foods");
         anonymous.send();
-        anonymous.assertError(401, "UNAUTHORIZED");
+        anonymous.assertError(401);
         verifyNoInteractions(anonymous.chain);
         verifyNoInteractions(accounts);
     }
@@ -229,7 +228,7 @@ class AuthenticationFilterTest {
         }
         Exchange addresses = request("GET", "/api/addresses", employee);
         addresses.send();
-        addresses.assertError(403, "FORBIDDEN");
+        addresses.assertError(403);
         verifyNoInteractions(addresses.chain);
     }
 
@@ -238,7 +237,7 @@ class AuthenticationFilterTest {
         when(accounts.getProfile("KH01")).thenReturn(CUSTOMER);
         Exchange exchange = request("GET", "/api/admin/orders", CUSTOMER);
         exchange.send();
-        exchange.assertError(403, "FORBIDDEN");
+        exchange.assertError(403);
         verifyNoInteractions(exchange.chain);
     }
 
@@ -279,7 +278,7 @@ class AuthenticationFilterTest {
             if ((Boolean) entry[2]) {
                 verify(exchange.chain).doFilter(exchange.request, exchange.response);
             } else {
-                exchange.assertError(403, "FORBIDDEN");
+                exchange.assertError(403);
                 verifyNoInteractions(exchange.chain);
             }
         }
@@ -295,7 +294,7 @@ class AuthenticationFilterTest {
                 Exchange exchange = request("GET", path, employee);
                 exchange.send();
                 if (path.startsWith("/api/")) {
-                    exchange.assertError(403, "FORBIDDEN");
+                    exchange.assertError(403);
                 } else {
                     verify(exchange.response).sendError(403, "Chức năng này chỉ dành cho khách hàng.");
                 }
@@ -312,7 +311,7 @@ class AuthenticationFilterTest {
             Exchange exchange = request("GET", path, employee);
             exchange.send();
             if (path.startsWith("/api/")) {
-                exchange.assertError(403, "FORBIDDEN");
+                exchange.assertError(403);
             } else {
                 verify(exchange.response).sendError(403, "Bạn không có quyền truy cập chức năng này.");
             }
@@ -325,7 +324,7 @@ class AuthenticationFilterTest {
         when(accounts.getProfile("NV01")).thenReturn(employee(EmployeeRole.ORDER_STAFF));
         Exchange exchange = request("GET", "/api/admin/foods", employee(EmployeeRole.ADMIN));
         exchange.send();
-        exchange.assertError(403, "FORBIDDEN");
+        exchange.assertError(403);
         verifyNoInteractions(exchange.chain);
     }
 
@@ -334,7 +333,7 @@ class AuthenticationFilterTest {
         when(accounts.getProfile("KH01")).thenThrow(new AccountException("ACCOUNT_INACTIVE", "Tài khoản bị khóa.", 401));
         Exchange exchange = request("GET", "/api/addresses", CUSTOMER);
         exchange.send();
-        exchange.assertError(401, "ACCOUNT_INACTIVE");
+        exchange.assertError(401);
         verify(exchange.session).invalidate();
         verifyNoInteractions(exchange.chain);
     }
@@ -350,7 +349,7 @@ class AuthenticationFilterTest {
 
         exchange.send();
 
-        exchange.assertError(401, "UNAUTHORIZED");
+        exchange.assertError(401);
         assertEquals(next, exchange.session.getAttribute("currentUser"));
         verify(exchange.session, never()).invalidate();
         verifyNoInteractions(exchange.chain);
@@ -367,7 +366,7 @@ class AuthenticationFilterTest {
 
             exchange.send();
 
-            exchange.assertError(401, "ACCOUNT_INACTIVE");
+            exchange.assertError(401);
             assertEquals(next, exchange.session.getAttribute("currentUser"));
             verify(exchange.session, never()).invalidate();
             verifyNoInteractions(exchange.chain);
@@ -384,7 +383,7 @@ class AuthenticationFilterTest {
 
         exchange.send();
 
-        exchange.assertError(401, "UNAUTHORIZED");
+        exchange.assertError(401);
         verify(exchange.session).invalidate();
         verify(exchange.session, never()).setAttribute("currentUser", CUSTOMER);
         verifyNoInteractions(exchange.chain);
@@ -414,8 +413,8 @@ class AuthenticationFilterTest {
         when(accounts.getProfile("KH01")).thenThrow(new IllegalStateException("jdbc:mysql://private-host secret"));
         Exchange exchange = request("GET", "/api/profile", CUSTOMER);
         exchange.send();
-        exchange.assertError(503, "SERVICE_UNAVAILABLE");
-        assertFalse(exchange.body.toString().contains("private-host"));
+        exchange.assertError(503);
+        verify(exchange.response).sendError(503, "Dịch vụ tài khoản tạm thời không khả dụng.");
         verifyNoInteractions(exchange.chain);
     }
 
@@ -426,7 +425,7 @@ class AuthenticationFilterTest {
             Exchange exchange = request("POST", "/api/auth/login", null);
             when(exchange.request.getHeader("Origin")).thenReturn(origin);
             exchange.send();
-            exchange.assertError(403, "FORBIDDEN");
+            exchange.assertError(403);
             verifyNoInteractions(exchange.chain);
         }
         verifyNoInteractions(accounts);
@@ -437,12 +436,12 @@ class AuthenticationFilterTest {
         Exchange exchange = request("POST", "/api/auth/logout", CUSTOMER);
         when(exchange.request.getHeader("Sec-Fetch-Site")).thenReturn("cross-site");
         exchange.send();
-        exchange.assertError(403, "FORBIDDEN");
+        exchange.assertError(403);
         verifyNoInteractions(exchange.chain);
     }
 
     @Test
-    void sameOriginJsonMutationAndNonBrowserClientMayProceed() throws Exception {
+    void sameOriginFormMutationAndNonBrowserClientMayProceed() throws Exception {
         for (String origin : new String[]{"http://localhost:8080", null}) {
             Exchange exchange = request("POST", "/api/auth/login", null);
             when(exchange.request.getHeader("Origin")).thenReturn(origin);
@@ -493,8 +492,122 @@ class AuthenticationFilterTest {
             Exchange crossOrigin = request("POST", path, null);
             when(crossOrigin.request.getHeader("Origin")).thenReturn("https://evil.example");
             crossOrigin.send();
-            crossOrigin.assertError(403, "FORBIDDEN");
+            crossOrigin.assertError(403);
             verifyNoInteractions(crossOrigin.chain);
+        }
+    }
+
+    @Test
+    void browserFormActionsRedirectGuestsToLogin() throws Exception {
+        String[][] routes = {{"/cart/action", "/cart"}, {"/delivery/quote", "/checkout"},
+                {"/payos/create", "/orders"}, {"/orders/create", "/checkout"}, {"/orders/cancel", "/orders"},
+                {"/promotions/apply", "/cart"}, {"/promotions/remove", "/cart"},
+                {"/customer/profile/save", "/customer/profile"},
+                {"/customer/addresses/save", "/customer/addresses"},
+                {"/customer/addresses/delete", "/customer/addresses"},
+                {"/customer/addresses/default", "/customer/addresses"},
+                {"/admin/orders/action", "/admin"}, {"/admin/orders/payment", "/admin"},
+                {"/admin/menu/action", "/admin"}, {"/admin/employees/action", "/admin"},
+                {"/admin/promotions/action", "/admin"},
+                {"/auth/password/change/submit", "/auth/change-password"},
+                {"/auth/password/change/code", "/auth/change-password"}};
+        for (String[] route : routes) {
+            Exchange exchange = request("POST", route[0], null);
+            when(exchange.request.getQueryString()).thenReturn("password=must-not-be-returned&orderId=DH01");
+            exchange.send();
+            verify(exchange.response).sendRedirect("/crave/auth/login?returnTo="
+                    + URLEncoder.encode("/crave" + route[1], StandardCharsets.UTF_8));
+            verifyNoInteractions(exchange.chain);
+        }
+        verifyNoInteractions(accounts);
+    }
+
+    @Test
+    void expiredCartFormReturnsToAnAllowedCatalogOrCartPage() throws Exception {
+        for (String target : new String[]{"/menu", "/menu?categoryId=DM01", "/menu/detail?id=MA01", "/cart"}) {
+            Exchange exchange = request("POST", "/cart/action", null);
+            when(exchange.request.getParameter("returnTo")).thenReturn(target);
+            exchange.send();
+            verify(exchange.response).sendRedirect("/crave/auth/login?returnTo="
+                    + URLEncoder.encode("/crave" + target, StandardCharsets.UTF_8));
+            verifyNoInteractions(exchange.chain);
+        }
+        verifyNoInteractions(accounts);
+    }
+
+    @Test
+    void expiredPromotionFormKeepsItsAllowedCheckoutDestination() throws Exception {
+        for (String action : new String[]{"/promotions/apply", "/promotions/remove"}) {
+            Exchange exchange = request("POST", action, null);
+            when(exchange.request.getParameter("returnTo")).thenReturn("/checkout");
+            exchange.send();
+            verify(exchange.response).sendRedirect("/crave/auth/login?returnTo=%2Fcrave%2Fcheckout");
+            verifyNoInteractions(exchange.chain);
+        }
+        verifyNoInteractions(accounts);
+    }
+
+    @Test
+    void expiredFormsRejectExternalAndActionReturnAddresses() throws Exception {
+        for (String route : new String[]{"/cart/action", "/promotions/apply"}) {
+            for (String target : new String[]{"https://evil.example/steal", "//evil.example/steal",
+                    "/admin/menu", "/cart/action", "/menu\r\nLocation: https://evil.example"}) {
+                Exchange exchange = request("POST", route, null);
+                when(exchange.request.getParameter("returnTo")).thenReturn(target);
+                exchange.send();
+                verify(exchange.response).sendRedirect("/crave/auth/login?returnTo=%2Fcrave%2Fcart");
+                verifyNoInteractions(exchange.chain);
+            }
+        }
+        verifyNoInteractions(accounts);
+    }
+
+    @Test
+    void customerFormActionsRefreshTheAccountBeforeReachingTheirServlet() throws Exception {
+        when(accounts.getProfile("KH01")).thenReturn(CUSTOMER);
+        for (String path : new String[]{"/cart/action", "/delivery/quote", "/payos/create", "/orders/create", "/orders/cancel",
+                "/promotions/apply", "/promotions/remove"}) {
+            Exchange exchange = request("POST", path, CUSTOMER);
+            when(exchange.request.getHeader("Origin")).thenReturn("http://localhost:8080");
+            exchange.send();
+            verify(exchange.session).setAttribute("currentUser", CUSTOMER);
+            verify(exchange.chain).doFilter(exchange.request, exchange.response);
+            verify(exchange.response).setHeader("Cache-Control", "no-store");
+        }
+    }
+
+    @Test
+    void browserFormActionsRejectForeignOriginsBeforeRefreshingAnyAccount() throws Exception {
+        for (String path : new String[]{"/cart/action", "/delivery/quote", "/payos/create", "/admin/orders/action",
+                "/promotions/apply", "/auth/password/change"}) {
+            Exchange exchange = request("POST", path, CUSTOMER);
+            when(exchange.request.getHeader("Origin")).thenReturn("https://evil.example");
+            exchange.send();
+            exchange.assertError(403);
+            verifyNoInteractions(exchange.chain);
+        }
+        verifyNoInteractions(accounts);
+    }
+
+    @Test
+    void orderActionsKeepStaffRoleChecksAndPasswordChangesAllowEmployees() throws Exception {
+        ProfileResponse orderStaff = employee(EmployeeRole.ORDER_STAFF);
+        when(accounts.getProfile("NV01")).thenReturn(orderStaff);
+        Exchange allowed = request("POST", "/admin/orders/action", orderStaff);
+        allowed.send();
+        verify(allowed.chain).doFilter(allowed.request, allowed.response);
+
+        ProfileResponse menuStaff = employee(EmployeeRole.MENU_MANAGER);
+        when(accounts.getProfile("NV01")).thenReturn(menuStaff);
+        Exchange denied = request("POST", "/admin/orders/action", menuStaff);
+        denied.send();
+        denied.assertError(403);
+        verifyNoInteractions(denied.chain);
+
+        for (String path : new String[]{"/auth/password/change", "/auth/password/change/code"}) {
+            Exchange changePassword = request("POST", path, menuStaff);
+            changePassword.send();
+            verify(changePassword.chain).doFilter(changePassword.request, changePassword.response);
         }
     }
 
@@ -503,7 +616,6 @@ class AuthenticationFilterTest {
         HttpServletResponse response = mock(HttpServletResponse.class);
         HttpSession session = principal == null ? null : mock(HttpSession.class);
         FilterChain chain = mock(FilterChain.class);
-        StringWriter body = new StringWriter();
         when(request.getMethod()).thenReturn(method);
         when(request.getRequestURI()).thenReturn("/crave" + path);
         when(request.getContextPath()).thenReturn("/crave");
@@ -544,22 +656,17 @@ class AuthenticationFilterTest {
             attributes.put(call.getArgument(0), call.getArgument(1));
             return null;
         }).when(request).setAttribute(any(String.class), any());
-        when(response.getWriter()).thenReturn(new PrintWriter(body));
-        return new Exchange(request, response, session, chain, body, filter);
+        return new Exchange(request, response, session, chain, filter);
     }
 
     private record Exchange(HttpServletRequest request, HttpServletResponse response, HttpSession session,
-                            FilterChain chain, StringWriter body, AuthenticationFilter filter) {
+                            FilterChain chain, AuthenticationFilter filter) {
         void send() throws Exception {
             filter.doFilter(request, response, chain);
         }
 
-        void assertError(int status, String code) throws Exception {
-            verify(response).setStatus(status);
-            JsonNode json = JsonProvider.objectMapper().readTree(body.toString());
-            assertFalse(json.path("success").asBoolean());
-            assertEquals(code, json.path("error").path("code").asText());
-            verify(response).setContentType("application/json");
+        void assertError(int status) throws Exception {
+            verify(response).sendError(eq(status), anyString());
         }
     }
 }

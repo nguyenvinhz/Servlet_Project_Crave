@@ -20,13 +20,9 @@ import com.foodordering.enums.OptionType;
 import com.foodordering.exception.ConflictException;
 import com.foodordering.exception.ResourceNotFoundException;
 import com.foodordering.exception.ValidationException;
-import com.foodordering.mapper.MenuMapper;
-import com.foodordering.repository.CategoryRepository;
-import com.foodordering.repository.FoodOptionRepository;
-import com.foodordering.repository.FoodRepository;
-import com.foodordering.repository.JpaCategoryRepository;
-import com.foodordering.repository.JpaFoodOptionRepository;
-import com.foodordering.repository.JpaFoodRepository;
+import com.foodordering.dao.CategoryDAO;
+import com.foodordering.dao.FoodOptionDAO;
+import com.foodordering.dao.FoodDAO;
 import com.foodordering.validator.MenuValidator;
 
 import java.math.BigDecimal;
@@ -40,17 +36,17 @@ import java.util.stream.Collectors;
  */
 public class MenuService {
 
-    private final CategoryRepository categoryRepository;
-    private final FoodRepository foodRepository;
-    private final FoodOptionRepository foodOptionRepository;
+    private final CategoryDAO categoryRepository;
+    private final FoodDAO foodRepository;
+    private final FoodOptionDAO foodOptionRepository;
 
     public MenuService() {
-        this(new JpaCategoryRepository(), new JpaFoodRepository(), new JpaFoodOptionRepository());
+        this(new CategoryDAO(), new FoodDAO(), new FoodOptionDAO());
     }
 
-    public MenuService(CategoryRepository categoryRepository,
-                       FoodRepository foodRepository,
-                       FoodOptionRepository foodOptionRepository) {
+    public MenuService(CategoryDAO categoryRepository,
+                       FoodDAO foodRepository,
+                       FoodOptionDAO foodOptionRepository) {
         this.categoryRepository = categoryRepository;
         this.foodRepository = foodRepository;
         this.foodOptionRepository = foodOptionRepository;
@@ -66,7 +62,7 @@ public class MenuService {
         for (Category category : categories) {
             long count = foodRepository.countByCategoryId(category.getId());
             List<String> imageUrls = getFoodImageUrlsForCategory(category.getId());
-            responses.add(MenuMapper.toCategoryResponse(category, count, imageUrls));
+            responses.add(createCategoryResponse(category, count, imageUrls));
         }
         return responses;
     }
@@ -76,7 +72,7 @@ public class MenuService {
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy danh mục với mã: " + id));
         long count = foodRepository.countByCategoryId(category.getId());
         List<String> imageUrls = getFoodImageUrlsForCategory(category.getId());
-        return MenuMapper.toCategoryResponse(category, count, imageUrls);
+        return createCategoryResponse(category, count, imageUrls);
     }
 
     private List<String> getFoodImageUrlsForCategory(String categoryId) {
@@ -107,7 +103,7 @@ public class MenuService {
         String description = request.description() != null ? request.description().trim() : null;
         Category category = new Category(id, trimmedName, description);
         Category saved = categoryRepository.save(category);
-        return MenuMapper.toCategoryResponse(saved, 0L, List.of());
+        return createCategoryResponse(saved, 0L, List.of());
     }
 
     public CategoryResponse updateCategory(String id, CategoryRequest request) {
@@ -125,7 +121,7 @@ public class MenuService {
         Category updated = categoryRepository.update(category);
         long count = foodRepository.countByCategoryId(id);
         List<String> imageUrls = getFoodImageUrlsForCategory(id);
-        return MenuMapper.toCategoryResponse(updated, count, imageUrls);
+        return createCategoryResponse(updated, count, imageUrls);
     }
 
     public void deleteCategory(String id) {
@@ -145,14 +141,14 @@ public class MenuService {
     public List<FoodSummaryResponse> getMenu(String categoryId, String keyword) {
         List<Food> foods = foodRepository.search(keyword, categoryId, FoodStatus.AVAILABLE);
         return foods.stream()
-                .map(MenuMapper::toFoodSummaryResponse)
+                .map(this::createFoodSummaryResponse)
                 .collect(Collectors.toList());
     }
 
     public List<FoodSummaryResponse> getAllFoodsForAdmin(String categoryId, String keyword, FoodStatus status) {
         List<Food> foods = foodRepository.search(keyword, categoryId, status);
         return foods.stream()
-                .map(MenuMapper::toFoodSummaryResponse)
+                .map(this::createFoodSummaryResponse)
                 .collect(Collectors.toList());
     }
 
@@ -160,7 +156,7 @@ public class MenuService {
         Food food = foodRepository.findByIdWithOptions(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy món ăn với mã: " + id));
 
-        return MenuMapper.toFoodDetailResponse(food, onlyActiveOptions);
+        return createFoodDetailResponse(food, onlyActiveOptions);
     }
 
     public FoodDetailResponse createFood(FoodRequest request) {
@@ -175,7 +171,7 @@ public class MenuService {
 
         Food food = new Food(id, category, request.name().trim(), request.price(), imageUrl, description, status);
         Food saved = foodRepository.save(food);
-        return MenuMapper.toFoodDetailResponse(saved, false);
+        return createFoodDetailResponse(saved, false);
     }
 
     public FoodDetailResponse updateFood(String id, FoodRequest request) {
@@ -197,7 +193,7 @@ public class MenuService {
 
         foodRepository.update(food);
         Food reloaded = foodRepository.findByIdWithOptions(id).orElse(food);
-        return MenuMapper.toFoodDetailResponse(reloaded, false);
+        return createFoodDetailResponse(reloaded, false);
     }
 
     public FoodDetailResponse updateFoodStatus(String id, FoodStatus newStatus) {
@@ -210,7 +206,7 @@ public class MenuService {
         food.setStatus(newStatus);
         foodRepository.update(food);
         Food reloaded = foodRepository.findByIdWithOptions(id).orElse(food);
-        return MenuMapper.toFoodDetailResponse(reloaded, false);
+        return createFoodDetailResponse(reloaded, false);
     }
 
     public void deleteFood(String id) {
@@ -409,14 +405,14 @@ public class MenuService {
                 : foodOptionRepository.findByFoodId(foodId);
 
         return options.stream()
-                .map(MenuMapper::toFoodOptionResponse)
+                .map(this::createFoodOptionResponse)
                 .collect(Collectors.toList());
     }
 
     public FoodOptionResponse getFoodOptionById(String optionId) {
         FoodOption option = foodOptionRepository.findById(optionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy tùy chọn với mã: " + optionId));
-        return MenuMapper.toFoodOptionResponse(option);
+        return createFoodOptionResponse(option);
     }
 
     public FoodOptionResponse createFoodOption(String foodId, FoodOptionRequest request) {
@@ -435,7 +431,7 @@ public class MenuService {
 
         FoodOption option = new FoodOption(id, food, request.optionType(), trimmedName, extraPrice, status);
         FoodOption saved = foodOptionRepository.save(option);
-        return MenuMapper.toFoodOptionResponse(saved);
+        return createFoodOptionResponse(saved);
     }
 
     public FoodOptionResponse updateFoodOption(String optionId, FoodOptionRequest request) {
@@ -457,7 +453,7 @@ public class MenuService {
         }
 
         FoodOption updated = foodOptionRepository.update(option);
-        return MenuMapper.toFoodOptionResponse(updated);
+        return createFoodOptionResponse(updated);
     }
 
     public FoodOptionResponse updateFoodOptionStatus(String optionId, OptionStatus newStatus) {
@@ -469,7 +465,7 @@ public class MenuService {
 
         option.setStatus(newStatus);
         FoodOption updated = foodOptionRepository.update(option);
-        return MenuMapper.toFoodOptionResponse(updated);
+        return createFoodOptionResponse(updated);
     }
 
     public void deleteFoodOption(String optionId) {
@@ -481,5 +477,75 @@ public class MenuService {
         } catch (Exception e) {
             throw new ConflictException("Không thể xóa tùy chọn đang tồn tại trong đơn hàng hoặc giỏ hàng. Hãy chuyển trạng thái tùy chọn sang Không áp dụng (INACTIVE).");
         }
+    }
+
+    private CategoryResponse createCategoryResponse(Category category, long foodCount, List<String> imageUrls) {
+        if (category == null) {
+            return null;
+        }
+        return new CategoryResponse(
+                category.getId(),
+                category.getName(),
+                category.getDescription(),
+                foodCount,
+                imageUrls != null ? imageUrls : List.of()
+        );
+    }
+
+    private FoodOptionResponse createFoodOptionResponse(FoodOption option) {
+        if (option == null) {
+            return null;
+        }
+        return new FoodOptionResponse(
+                option.getId(),
+                option.getFood() != null ? option.getFood().getId() : null,
+                option.getOptionType(),
+                option.getName(),
+                option.getExtraPrice(),
+                option.getStatus()
+        );
+    }
+
+    private FoodSummaryResponse createFoodSummaryResponse(Food food) {
+        if (food == null) {
+            return null;
+        }
+        return new FoodSummaryResponse(
+                food.getId(),
+                food.getCategory() != null ? food.getCategory().getId() : null,
+                food.getCategory() != null ? food.getCategory().getName() : null,
+                food.getName(),
+                food.getPrice(),
+                food.getImageUrl(),
+                food.getDescription(),
+                food.getStatus()
+        );
+    }
+
+    private FoodDetailResponse createFoodDetailResponse(Food food, boolean onlyActiveOptions) {
+        if (food == null) {
+            return null;
+        }
+        List<FoodOptionResponse> options;
+        if (food.getOptions() == null) {
+            options = List.of();
+        } else {
+            options = food.getOptions().stream()
+                    .filter(opt -> !onlyActiveOptions || opt.getStatus() == OptionStatus.ACTIVE)
+                    .map(this::createFoodOptionResponse)
+                    .collect(Collectors.toList());
+        }
+
+        return new FoodDetailResponse(
+                food.getId(),
+                food.getCategory() != null ? food.getCategory().getId() : null,
+                food.getCategory() != null ? food.getCategory().getName() : null,
+                food.getName(),
+                food.getPrice(),
+                food.getImageUrl(),
+                food.getDescription(),
+                food.getStatus(),
+                options
+        );
     }
 }

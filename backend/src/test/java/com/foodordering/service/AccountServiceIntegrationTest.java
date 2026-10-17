@@ -17,7 +17,7 @@ import com.foodordering.enums.EmployeeRole;
 import com.foodordering.enums.EmployeeStatus;
 import com.foodordering.enums.FulfillmentType;
 import com.foodordering.exception.AccountException;
-import com.foodordering.repository.JpaAccountRepository;
+import com.foodordering.dao.AccountDAO;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import org.junit.jupiter.api.AfterAll;
@@ -92,7 +92,7 @@ class AccountServiceIntegrationTest {
 
     @Test
     void registrationLoginProfileAndAddressCrudPersistWithOwnershipAndPreserveOrderSnapshots() {
-        AccountService service = new AccountService(new JpaAccountRepository(emf));
+        AccountService service = new AccountService(new AccountDAO(emf));
         ProfileResponse owner = register(service);
         ProfileResponse other = register(service);
         assertEquals(owner, service.login(new LoginRequest(owner.email().toUpperCase(), "Integration#123", false)));
@@ -140,7 +140,7 @@ class AccountServiceIntegrationTest {
 
     @Test
     void concurrentAddressCreationSerializesDefaultChangesAndKeepsExactlyOneDefault() throws Exception {
-        AccountService service = new AccountService(new JpaAccountRepository(emf));
+        AccountService service = new AccountService(new AccountDAO(emf));
         ProfileResponse owner = register(service);
         ExecutorService executor = Executors.newFixedThreadPool(2);
         CountDownLatch start = new CountDownLatch(1);
@@ -167,11 +167,11 @@ class AccountServiceIntegrationTest {
 
     @Test
     void databaseUniquenessViolationReturnsFieldConflictAndRollsBackInsert() {
-        AccountService service = new AccountService(new JpaAccountRepository(emf));
+        AccountService service = new AccountService(new AccountDAO(emf));
         ProfileResponse owner = register(service);
         String conflictingId = "KH" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
         accountEmails.put(conflictingId, owner.email());
-        JpaAccountRepository repository = new JpaAccountRepository(emf);
+        AccountDAO repository = new AccountDAO(emf);
         AccountException exception = assertThrows(AccountException.class, () -> repository.write(session -> {
             session.persistCustomer(new Customer(conflictingId, "Conflicting User", owner.email(), newPhone(),
                     "not-a-login-hash"));
@@ -190,7 +190,7 @@ class AccountServiceIntegrationTest {
 
     @Test
     void mixedConcurrentDefaultMutationsAndDeletingLastAddressSerializeWithoutLosingDefaults() throws Exception {
-        AccountService service = new AccountService(new JpaAccountRepository(emf));
+        AccountService service = new AccountService(new AccountDAO(emf));
         ProfileResponse owner = register(service);
         AddressResponse first = service.createAddress(owner.id(), write("First address", true));
         AddressResponse second = service.createAddress(owner.id(), write("Second address", false));
@@ -225,7 +225,7 @@ class AccountServiceIntegrationTest {
 
     @Test
     void constraintFailureAfterFlushingDefaultClearRollsBackAllAddressChanges() {
-        JpaAccountRepository repository = new JpaAccountRepository(emf);
+        AccountDAO repository = new AccountDAO(emf);
         AccountService service = new AccountService(repository);
         ProfileResponse owner = register(service);
         ProfileResponse other = register(service);
@@ -254,7 +254,7 @@ class AccountServiceIntegrationTest {
 
     @Test
     void concurrentProfileContactClaimsCommitExactlyOneAndLeaveLoserUnchanged() throws Exception {
-        AccountService service = new AccountService(new JpaAccountRepository(emf));
+        AccountService service = new AccountService(new AccountDAO(emf));
         ProfileResponse first = register(service);
         ProfileResponse second = register(service);
         String claimedPhone = newPhone();
@@ -280,7 +280,7 @@ class AccountServiceIntegrationTest {
 
     @Test
     void employeeAuthorizationAndInactiveAccountsAreEnforcedAgainstRealDatabaseRecords() {
-        AccountService service = new AccountService(new JpaAccountRepository(emf));
+        AccountService service = new AccountService(new AccountDAO(emf));
         ProfileResponse customer = register(service);
         String employeeId = "NV" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
         String employeeEmail = "it-employee-" + UUID.randomUUID().toString().replace("-", "") + "@example.com";
@@ -318,13 +318,13 @@ class AccountServiceIntegrationTest {
 
     @Test
     void databasePhoneUniquenessReturnsFieldConflictAndDoesNotLeavePartialAccount() {
-        AccountService service = new AccountService(new JpaAccountRepository(emf));
+        AccountService service = new AccountService(new AccountDAO(emf));
         ProfileResponse owner = register(service);
         String id = "KH" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
         String email = "it-phone-" + UUID.randomUUID().toString().replace("-", "") + "@example.com";
         accountEmails.put(id, email);
         AccountException failure = assertThrows(AccountException.class,
-                () -> new JpaAccountRepository(emf).write(session -> {
+                () -> new AccountDAO(emf).write(session -> {
                     session.persistCustomer(new Customer(id, "Phone conflict", email, owner.phone(), "unsupported"));
                     session.flush();
                     return null;

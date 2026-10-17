@@ -9,7 +9,7 @@ import com.foodordering.entity.Employee;
 import com.foodordering.entity.User;
 import com.foodordering.enums.EmployeeRole;
 import com.foodordering.exception.AccountException;
-import com.foodordering.repository.JpaAccountRepository;
+import com.foodordering.dao.AccountDAO;
 import com.foodordering.utils.PasswordHasher;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
@@ -192,11 +192,11 @@ class EmailVerificationServiceIntegrationTest {
     }
 
     private EmailVerificationService service() {
-        return new EmailVerificationService(new JpaAccountRepository(emf), hasher,
+        return new EmailVerificationService(new AccountDAO(emf), hasher,
                 (email, code, purpose) -> mail.add(new Mail(email, code, purpose)), clock, SECRET);
     }
 
-    private AccountService accounts() { return new AccountService(new JpaAccountRepository(emf), hasher); }
+    private AccountService accounts() { return new AccountService(new AccountDAO(emf), hasher); }
 
     private ProfileResponse provisionCustomer() {
         ProfileResponse profile = accounts().register(registration(newEmail(), newPhone()));

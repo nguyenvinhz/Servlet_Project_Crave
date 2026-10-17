@@ -1,620 +1,269 @@
-(function () {
+document.addEventListener('DOMContentLoaded', () => {
     'use strict';
-
-    const API_BASE = document.body.dataset.contextPath || '';
-    const VOUCHER_KEY = 'crave_applied_voucher';
-    const state = {
-        subtotal: 0, discount: 0, promotionId: null,
-        policy: null, location: null, locationRevision: 0, locationConfirmed: false, pinDragging: false, addressResolving: false, quote: null, quotePending: false, quoteRequest: 0,
-        ready: false, loading: false, submitting: false, completed: false, sessionExpired: false
-    };
-    let elements;
-    let deliveryMap, deliveryMarker;
-    let addressLookupTimer;
-
-    function deliveryReady() {
-        return elements.fulfillment.value === 'PICKUP' || (state.locationConfirmed && !state.quotePending && state.quote?.deliverable === true);
+    const form = document.getElementById('checkoutForm');
+    if (!form) return;
+    const byId = id => document.getElementById(id), context = document.body.dataset.contextPath || '';
+    const money = amount => Number(amount || 0).toLocaleString('vi-VN') + '\u00a0đ';
+    const type = byId('fulfillmentType'), address = byId('deliveryAddress'), place = byId('placeOrderBtn');
+    const status = byId('deliveryLocationStatus'), searchResults = byId('deliverySearchResults');
+    const lat = byId('deliveryLatitude'), lon = byId('deliveryLongitude');
+    const locate = byId('useMyLocationBtn'), confirm = byId('confirmDeliveryLocationBtn');
+    const savedAddresses = byId('savedAddressSelect'), note = byId('customerNote');
+    const requests = new Set();
+    let map, marker, fee = null, confirmed = false, revision = 0;
+    let searching = false, quoting = false, locating = false, undeliverable = false;
+    let searchAddress = '', selectedAddress = '', resolvedAddress = '', lastSearch = '', lastSavedNote = '', lookupTimer;
+    const subtotal = Number(form.dataset.subtotal), discount = Number(form.dataset.discount);
+    const empty = form.dataset.empty === 'true';
+    function summary() {
+        const pickup = type.value === 'PICKUP', amount = pickup || subtotal <= 0 ? 0 : fee;
+        const hasPoint = Boolean(marker && lat.value && lon.value);
+        byId('summaryFee').textContent = amount != null ? money(amount)
+            : quoting ? 'Đang tính...' : undeliverable ? 'Không hỗ trợ' : 'Chưa xác định';
+        byId('summaryDiscount').textContent = '-' + money(discount);
+        byId('summaryDiscountRow').hidden = discount <= 0;
+        byId('summaryTotal').textContent = money(Math.max(0, subtotal - discount + (amount || 0)))
+            + (amount == null ? ' + phí giao hàng' : '');
+        place.disabled = empty || (!pickup && (!confirmed || fee == null));
+        confirm.hidden = pickup || !hasPoint || confirmed;
+        confirm.disabled = quoting;
+        byId('retryDeliveryQuoteBtn').disabled = quoting || !hasPoint;
+        byId('findDeliveryAddressBtn').disabled = pickup || !map || searching || address.value.trim().length < 3;
+        locate.disabled = locating;
     }
-
-    function clearVoucher() {
-        state.promotionId = null;
-        state.discount = 0;
-        try { sessionStorage.removeItem(VOUCHER_KEY); } catch (_) { }
-        const url = new URL(window.location.href);
-        if (url.searchParams.has('voucher') && !state.completed && !state.sessionExpired) {
-            url.searchParams.delete('voucher');
-            window.history.replaceState(null, '', url);
+    function invalidate(clearPoint) {
+        clearTimeout(lookupTimer); lookupTimer = null;
+        revision++;
+        requests.forEach(request => request.abort());
+        requests.clear();
+        searching = false; quoting = false; locating = false;
+        fee = null; confirmed = false; undeliverable = false;
+        byId('retryDeliveryQuoteBtn').hidden = true;
+        searchResults.replaceChildren();
+        if (clearPoint) {
+            lat.value = ''; lon.value = ''; selectedAddress = ''; resolvedAddress = '';
+            if (marker) { map.removeLayer(marker); marker = null; }
+            byId('matchedDeliveryAddress').textContent = '';
         }
     }
-
-    function voucherCode() {
-        const fromUrl = new URLSearchParams(window.location.search).get('voucher');
-        if (fromUrl) return fromUrl.trim().toUpperCase();
+    async function post(path, values) {
+        const controller = new AbortController();
+        requests.add(controller);
+        let timedOut = false;
+        const timer = setTimeout(() => { timedOut = true; controller.abort(); }, 15000);
         try {
-            const saved = JSON.parse(sessionStorage.getItem(VOUCHER_KEY));
-            return typeof saved?.code === 'string' ? saved.code.trim().toUpperCase() : '';
-        } catch (_) {
-            return '';
-        }
-    }
-
-    function alert(message, success = false) {
-        elements.alert.textContent = message;
-        elements.alert.className = `alert ${success ? 'success' : 'error'}`;
-        elements.alert.style.display = 'block';
-    }
-
-    function updateControls() {
-        elements.submit.disabled = !state.ready || !deliveryReady() || state.loading || state.submitting || state.completed || state.sessionExpired;
-        elements.retry.hidden = state.ready || state.loading || state.sessionExpired || state.completed;
-        elements.form.setAttribute('aria-busy', String(state.loading || state.submitting));
-        elements.fulfillment.disabled = state.submitting || state.completed;
-        elements.address.disabled = state.submitting || state.completed;
-        elements.findAddress.disabled = !deliveryMap || state.addressResolving || state.submitting || state.completed || state.sessionExpired;
-        elements.myLocation.disabled = !deliveryMap || state.submitting || state.completed || state.sessionExpired;
-        elements.confirmLocation.hidden = !state.location || state.locationConfirmed;
-        elements.confirmLocation.disabled = state.pinDragging || state.submitting || state.completed || state.sessionExpired;
-        const savedAddress = document.getElementById('savedAddressSelect');
-        if (savedAddress) savedAddress.disabled = state.submitting || state.completed;
-        if (deliveryMarker?.dragging) {
-            if (state.submitting || state.completed || state.sessionExpired) deliveryMarker.dragging.disable();
-            else deliveryMarker.dragging.enable();
-        }
-    }
-
-    function updateSummary() {
-        const delivery = elements.fulfillment.value === 'DELIVERY';
-        const fee = !delivery || state.subtotal <= 0 ? 0 : (deliveryReady() ? Number(state.quote.deliveryFee) : null);
-        const price = amount => new Intl.NumberFormat('vi-VN').format(amount) + ' đ';
-        elements.subtotal.textContent = price(state.subtotal);
-        elements.fee.textContent = fee != null ? price(fee) : (state.quotePending ? 'Đang tính...' : state.quote?.deliverable === false ? 'Không hỗ trợ' : 'Chưa xác định');
-        elements.discount.textContent = '-' + price(state.discount);
-        elements.discountRow.hidden = state.discount <= 0;
-        elements.total.textContent = price(Math.max(0, state.subtotal + (fee || 0) - state.discount)) + (fee == null ? ' + phí giao hàng' : '');
-    }
-
-    function invalidateDeliveryLocation() {
-        clearTimeout(addressLookupTimer);
-        addressLookupTimer = null;
-        state.quoteRequest++;
-        state.locationRevision++;
-        state.location = null;
-        state.locationConfirmed = false;
-        state.pinDragging = false;
-        state.addressResolving = false;
-        state.quote = null;
-        state.quotePending = false;
-        if (deliveryMarker) { deliveryMarker.remove(); deliveryMarker = null; }
-        elements.locationStatus.textContent = 'Đang chờ xác định địa chỉ nhận hàng.';
-        elements.matchedAddress.textContent = '';
-        elements.searchResults.replaceChildren();
-        elements.retryQuote.hidden = true;
-        updateSummary();
-        updateControls();
-    }
-
-    async function resolveDeliveryAddress() {
-        clearTimeout(addressLookupTimer);
-        addressLookupTimer = null;
-        if (!deliveryMap || elements.fulfillment.value !== 'DELIVERY' || state.submitting || state.completed || state.sessionExpired) return;
-        const address = elements.address.value.trim();
-        if (address.length < 3) {
-            elements.locationStatus.textContent = 'Nhập tên đường, địa điểm hoặc tọa độ; bạn cũng có thể chọn trực tiếp trên bản đồ.';
-            return;
-        }
-        invalidateDeliveryLocation();
-        const requestId = ++state.quoteRequest;
-        state.locationConfirmed = false;
-        state.addressResolving = true;
-        state.quote = null;
-        state.quotePending = true;
-        elements.locationStatus.textContent = 'Đang xác định địa chỉ và tính phí giao hàng...';
-        elements.retryQuote.hidden = true;
-        updateSummary(); updateControls();
-        try {
-            const data = await requestApi('/api/delivery/search', {
-                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ address })
+            const response = await fetch(context + path, {
+                method: 'POST', credentials: 'same-origin', signal: controller.signal,
+                headers: {'Accept': 'text/html', 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'},
+                body: new URLSearchParams(values)
             });
-            if (!data || requestId !== state.quoteRequest || address !== elements.address.value.trim() || state.sessionExpired) return;
-            if (!data.success || !Array.isArray(data.data) || !data.data.length) throw new Error(message(data, 'Không tìm được địa chỉ. Bạn có thể chọn trực tiếp trên bản đồ.'));
-            const candidates = data.data.filter(point => Number.isFinite(point.latitude) && Number.isFinite(point.longitude));
-            if (!candidates.length) throw new Error('Chưa xác định được vị trí hợp lệ. Vui lòng chọn trên bản đồ.');
-            state.quotePending = false;
-            state.addressResolving = false;
-            if (candidates.length > 1) {
-                elements.locationStatus.textContent = 'Có nhiều kết quả. Chọn địa điểm phù hợp bên dưới rồi kiểm tra điểm nhận trên bản đồ.';
-                for (const candidate of candidates) {
-                    const button = document.createElement('button');
-                    button.type = 'button';
-                    button.className = 'button outline delivery-search-result';
-                    button.textContent = candidate.label + (candidate.approximate ? ' · Vị trí gợi ý' : '');
-                    button.addEventListener('click', () => chooseSearchResult(candidate, true));
-                    elements.searchResults.appendChild(button);
-                }
-                deliveryMap.fitBounds(L.latLngBounds(candidates.map(point => [point.latitude, point.longitude])), { padding: [30, 30], maxZoom: 15 });
-            } else await chooseSearchResult(candidates[0]);
-        } catch (error) {
-            if (requestId === state.quoteRequest && !state.sessionExpired) {
-                elements.locationStatus.textContent = error.message || 'Chưa tra được địa chỉ. Vui lòng ghim điểm nhận trên bản đồ.';
-                elements.retryQuote.hidden = false;
+            if (response.redirected && new URL(response.url).pathname.includes('/auth/login')) {
+                location.href = response.url; throw new Error('Vui lòng đăng nhập lại.');
             }
-        } finally {
-            if (requestId === state.quoteRequest) { state.addressResolving = false; state.quotePending = false; updateSummary(); updateControls(); }
-        }
-    }
-
-    function setAddressFromPoint(text) {
-        elements.address.value = text.slice(0, 255);
-        const saved = document.getElementById('savedAddressSelect');
-        if (saved) saved.value = 'custom';
-        showAddressHint('Địa chỉ của điểm nhận trên bản đồ. Bạn có thể thêm chi tiết giao hàng ở phần ghi chú.');
-    }
-
-    async function chooseSearchResult(candidate, selectedFromList = false) {
-        if (state.submitting || state.completed || state.sessionExpired) return;
-        const point = [candidate.latitude, candidate.longitude];
-        elements.searchResults.replaceChildren();
-        elements.matchedAddress.textContent = `Vị trí gợi ý: ${candidate.label}. Hãy kiểm tra và kéo ghim tới đúng nơi nhận hàng.`;
-        if (candidate.approximate) elements.matchedAddress.textContent += ' Cần bạn kiểm tra và xác nhận điểm nhận.';
-        if (selectedFromList) setAddressFromPoint(`${candidate.label.slice(0, 215)} (${candidate.latitude.toFixed(6)}, ${candidate.longitude.toFixed(6)})`);
-        else if (/^[+-]?\d+\.\d+,\s*[+-]?\d+\.\d+$/.test(candidate.label)) setAddressFromPoint(candidate.label);
-        deliveryMap.setView(point, 16);
-        await selectDeliveryLocation(point, candidate.approximate || selectedFromList ? 'approximate' : 'address');
-    }
-
-    async function updateAddressForPin(location, revision) {
-        try {
-            const data = await requestApi('/api/delivery/reverse', {
-                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(location)
-            });
-            if (!data?.success || !data.data?.label || revision !== state.locationRevision || state.submitting
-                    || state.completed || state.sessionExpired || elements.fulfillment.value !== 'DELIVERY') return;
-            const coordinates = `${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)}`;
-            // A nearby address is a description. Keep the exact pin visible and authoritative.
-            const label = data.data.label === coordinates ? coordinates : `${data.data.label.slice(0, 215)} (${coordinates})`;
-            setAddressFromPoint(label);
-            elements.matchedAddress.textContent = data.data.label === coordinates
-                ? 'Chưa tra được tên địa chỉ. Tọa độ điểm nhận đã được điền; bạn vẫn có thể xác nhận và đặt hàng.'
-                : `Địa chỉ gần điểm ghim: ${data.data.label}. Điểm nhận là ghim bạn đã chọn.`;
-        } catch (_) {
-            // Coordinates are filled immediately; reverse lookup failure must not block checkout.
-        }
-    }
-
-    async function loadDeliveryPolicy() {
-        if (state.policy) return;
-        try {
-            const data = await requestApi('/api/delivery/policy');
-            if (!data) return;
-            if (!data.success || !data.data) throw new Error(message(data, 'Không thể tải thông tin giao hàng.'));
-            state.policy = data.data;
-            const store = data.data.store;
-            elements.storeAddress.textContent = `Cửa hàng: ${store.address || 'Chưa thiết lập địa chỉ'}`;
-            if (!data.data.configured) throw new Error('Cửa hàng chưa thiết lập vị trí giao hàng. Bạn có thể chọn lấy tại quán.');
-            if (!window.L) throw new Error('Không tải được bản đồ. Vui lòng tải lại trang hoặc chọn lấy tại quán.');
-            deliveryMap = L.map('deliveryMap').setView([store.latitude, store.longitude], 14);
-            L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-            }).addTo(deliveryMap);
-            const storeLabel = document.createElement('span');
-            storeLabel.textContent = `CRAVE · ${store.address}`;
-            L.marker([store.latitude, store.longitude], { icon: L.divIcon({ className: 'delivery-pin delivery-store-pin', iconSize: [20, 20] }) })
-                .addTo(deliveryMap).bindTooltip(storeLabel);
-            deliveryMap.on('click', event => selectDeliveryLocation(event.latlng));
-            elements.locationStatus.textContent = 'Tìm theo địa chỉ hoặc chạm bản đồ, kéo ghim đến nơi nhận rồi xác nhận điểm nhận.';
-            elements.myLocation.hidden = !window.isSecureContext || !navigator.geolocation;
-            updateControls();
+            const document = new DOMParser().parseFromString(await response.text(), 'text/html');
+            if (!response.ok) throw new Error(document.querySelector('[data-delivery-error]')?.textContent.trim()
+                || 'Chưa xử lý được vị trí. Vui lòng thử lại hoặc chọn điểm trên bản đồ.');
+            return document;
         } catch (error) {
-            elements.locationStatus.textContent = error.message || 'Không thể tải bản đồ giao hàng. Vui lòng thử tải lại trang.';
+            if (timedOut) throw new Error('Tìm vị trí mất quá lâu. Vui lòng thử lại hoặc ghim điểm nhận trên bản đồ.');
+            if (error.name === 'TypeError') throw new Error('Không kết nối được máy chủ. Vui lòng kiểm tra kết nối và thử lại.');
+            throw error;
+        } finally {
+            clearTimeout(timer); requests.delete(controller);
         }
     }
-
-    async function selectDeliveryLocation(point, source = 'manual') {
-        if (!deliveryMap || elements.fulfillment.value !== 'DELIVERY' || state.submitting || state.completed || state.sessionExpired) return;
-        const latlng = L.latLng(point);
-        clearTimeout(addressLookupTimer);
-        addressLookupTimer = null;
-        state.quoteRequest++;
-        const revision = ++state.locationRevision;
-        state.addressResolving = false;
-        state.pinDragging = false;
-        state.quotePending = false;
-        state.quote = null;
-        state.locationConfirmed = source === 'address';
-        elements.retryQuote.hidden = true;
-        if (source === 'manual') elements.matchedAddress.textContent = 'Điểm nhận do bạn chọn trên bản đồ. Hãy kiểm tra ghim và địa chỉ mô tả cùng một nơi.';
-        state.location = { latitude: latlng.lat, longitude: latlng.lng };
-        elements.searchResults.replaceChildren();
-        if (source === 'manual') {
-            setAddressFromPoint(`${latlng.lat.toFixed(6)}, ${latlng.lng.toFixed(6)}`);
-            updateAddressForPin({ ...state.location }, revision);
+    async function quote() {
+        if (!marker || !lat.value || !lon.value || type.value !== 'DELIVERY' || quoting) return;
+        invalidate(false);
+        const current = revision;
+        quoting = true; summary(); status.textContent = 'Đang tính phí giao hàng...';
+        try {
+            const document = await post('/delivery/quote', {latitude:lat.value, longitude:lon.value});
+            if (current !== revision || type.value !== 'DELIVERY') return;
+            const result = document.querySelector('[data-quote]');
+            if (!result) throw new Error('Chưa tính được phí giao hàng.');
+            confirmed = result.dataset.deliverable === 'true';
+            undeliverable = !confirmed;
+            fee = confirmed ? Number(result.dataset.fee) : null;
+            if (confirmed && (!Number.isFinite(fee) || fee < 0)) throw new Error('Chưa tính được phí giao hàng.');
+            status.textContent = result.textContent;
+        } catch (error) {
+            if (current !== revision) return;
+            confirmed = false; fee = null;
+            status.textContent = error.message; byId('retryDeliveryQuoteBtn').hidden = false;
+        } finally {
+            if (current === revision) { quoting = false; summary(); }
         }
-        if (deliveryMarker) deliveryMarker.setLatLng(latlng);
+    }
+    function writeAddress(label, point) {
+        const coordinates = Number(point.lat).toFixed(6) + ', ' + Number(point.lng).toFixed(6);
+        const suffix = ' (' + coordinates + ')';
+        const text = (label || '').trim();
+        address.value = !text || /^[+-]?[\d.]+\s*[,;]\s*[+-]?[\d.]+$/.test(text)
+            ? coordinates : text.slice(0, 255 - suffix.length) + suffix;
+        resolvedAddress = address.value;
+    }
+    function selectPoint(point, label, originalAddress) {
+        if (!map || type.value !== 'DELIVERY' || !Number.isFinite(point.lat) || !Number.isFinite(point.lng)) return;
+        invalidate(false);
+        selectedAddress = originalAddress || '';
+        lat.value = Number(point.lat).toFixed(7); lon.value = Number(point.lng).toFixed(7);
+        if (marker) marker.setLatLng(point);
         else {
-            deliveryMarker = L.marker(latlng, { draggable: true, icon: L.divIcon({ className: 'delivery-pin', iconSize: [24, 24] }) })
-                .addTo(deliveryMap).bindTooltip('Điểm nhận hàng');
-            deliveryMarker.on('dragstart', () => {
-                clearTimeout(addressLookupTimer);
-                addressLookupTimer = null;
-                state.quoteRequest++; state.quotePending = false; state.addressResolving = false;
-                state.locationRevision++;
-                state.quote = null; state.locationConfirmed = false; state.pinDragging = true;
-                elements.retryQuote.hidden = true;
-                elements.locationStatus.textContent = 'Kéo ghim đến đúng nơi nhận hàng rồi xác nhận lại.';
-                updateSummary(); updateControls();
-            });
-            deliveryMarker.on('dragend', () => selectDeliveryLocation(deliveryMarker.getLatLng()));
+            marker = L.marker(point, {draggable:true, icon:L.divIcon({className:'delivery-pin', iconSize:[24,24]})})
+                .addTo(map).bindTooltip('Điểm nhận hàng');
+            marker.on('dragstart', () => { invalidate(false); lat.value = ''; lon.value = ''; summary(); });
+            marker.on('dragend', () => selectPoint(marker.getLatLng(), null, selectedAddress));
         }
-        if (state.locationConfirmed) await requestDeliveryQuote();
-        else {
-            elements.locationStatus.textContent = 'Kiểm tra điểm ghim rồi bấm “Xác nhận điểm nhận” để tính phí giao hàng.';
-            updateSummary(); updateControls();
+        writeAddress(selectedAddress || label, point);
+        byId('matchedDeliveryAddress').textContent = label || 'Điểm nhận do bạn chọn trên bản đồ. Hãy kiểm tra ghim rồi xác nhận.';
+        status.textContent = 'Đây là vị trí gợi ý. Kiểm tra và kéo ghim đúng nơi nhận hàng trước khi xác nhận.';
+        summary();
+        if (!label) {
+            const current = revision;
+            post('/delivery/reverse', {latitude:lat.value, longitude:lon.value}).then(document => {
+                const result = document.querySelector('[data-location-label]');
+                if (result && current === revision) {
+                    byId('matchedDeliveryAddress').textContent = result.textContent;
+                    if (!selectedAddress) writeAddress(result.textContent, point);
+                }
+            }).catch(() => {});
         }
     }
-
-    async function requestDeliveryQuote() {
-        if (!state.location || !state.locationConfirmed || elements.fulfillment.value !== 'DELIVERY' || state.submitting || state.completed || state.sessionExpired) return;
-        const requestId = ++state.quoteRequest;
-        const location = { ...state.location };
-        state.quote = null;
-        state.quotePending = true;
-        elements.retryQuote.hidden = true;
-        elements.locationStatus.textContent = 'Đang tính phí giao hàng...';
-        updateSummary(); updateControls();
+    function chooseResult(button, chosenFromList) {
+        const point = L.latLng(Number(button.dataset.latitude), Number(button.dataset.longitude));
+        const approximate = button.dataset.approximate !== 'false';
+        selectPoint(point, button.textContent.trim(), searchAddress);
+        map.setView(point, 16);
+        // A suggested street position still needs the customer to confirm the receiving pin.
+        if (!approximate && !chosenFromList) quote();
+    }
+    async function search() {
+        clearTimeout(lookupTimer); lookupTimer = null;
+        const query = address.value.trim();
+        if (!map || type.value !== 'DELIVERY' || searching || query.length < 3) return;
+        if (marker && query === resolvedAddress) return;
+        invalidate(true);
+        const current = revision;
+        lastSearch = query;
+        searching = true; summary(); status.textContent = 'Đang tìm địa chỉ...';
         try {
-            const data = await requestApi('/api/delivery/quote', {
-                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(location)
-            });
-            if (!data || requestId !== state.quoteRequest || state.sessionExpired) return;
-            if (!data.success || !data.data) throw new Error(message(data, 'Không thể tính phí giao hàng.'));
-            state.quote = data.data;
-            elements.locationStatus.textContent = !data.data.deliverable
-                ? (data.data.message || 'Khu vực này hiện chưa được hỗ trợ giao hàng.')
-                : (data.data.message || 'Đã cập nhật phí giao hàng theo điểm nhận.');
+            const document = await post('/delivery/search', {address:query});
+            if (current !== revision || type.value !== 'DELIVERY') return;
+            searchAddress = query;
+            const candidates = Array.from(document.querySelectorAll('.delivery-search-result')).filter(button =>
+                Number.isFinite(Number(button.dataset.latitude)) && Number.isFinite(Number(button.dataset.longitude)));
+            if (!candidates.length) throw new Error('Chưa tìm thấy địa chỉ. Hãy thêm phường/thành phố hoặc chọn điểm trên bản đồ.');
+            if (candidates.length === 1) chooseResult(candidates[0], false);
+            else {
+                searchResults.replaceChildren(...candidates);
+                map.fitBounds(L.latLngBounds(candidates.map(button => [Number(button.dataset.latitude), Number(button.dataset.longitude)])),
+                    {padding:[30,30], maxZoom:15});
+                status.textContent = 'Có nhiều kết quả. Chọn địa điểm phù hợp bên dưới rồi kiểm tra điểm nhận trên bản đồ.';
+            }
         } catch (error) {
-            if (requestId === state.quoteRequest && !state.sessionExpired) {
-                elements.locationStatus.textContent = error.message || 'Lỗi kết nối khi tính phí giao hàng.';
-                elements.retryQuote.hidden = false;
-            }
+            if (current === revision) status.textContent = error.message;
         } finally {
-            if (requestId === state.quoteRequest) { state.quotePending = false; updateSummary(); updateControls(); }
+            if (current === revision) { searching = false; summary(); }
         }
     }
-
-    async function requestApi(path, options = {}) {
-        const response = await fetch(`${API_BASE}${path}`, {
-            ...options,
-            credentials: 'same-origin',
-            headers: { 'Accept': 'application/json', ...options.headers }
-        });
-        if (response.status === 401) {
-            state.quoteRequest++;
-            state.quote = null;
-            state.quotePending = false;
-            state.addressResolving = false;
-            state.sessionExpired = true;
-            state.ready = false;
-            state.subtotal = 0;
-            clearVoucher();
-            updateSummary();
-            elements.form.reset();
-            updateControls();
-            alert('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
-            const query = new URLSearchParams({
-                reason: 'session-expired', returnTo: `${window.location.pathname}${window.location.search}`
-            });
-            window.location.assign(`${API_BASE}/auth/login?${query}`);
-            return null;
-        }
-        const data = await response.json();
-        if (!response.ok) data.success = false;
-        return data;
+    if (form.dataset.configured === 'true' && window.L) {
+        const store = [Number(form.dataset.storeLatitude), Number(form.dataset.storeLongitude)];
+        map = L.map('deliveryMap').setView(store, 14);
+        L.tileLayer(context + '/map/tiles/{z}/{x}/{y}.png', {
+            maxZoom:19, attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+        const storeLabel = document.createElement('span');
+        storeLabel.textContent = 'CRAVE · ' + byId('storeAddress').textContent.replace(/^Cửa hàng:\s*/, '');
+        L.marker(store, {icon:L.divIcon({className:'delivery-pin delivery-store-pin', iconSize:[20,20]})})
+            .addTo(map).bindTooltip(storeLabel);
+        map.on('click', event => selectPoint(event.latlng));
+        status.textContent = 'Tìm theo địa chỉ hoặc chạm bản đồ, kéo ghim đến nơi nhận rồi xác nhận điểm nhận.';
+    } else {
+        status.textContent = 'Chưa mở được bản đồ nhận hàng. Bạn có thể tải lại trang hoặc chọn lấy tại quán.';
     }
-
-    function message(data, fallback) {
-        return data?.error?.message || data?.message || fallback;
+    if (empty) {
+        byId('checkoutAlert').textContent = 'Giỏ hàng đang trống. Vui lòng chọn món trước khi đặt hàng.';
+        byId('checkoutAlert').classList.add('error');
+        byId('checkoutAlert').style.display = 'block';
     }
-
-    function showAddressHint(text) {
-        const hint = document.getElementById('addressHint');
-        if (hint) hint.textContent = text;
-    }
-
-    let addressesLoaded = false;
-    async function loadSavedAddresses() {
-        if (addressesLoaded) return;
-        try {
-            const data = await requestApi('/api/addresses');
-            if (!data || !data.success || !Array.isArray(data.data)) return;
-            const addresses = data.data;
-            const selectWrap = document.getElementById('savedAddressWrap');
-            const select = document.getElementById('savedAddressSelect');
-            const addressInput = document.getElementById('deliveryAddress');
-            const noteInput = document.getElementById('customerNote');
-
-            if (!select || !addressInput) return;
-
-            if (addresses.length > 0) {
-                select.innerHTML = '';
-
-                let defaultIdx = -1;
-                addresses.forEach((addr, idx) => {
-                    const opt = document.createElement('option');
-                    opt.value = String(idx);
-                    const isDef = Boolean(addr.isDefault);
-                    if (isDef && defaultIdx === -1) defaultIdx = idx;
-
-                    const notePart = addr.note ? ` (${addr.note})` : '';
-                    opt.textContent = `${isDef ? '★ [Mặc định] ' : '📍 '}${addr.addressLine}${notePart}`;
-                    select.appendChild(opt);
-                });
-
-                const customOpt = document.createElement('option');
-                customOpt.value = 'custom';
-                customOpt.textContent = '✏️ Nhập địa chỉ khác...';
-                select.appendChild(customOpt);
-
-                const chosenIdx = defaultIdx !== -1 ? defaultIdx : 0;
-                select.value = String(chosenIdx);
-
-                // Điền địa chỉ mặc định vào ô nhập nếu ô đang trống
-                if (!addressInput.value.trim() && addresses[chosenIdx]) {
-                    addressInput.value = addresses[chosenIdx].addressLine || '';
-                    if (addresses[chosenIdx].note && noteInput && !noteInput.value.trim()) {
-                        noteInput.value = addresses[chosenIdx].note;
-                    }
-                }
-
-                if (selectWrap) {
-                    selectWrap.style.display = 'block';
-                }
-
-                showAddressHint(addresses[chosenIdx]?.isDefault
-                    ? 'Đang dùng địa chỉ mặc định của bạn. Bạn có thể chọn địa chỉ khác ở danh sách hoặc sửa trực tiếp.'
-                    : 'Đang dùng địa chỉ từ sổ địa chỉ của bạn.');
-
-                select.addEventListener('change', () => {
-                    invalidateDeliveryLocation();
-                    if (select.value === 'custom') {
-                        addressInput.value = '';
-                        addressInput.focus();
-                        showAddressHint('Vui lòng nhập địa chỉ giao hàng cho đơn này.');
-                    } else {
-                        const selectedAddr = addresses[parseInt(select.value, 10)];
-                        if (selectedAddr) {
-                            addressInput.value = selectedAddr.addressLine || '';
-                            if (selectedAddr.note && noteInput && (!noteInput.value.trim() || noteInput.value === addresses[chosenIdx]?.note)) {
-                                noteInput.value = selectedAddr.note;
-                            }
-                            showAddressHint(selectedAddr.isDefault
-                                ? 'Đang dùng địa chỉ mặc định của bạn.'
-                                : 'Đang dùng địa chỉ từ sổ địa chỉ của bạn.');
-                        }
-                    }
-                    resolveDeliveryAddress();
-                });
-
-                addressInput.addEventListener('input', () => {
-                    const currentVal = addressInput.value.trim();
-                    const matchedIdx = addresses.findIndex(a => a.addressLine.trim() === currentVal);
-                    if (matchedIdx !== -1) {
-                        select.value = String(matchedIdx);
-                        showAddressHint(addresses[matchedIdx].isDefault ? 'Đang dùng địa chỉ mặc định.' : 'Đang dùng địa chỉ đã lưu.');
-                    } else {
-                        select.value = 'custom';
-                        showAddressHint('Địa chỉ tùy chỉnh cho đơn hàng này.');
-                    }
-                });
-
-                addressesLoaded = true;
-            }
-        } catch (_) {}
-    }
-
-    let profileLoaded = false;
-    async function loadProfileInfo() {
-        if (profileLoaded) return;
-        const nameInput = document.getElementById('receiverName');
-        const phoneInput = document.getElementById('receiverPhone');
-        if (nameInput?.value && phoneInput?.value) {
-            profileLoaded = true;
-            return;
-        }
-
-        try {
-            const data = await requestApi('/api/profile');
-            if (data?.success && data.data) {
-                if (nameInput && !nameInput.value.trim() && data.data.fullName) {
-                    nameInput.value = data.data.fullName;
-                }
-                if (phoneInput && !phoneInput.value.trim() && data.data.phone) {
-                    phoneInput.value = data.data.phone;
-                }
-                profileLoaded = true;
-            }
-        } catch (_) {}
-    }
-
-    async function loadCheckout(warning = '', blockOrder = false) {
-        if (state.loading || state.submitting || state.completed || state.sessionExpired) return;
-        state.loading = true;
-        state.ready = false;
-        elements.alert.style.display = 'none';
-        updateControls();
-        try {
-            const data = await requestApi('/api/cart');
-            if (!data) return;
-            if (!data.success || !data.data) throw new Error(message(data, 'Không thể tải giỏ hàng.'));
-            state.subtotal = Number(data.data.subtotal) || 0;
-            state.discount = 0;
-            state.promotionId = null;
-            if (!data.data.items?.length || state.subtotal <= 0) {
-                clearVoucher();
-                updateSummary();
-                throw new Error('Giỏ hàng đang trống. Vui lòng thêm món trước khi đặt hàng.');
-            }
-
-            // Tải thông tin người nhận và sổ địa chỉ giao hàng
-            await Promise.all([loadProfileInfo(), loadSavedAddresses(), loadDeliveryPolicy()]);
-
-            const code = voucherCode();
-            if (code) {
-                const validation = await requestApi('/api/promotions/validate', {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ code, subtotal: state.subtotal })
-                });
-                if (!validation) return;
-                if (validation.success && validation.data?.valid && validation.data.promotion?.promotionId) {
-                    // Use the freshly validated server amount, never the amount saved by the cart page.
-                    state.subtotal = Number(validation.data.originalSubtotal ?? state.subtotal);
-                    state.discount = Number(validation.data.discountAmount) || 0;
-                    state.promotionId = validation.data.promotion.promotionId;
-                } else if (validation.error?.code?.startsWith('PROMOTION_') || validation.data?.valid === false) {
-                    clearVoucher();
-                    alert(message(validation, validation.data?.message || 'Mã khuyến mãi không còn hợp lệ. Vui lòng kiểm tra tổng tiền trước khi đặt hàng.'));
-                } else {
-                    throw new Error(message(validation, 'Không thể xác thực voucher. Vui lòng thử lại.'));
-                }
-            }
-            state.ready = !blockOrder;
-            if (elements.fulfillment.value === 'DELIVERY') {
-                if (state.locationConfirmed) await requestDeliveryQuote();
-                else if (!state.location) resolveDeliveryAddress();
-            }
-            updateSummary();
-            if (warning) alert(warning);
-        } catch (error) {
-            updateSummary();
-            alert(error.message || 'Lỗi kết nối máy chủ. Vui lòng thử lại.');
-        } finally {
-            state.loading = false;
-            updateControls();
-        }
-    }
-
-    async function submitOrder(event) {
-        event.preventDefault();
-        if (!state.ready || !deliveryReady() || state.loading || state.submitting || state.completed || state.sessionExpired) return;
-        state.submitting = true;
-        elements.alert.style.display = 'none';
-        updateControls();
-        const value = id => document.getElementById(id).value.trim();
-        const payload = {
-            fulfillmentType: elements.fulfillment.value,
-            receiverName: value('receiverName'), receiverPhone: value('receiverPhone'),
-            deliveryAddress: elements.fulfillment.value === 'DELIVERY' ? value('deliveryAddress') : null,
-            deliveryLatitude: elements.fulfillment.value === 'DELIVERY' ? state.location?.latitude : null,
-            deliveryLongitude: elements.fulfillment.value === 'DELIVERY' ? state.location?.longitude : null,
-            paymentMethod: value('paymentMethod'), customerNote: value('customerNote'),
-            promotionId: state.promotionId
-        };
-        let refreshWarning = '';
-        let blockOrder = false;
-        try {
-            const data = await requestApi('/api/orders', {
-                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
-            });
-            if (!data) return;
-            if (data.success && data.data?.orderId) {
-                state.completed = true;
-                clearVoucher();
-                const onlinePayment = ['BANK_TRANSFER', 'E_WALLET'].includes(payload.paymentMethod);
-                alert('Đặt hàng thành công! Mã đơn: ' + data.data.orderId
-                    + (onlinePayment ? '. Đang chuyển đến mã QR thanh toán...' : ''), true);
-                setTimeout(() => window.location.assign(`${API_BASE}/orders/${encodeURIComponent(data.data.orderId)}`), 2000);
-            } else {
-                const errorCode = data.error?.code || '';
-                if (errorCode.startsWith('DELIVERY_')) {
-                    state.quote = null;
-                    elements.locationStatus.textContent = message(data, 'Vui lòng kiểm tra lại điểm nhận hàng.');
-                    elements.retryQuote.hidden = !state.location;
-                    updateSummary();
-                }
-                if (errorCode.startsWith('PROMOTION_')) {
-                    clearVoucher();
-                    updateSummary();
-                }
-                const orderError = message(data, 'Không thể đặt hàng. Vui lòng thử lại.');
-                if (errorCode.startsWith('PROMOTION_') || ['CART_EMPTY', 'FOOD_NOT_AVAILABLE', 'INVALID_OPTION'].includes(errorCode)) {
-                    state.ready = false;
-                    refreshWarning = orderError;
-                    blockOrder = ['FOOD_NOT_AVAILABLE', 'INVALID_OPTION'].includes(errorCode);
-                }
-                alert(orderError);
-            }
-        } catch (_) {
-            alert('Lỗi kết nối máy chủ. Vui lòng thử lại.');
-        } finally {
-            state.submitting = false;
-            updateControls();
-            if (refreshWarning) await loadCheckout(refreshWarning, blockOrder);
-        }
-    }
-
-    document.addEventListener('DOMContentLoaded', () => {
-        elements = {
-            form: document.getElementById('checkoutForm'), submit: document.getElementById('placeOrderBtn'),
-            retry: document.getElementById('retryCheckoutBtn'), alert: document.getElementById('checkoutAlert'),
-            fulfillment: document.getElementById('fulfillmentType'),
-            subtotal: document.getElementById('summarySubtotal'), fee: document.getElementById('summaryFee'),
-            discount: document.getElementById('summaryDiscount'), discountRow: document.getElementById('summaryDiscountRow'),
-            total: document.getElementById('summaryTotal'),
-            address: document.getElementById('deliveryAddress'),
-            storeAddress: document.getElementById('storeAddress'),
-            locationStatus: document.getElementById('deliveryLocationStatus'),
-            matchedAddress: document.getElementById('matchedDeliveryAddress'),
-            searchResults: document.getElementById('deliverySearchResults'),
-            findAddress: document.getElementById('findDeliveryAddressBtn'), myLocation: document.getElementById('useMyLocationBtn'),
-            confirmLocation: document.getElementById('confirmDeliveryLocationBtn'),
-            retryQuote: document.getElementById('retryDeliveryQuoteBtn')
-        };
-        elements.fulfillment.addEventListener('change', () => {
-            const pickup = elements.fulfillment.value === 'PICKUP';
-            document.getElementById('addressGroup').style.display = pickup ? 'none' : 'block';
-            document.getElementById('deliveryAddress').required = !pickup;
-            state.quoteRequest++;
-            state.locationRevision++;
-            state.addressResolving = false;
-            state.quotePending = false;
-            state.quote = null;
-            elements.retryQuote.hidden = true;
-            if (!pickup) {
-                setTimeout(() => deliveryMap?.invalidateSize(), 0);
-                if (state.locationConfirmed) requestDeliveryQuote();
-                else if (!state.location) resolveDeliveryAddress();
-            }
-            updateSummary();
-            updateControls();
-        });
-        elements.address.addEventListener('input', () => {
-            invalidateDeliveryLocation();
-            addressLookupTimer = setTimeout(resolveDeliveryAddress, 1200);
-        });
-        elements.address.addEventListener('change', resolveDeliveryAddress);
-        elements.findAddress.addEventListener('click', resolveDeliveryAddress);
-        elements.confirmLocation.addEventListener('click', () => {
-            if (!state.location || state.pinDragging || state.submitting || state.completed || state.sessionExpired) return;
-            state.locationConfirmed = true;
-            requestDeliveryQuote();
-        });
-        elements.retryQuote.addEventListener('click', () => state.location ? requestDeliveryQuote() : resolveDeliveryAddress());
-        elements.myLocation.addEventListener('click', () => {
-            if (!navigator.geolocation || state.submitting) return;
-            invalidateDeliveryLocation();
-            const address = elements.address.value.trim();
-            const requestId = state.quoteRequest;
-            elements.locationStatus.textContent = 'Đang lấy vị trí hiện tại...';
-            navigator.geolocation.getCurrentPosition(position => {
-                if (state.submitting || state.completed || state.sessionExpired || requestId !== state.quoteRequest || address !== elements.address.value.trim()) return;
-                const point = [position.coords.latitude, position.coords.longitude];
-                deliveryMap.setView(point, 17);
-                selectDeliveryLocation(point);
-            }, () => {
-                if (requestId === state.quoteRequest && !state.sessionExpired && !state.completed) elements.locationStatus.textContent = 'Không lấy được vị trí hiện tại. Vui lòng ghim trên bản đồ.';
-            }, { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 });
-        });
-        elements.form.addEventListener('submit', submitOrder);
-        elements.retry.addEventListener('click', () => loadCheckout());
-        loadCheckout();
+    searchResults.addEventListener('click', event => {
+        const button = event.target.closest('[data-latitude]');
+        if (!button || !map) return;
+        chooseResult(button, true);
     });
-})();
+    byId('findDeliveryAddressBtn').addEventListener('click', search);
+    address.addEventListener('keydown', event => {
+        if (event.key === 'Enter') { event.preventDefault(); search(); }
+    });
+    confirm.addEventListener('click', quote);
+    byId('retryDeliveryQuoteBtn').addEventListener('click', quote);
+    byId('retryCheckoutBtn').addEventListener('click', () => location.reload());
+    function savedAddressHint() {
+        const selected = savedAddresses.selectedOptions[0];
+        byId('addressHint').textContent = selected?.dataset.default === 'true'
+            ? 'Đang dùng địa chỉ mặc định của bạn. Bạn có thể chọn địa chỉ khác ở danh sách hoặc sửa trực tiếp.'
+            : selected?.value ? 'Đang dùng địa chỉ từ sổ địa chỉ của bạn.' : 'Vui lòng nhập địa chỉ giao hàng cho đơn này.';
+        const savedNote = selected?.dataset.note || '';
+        if (note && (!note.value.trim() || note.value === lastSavedNote)) note.value = savedNote;
+        lastSavedNote = savedNote;
+    }
+    savedAddresses.addEventListener('change', event => {
+        address.value = event.target.value;
+        invalidate(true); lastSearch = ''; savedAddressHint(); summary();
+        if (address.value.trim()) search();
+        else address.focus();
+    });
+    address.addEventListener('input', () => {
+        invalidate(true); lastSearch = ''; summary();
+        const saved = Array.from(savedAddresses.options).find(option => option.value === address.value.trim());
+        savedAddresses.value = saved?.value || '';
+        byId('addressHint').textContent = saved?.dataset.default === 'true' ? 'Đang dùng địa chỉ mặc định.'
+            : saved?.value ? 'Đang dùng địa chỉ đã lưu.' : 'Địa chỉ tùy chỉnh cho đơn hàng này.';
+        status.textContent = 'Đang chờ xác định địa chỉ nhận hàng.';
+        if (address.value.trim().length >= 3) lookupTimer = setTimeout(search, 1200);
+    });
+    address.addEventListener('change', () => { if (address.value.trim() !== lastSearch) search(); });
+    type.addEventListener('change', () => {
+        invalidate(false);
+        byId('addressGroup').hidden = type.value === 'PICKUP';
+        address.required = type.value === 'DELIVERY';
+        if (type.value === 'DELIVERY') {
+            requestAnimationFrame(() => map?.invalidateSize());
+            status.textContent = marker && lat.value && lon.value
+                ? 'Kiểm tra ghim rồi xác nhận lại điểm nhận.' : 'Tìm địa chỉ hoặc chọn điểm nhận trên bản đồ.';
+        }
+        summary();
+        if (type.value === 'DELIVERY' && !marker && address.value.trim()) search();
+    });
+    locate.hidden = !window.isSecureContext || !navigator.geolocation || !map;
+    locate.addEventListener('click', () => {
+        invalidate(true);
+        const current = revision;
+        locating = true; summary(); status.textContent = 'Đang lấy vị trí hiện tại...';
+        navigator.geolocation.getCurrentPosition(
+            result => {
+                if (current !== revision || type.value !== 'DELIVERY') return;
+                const point = L.latLng(result.coords.latitude, result.coords.longitude);
+                selectPoint(point); map.setView(point,16);
+            },
+            () => {
+                if (current !== revision || type.value !== 'DELIVERY') return;
+                locating = false; summary();
+                status.textContent = 'Không lấy được vị trí hiện tại. Bạn có thể tìm địa chỉ hoặc chọn điểm trên bản đồ.';
+            },
+            {enableHighAccuracy:true, timeout:10000, maximumAge:0}
+        );
+    });
+    form.addEventListener('submit', event => {
+        if (empty || (type.value === 'DELIVERY' && !confirmed)) { event.preventDefault(); summary(); return; }
+        place.disabled = true; place.textContent = 'Đang đặt hàng...';
+    });
+    summary();
+    if (!address.value.trim()) {
+        const firstSaved = Array.from(savedAddresses.options).find(option => option.value);
+        if (firstSaved) { savedAddresses.value = firstSaved.value; address.value = firstSaved.value; }
+    }
+    if (savedAddresses.value) savedAddressHint();
+    if (address.value.trim()) search();
+});

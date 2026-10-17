@@ -4,16 +4,17 @@ import com.foodordering.config.DatabaseConfig;
 import com.foodordering.dto.AdminPromotionRequest;
 import com.foodordering.dto.PromotionDto;
 import com.foodordering.entity.Promotion;
+import com.foodordering.enums.DiscountType;
 import com.foodordering.enums.PromotionStatus;
 import com.foodordering.exception.ConflictException;
 import com.foodordering.exception.ResourceNotFoundException;
 import com.foodordering.exception.ValidationException;
-import com.foodordering.mapper.PromotionMapper;
 import com.foodordering.validator.AdminPromotionValidator;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import jakarta.persistence.LockModeType;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
@@ -21,7 +22,6 @@ import java.util.function.Function;
 
 public class AdminPromotionService {
     private final EntityManagerFactory emf;
-    private final PromotionMapper mapper = new PromotionMapper();
 
     public AdminPromotionService() {
         this(DatabaseConfig.getEntityManagerFactory());
@@ -33,8 +33,15 @@ public class AdminPromotionService {
 
     public List<PromotionDto> listPromotions() {
         try (EntityManager em = emf.createEntityManager()) {
-            return mapper.toDtoList(em.createQuery("SELECT p FROM Promotion p ORDER BY p.createdAt DESC, p.promotionId", Promotion.class)
-                    .getResultList());
+            List<Promotion> promotions = em.createQuery("SELECT p FROM Promotion p ORDER BY p.createdAt DESC, p.promotionId", Promotion.class)
+                    .getResultList();
+            List<PromotionDto> results = new ArrayList<>();
+            for (Promotion promotion : promotions) {
+                if (promotion != null) {
+                    results.add(createPromotionDto(promotion));
+                }
+            }
+            return results;
         }
     }
 
@@ -51,7 +58,7 @@ public class AdminPromotionService {
             apply(promotion, validated);
             em.persist(promotion);
             em.flush();
-            return mapper.toDto(promotion);
+            return createPromotionDto(promotion);
         });
     }
 
@@ -62,7 +69,7 @@ public class AdminPromotionService {
             requireUniqueCode(em, validated.code(), id);
             apply(promotion, validated);
             em.flush();
-            return mapper.toDto(promotion);
+            return createPromotionDto(promotion);
         });
     }
 
@@ -72,8 +79,37 @@ public class AdminPromotionService {
             Promotion promotion = requirePromotion(em, id);
             promotion.setStatus(status);
             em.flush();
-            return mapper.toDto(promotion);
+            return createPromotionDto(promotion);
         });
+    }
+
+    private PromotionDto createPromotionDto(Promotion promotion) {
+        PromotionDto dto = new PromotionDto();
+        dto.setPromotionId(promotion.getPromotionId());
+        dto.setCode(promotion.getCode());
+        dto.setName(promotion.getName());
+        dto.setDiscountType(promotion.getDiscountType());
+        dto.setDiscountValue(promotion.getDiscountValue());
+        dto.setMinimumOrderValue(promotion.getMinimumOrderValue());
+        dto.setMaximumDiscount(promotion.getMaximumDiscount());
+        dto.setStartAt(promotion.getStartAt());
+        dto.setEndAt(promotion.getEndAt());
+        dto.setStatus(promotion.getStatus());
+
+        if (promotion.getDiscountType() == DiscountType.PERCENT) {
+            String maximumDiscount = (promotion.getMaximumDiscount() != null && promotion.getMaximumDiscount().doubleValue() > 0)
+                    ? String.format(", tối đa %,.0f đ", promotion.getMaximumDiscount().doubleValue())
+                    : "";
+            dto.setDescription(String.format("Giảm %s%% cho đơn từ %,.0f đ%s",
+                    promotion.getDiscountValue() != null ? promotion.getDiscountValue().toPlainString() : "0",
+                    promotion.getMinimumOrderValue() != null ? promotion.getMinimumOrderValue().doubleValue() : 0,
+                    maximumDiscount));
+        } else {
+            dto.setDescription(String.format("Giảm %,.0f đ cho đơn từ %,.0f đ",
+                    promotion.getDiscountValue() != null ? promotion.getDiscountValue().doubleValue() : 0,
+                    promotion.getMinimumOrderValue() != null ? promotion.getMinimumOrderValue().doubleValue() : 0));
+        }
+        return dto;
     }
 
     private static Promotion requirePromotion(EntityManager em, String id) {

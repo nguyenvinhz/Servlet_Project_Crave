@@ -6,6 +6,7 @@
 <c:set var="pageTitle" value="Món ăn - Thức uống"/>
 <%@ include file="/WEB-INF/views/admin/components/begin.jspf" %>
 
+<c:if test="${not empty sessionScope.adminError or not empty sessionScope.adminSuccess}"><div id="adminFlash" hidden data-message="<c:out value='${not empty sessionScope.adminError ? sessionScope.adminError : sessionScope.adminSuccess}'/>" data-type="${not empty sessionScope.adminError ? 'error' : 'success'}"></div><c:remove var="adminError" scope="session"/><c:remove var="adminSuccess" scope="session"/></c:if>
 <main class="admin-content page-container admin-page">
     <header class="admin-header">
         <div class="admin-header-title">
@@ -177,40 +178,41 @@
 </main>
 
 <!-- Modal Thêm / Chỉnh sửa món ăn -->
-<div class="modal-backdrop" id="foodModal" style="display: none;">
+<div class="modal-backdrop" id="foodModal" data-open="${not empty editingFood}" style="display: none;">
     <div class="modal-dialog">
         <div class="modal-header">
             <h3 id="foodModalTitle">Thêm món ăn mới</h3>
             <button type="button" class="modal-close" onclick="closeFoodModal()" aria-label="Đóng hộp thoại">&times;</button>
         </div>
-        <form id="foodForm" onsubmit="event.preventDefault(); submitFoodForm();">
-            <input type="hidden" id="foodModalId" value="">
+        <form id="foodForm" method="post" action="<c:url value='/admin/menu/action'/>">
+            <input type="hidden" name="action" value="${empty editingFood ? 'create' : 'update'}">
+            <input type="hidden" id="foodModalId" name="id" value="<c:out value='${editingFood.id}'/>">
             <div class="modal-body">
                 <div id="foodFormAlert" class="alert-box" style="display: none;"></div>
 
                 <div class="form-group">
                     <label for="foodCategorySelect">Danh mục món ăn *</label>
-                    <select id="foodCategorySelect" required>
+                    <select id="foodCategorySelect" name="categoryId" required>
                         <option value="">-- Chọn danh mục --</option>
                         <c:forEach var="c" items="${categories}">
-                            <option value="<c:out value='${c.id}'/>"><c:out value="${c.name}"/></option>
+                            <option value="<c:out value='${c.id}'/>" ${editingFood.categoryId == c.id ? 'selected' : ''}><c:out value="${c.name}"/></option>
                         </c:forEach>
                     </select>
                 </div>
 
                 <div class="form-group">
                     <label for="foodNameInput">Tên món ăn *</label>
-                    <input type="text" id="foodNameInput" placeholder="Ví dụ: Cơm gà xối mỡ" required maxlength="150">
+                    <input type="text" id="foodNameInput" name="name" value="<c:out value='${editingFood.name}'/>" placeholder="Ví dụ: Cơm gà xối mỡ" required maxlength="150">
                 </div>
 
                 <div class="form-row">
                     <div class="form-group col">
                         <label for="foodPriceInput">Giá bán (VNĐ) *</label>
-                        <input type="number" id="foodPriceInput" placeholder="Ví dụ: 45000" min="1000" step="1000" required>
+                        <input type="number" id="foodPriceInput" name="price" value="<c:out value='${editingFood.price}'/>" placeholder="Ví dụ: 45000" min="1000" step="1000" required>
                     </div>
                     <div class="form-group col">
                         <label for="foodStatusSelect">Trạng thái *</label>
-                        <select id="foodStatusSelect" required>
+                        <select id="foodStatusSelect" name="status" data-value="${editingFood.status}" required>
                             <option value="AVAILABLE">Đang bán</option>
                             <option value="UNAVAILABLE">Tạm hết</option>
                         </select>
@@ -219,12 +221,12 @@
 
                 <div class="form-group">
                     <label for="foodImageInput">Đường dẫn hình ảnh (URL)</label>
-                    <input type="url" id="foodImageInput" placeholder="https://..." maxlength="512">
+                    <input type="url" id="foodImageInput" name="imageUrl" value="<c:out value='${editingFood.imageUrl}'/>" placeholder="https://..." maxlength="512">
                 </div>
 
                 <div class="form-group">
                     <label for="foodDescInput">Mô tả món ăn</label>
-                    <textarea id="foodDescInput" rows="3" placeholder="Mô tả hương vị, nguyên liệu món..." maxlength="500"></textarea>
+                    <textarea id="foodDescInput" name="description" rows="3" placeholder="Mô tả hương vị, nguyên liệu món..." maxlength="500"><c:out value="${editingFood.description}"/></textarea>
                 </div>
             </div>
             <div class="modal-footer">
@@ -236,12 +238,12 @@
 </div>
 
 <!-- Modal Quản lý tùy chọn của món -->
-<div class="modal-backdrop" id="optionsModal" style="display: none;">
+<div class="modal-backdrop" id="optionsModal" data-open="${not empty optionsFood}" style="display: none;">
     <div class="modal-dialog modal-lg">
         <div class="modal-header">
             <div>
                 <h3>Quản lý tùy chọn món</h3>
-                <p class="text-muted" id="optionsModalFoodName">Món: ...</p>
+                <p class="text-muted" id="optionsModalFoodName">Món ăn: <c:out value="${optionsFood.name}"/></p>
             </div>
             <button type="button" class="modal-close" onclick="closeOptionsModal()" aria-label="Đóng hộp thoại">&times;</button>
         </div>
@@ -262,20 +264,24 @@
                         </tr>
                     </thead>
                     <tbody id="optionsTableBody">
-                        <tr><td colspan="5" class="text-center py-2">Đang tải dữ liệu...</td></tr>
-                    </tbody>
+<c:forEach var="option" items="${foodOptions}"><tr id="optRow-<c:out value='${option.id}'/>">
+<td><c:choose><c:when test="${option.optionType == 'SIZE'}">Kích cỡ</c:when><c:when test="${option.optionType == 'TOPPING'}">Topping thêm</c:when><c:when test="${option.optionType == 'SUGAR_LEVEL'}">Mức đường</c:when><c:when test="${option.optionType == 'ICE_LEVEL'}">Mức đá</c:when><c:otherwise>Khác</c:otherwise></c:choose></td>
+<td><strong><c:out value="${option.name}"/></strong></td><td>+<fmt:formatNumber value="${option.extraPrice}" groupingUsed="true"/> ₫</td>
+<td><button type="button" class="status-toggle-btn ${option.status == 'ACTIVE' ? 'btn-status-available' : 'btn-status-unavailable'}" data-option-id="<c:out value='${option.id}'/>" data-status="${option.status}" onclick="toggleFoodOptionStatus(this)" title="Nhấp để bật/tắt trạng thái tùy chọn">${option.status == 'ACTIVE' ? '● Khả dụng' : '○ Tạm khóa'}</button></td>
+<td style="text-align: right;"><button type="button" class="action-btn delete-btn" data-id="<c:out value='${option.id}'/>" data-name="<c:out value='${option.name}'/>" onclick="handleDeleteOptionClick(this)" title="Xóa">🗑️</button></td></tr></c:forEach>
+<c:if test="${empty foodOptions}"><tr><td colspan="5" class="text-center py-2 text-muted">Chưa có tùy chọn nào cho món này.</td></tr></c:if></tbody>
                 </table>
             </div>
 
             <!-- Form thêm tùy chọn mới -->
             <div class="add-option-box">
                 <h4>Thêm tùy chọn mới</h4>
-                <form id="addOptionForm" onsubmit="event.preventDefault(); submitAddOption();" class="option-form-inline">
-                    <input type="hidden" id="currentOptionFoodId" value="">
+                <form id="addOptionForm" method="post" action="<c:url value='/admin/menu/action'/>" class="option-form-inline"><input type="hidden" name="action" value="optionCreate"><input type="hidden" name="status" value="ACTIVE">
+                    <input type="hidden" id="currentOptionFoodId" name="foodId" value="<c:out value='${optionsFood.id}'/>">
                     <div class="inline-fields">
                         <div class="field">
                             <label for="newOptType">Loại tùy chọn</label>
-                            <select id="newOptType" required>
+                            <select id="newOptType" name="optionType" required>
                                 <option value="SIZE">Kích cỡ</option>
                                 <option value="TOPPING">Topping thêm</option>
                                 <option value="SUGAR_LEVEL">Mức đường</option>
@@ -285,11 +291,11 @@
                         </div>
                         <div class="field">
                             <label for="newOptName">Tên tùy chọn *</label>
-                            <input type="text" id="newOptName" placeholder="VD: Size L, Trứng ốp la" required maxlength="100">
+                            <input type="text" id="newOptName" name="name" placeholder="VD: Size L, Trứng ốp la" required maxlength="100">
                         </div>
                         <div class="field">
                             <label for="newOptExtra">Phụ thu (₫) *</label>
-                            <input type="number" id="newOptExtra" value="0" min="0" step="1000" required>
+                            <input type="number" id="newOptExtra" name="extraPrice" value="0" min="0" step="1000" required>
                         </div>
                         <div class="field btn-field">
                             <button type="submit" class="button primary">＋ Thêm</button>
@@ -307,6 +313,6 @@
 <!-- Toast Feedback Container -->
 <div class="toast-container" id="toastContainer"></div>
 
-<script src="<c:url value='/assets/js/menu-admin.js'/>"></script>
+<script src="<c:url value='/assets/js/menu-admin.js?v=20261017-forms1'/>"></script>
 
 <%@ include file="/WEB-INF/views/admin/components/end.jspf" %>

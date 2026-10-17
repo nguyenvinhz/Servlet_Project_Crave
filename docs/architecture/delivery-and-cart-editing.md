@@ -1,58 +1,122 @@
-# Delivery fees and cart customization
+# Giao hàng và chỉnh sửa giỏ hàng
 
-The current `food` table belongs to `category`, with no restaurant/branch foreign key or store address. `delivery_address` belongs to customers; `employee.address` is an employee address. The current implementation uses one shared store origin in application configuration. This is an implementation choice, not an explicit requirement found in the original project documentation.
+Checkout và giỏ hàng dùng form, Servlet, JPA và JSP. CSS, Leaflet, hình ảnh và
+các lớp giao diện cũ được giữ lại. Không gửi JSON giữa trình duyệt và backend.
 
-The original `class-diagram.drawio` and its mapping in `docs/architecture/README.md` model dishes/categories, customers, employees, carts, orders, promotions, and payments. They do not model restaurants, store ownership, or seller accounts. The available documentation does not explicitly require all dishes to have the same pickup address, and it also does not specify a marketplace for independent sellers.
+## Phí giao hàng
 
-Multiple stores are feasible as an extension: introduce a `store` entity/table with address and coordinates, then relate `food.store_id` to it. A shared store record avoids copying an address onto every dish. A limited first version could allow one store per cart/order. Supporting mixed-store carts requires deciding how to split orders and calculate shipping, vouchers, payment/refunds, pickup, and store-specific staff permissions. An independent seller marketplace additionally needs store-owner accounts and authorization. These extensions are not implemented by the fee/UI revision.
+`DeliveryFeeService` tính khoảng cách Haversine từ cửa hàng, dùng khoảng cách
+chưa làm tròn để chọn mức phí và giới hạn khu vực; phí cuối làm tròn HALF_UP
+đến đơn vị đồng. Đây là khoảng cách địa lý, không phải tuyến xe máy.
 
-The demo address is **99 Đường Số 9, Dĩ An, Hồ Chí Minh 825030, Việt Nam**. The demo coordinates **10.8925871, 106.7637161** identify Đường số 9 in Nhị Đồng 2, from an OpenStreetMap street-level search. They are an approximate demonstration pin, not a verified entrance for house number 99. Override `CRAVE_STORE_ADDRESS`, `CRAVE_STORE_LATITUDE`, and `CRAVE_STORE_LONGITUDE` in the Tomcat environment/JVM properties with a precise entrance pin before real delivery operations. The deploy script carries those optional settings into the application container.
+| Khoảng cách | Phí |
+|---|---|
+| Dưới 1 km | 0 đ |
+| Từ 1 đến dưới 3 km | 4.000 đ |
+| Từ 3 đến dưới 5 km | 7.000 đ |
+| Từ 5 đến dưới 7 km | 7.000 + (km − 5) × 2.500 đ |
+| Từ 7 đến 10 km | 12.000 + (km − 7) × 3.000 đ |
+| Trên 10 km | Không hỗ trợ giao |
+| Lấy tại quán | 0 đ |
 
-| Geographic distance | Fee |
-| --- | ---: |
-| 0 ≤ distance < 1 km | Free |
-| 1 ≤ distance < 3 km | 4,000 VND |
-| 3 ≤ distance < 5 km | 7,000 VND |
-| 5 ≤ distance < 7 km | 7,000 + (distance − 5) × 2,500 VND |
-| 7 ≤ distance ≤ 10 km | 12,000 + (distance − 7) × 3,000 VND |
-| distance > 10 km | Delivery rejected |
-| Pickup | 0 VND |
+Subtotal tiền món lớn hơn 150.000 đ được miễn phí giao trong khu vực hỗ trợ,
+tính trước khi giảm voucher. Đúng 150.000 đ vẫn tính phí bình thường.
+`CustomerOrderService` đọc giỏ hàng đã khóa và tính lại phí khi tạo đơn;
+không nhận số tiền hay kết quả đủ điều kiện từ trình duyệt.
 
-Food subtotal strictly greater than 150,000 VND qualifies for free shipping before voucher discounts, provided the destination is within the delivery area. Exactly 150,000 VND keeps the normal distance fee. The quote API reads the authenticated customer's verified cart subtotal; order creation recalculates from the locked persisted cart. Large orders do not bypass the delivery-radius limit.
+Cấu hình `CRAVE_STORE_ADDRESS`, `CRAVE_STORE_LATITUDE`,
+`CRAVE_STORE_LONGITUDE` để đặt đúng vị trí cửa hàng. Bảng phí và bán kính ở
+đây là tài liệu kỹ thuật; trang khách chỉ hiển thị phí cuối và thông báo hỗ trợ.
 
-`DeliveryFeeService` uses Haversine distance. It compares the unrounded distance with the band/radius limits. Beyond 5 km, the fare accumulates from 7,000 VND: add 2,500 VND per km between 5 and 7 km, then 3,000 VND per km beyond 7 km. Use the unrounded distance and round only the final fee to the nearest VND (HALF_UP). For example, 6 km costs 9,500 VND and 9 km costs 18,000 VND. Exactly 5 km costs 7,000 VND, exactly 7 km costs 12,000 VND, and exactly 10 km costs 21,000 VND. The internal quote/order distance snapshot is separately rounded to 0.001 km. This is a geographic radius, not a motorcycle driving route. Motorcycle routing is feasible with a suitable provider/API credential or a hosted routing engine; it is not configured in this release. A car route must not be presented as a motorcycle route.
+## Địa chỉ và bản đồ
 
-The table and formula above are developer documentation. Customer pages do not show fee bands, distance calculations, distance thresholds, or a service-radius circle. Customer delivery APIs return store location/configuration and the final fee/eligibility message, without the pricing table, distance method, maximum radius, or computed quote distance.
+JSP checkout render sẵn hồ sơ, sổ địa chỉ, subtotal, voucher và vị trí cửa hàng.
+Địa chỉ mặc định hoặc địa chỉ đã lưu được tìm khi chọn. Địa chỉ đang nhập được
+tìm sau khi ngừng gõ 1,2 giây; khách cũng có thể bấm tìm hoặc nhấn Enter.
+Một kết quả tự đặt ghim, nhiều kết quả hiện lựa chọn và thu/phóng bản đồ để xem.
+Vị trí gợi ý cần khách kiểm tra ghim rồi bấm “Xác nhận điểm nhận”.
+Đổi địa chỉ, di chuyển ghim hoặc đổi hình thức nhận sẽ hủy báo giá cũ.
+Server nhận cùng tọa độ đã chọn để báo phí và tạo đơn.
+Khi sửa địa chỉ, ghim và tọa độ cũ được xóa; yêu cầu tìm kiếm/báo phí đang chờ
+bị hủy để kết quả cũ không ghi đè lựa chọn mới. Chọn gợi ý vẫn giữ số nhà và
+địa chỉ khách nhập trong thông tin nhận hàng; tên địa điểm khớp hiện riêng để kiểm tra.
 
-Checkout searches the default/selected address automatically. An exact, unique house match receives an automatic quote. Road/locality/place-name suggestions need pin confirmation, and ambiguous matches appear as a list of named choices instead of being discarded or silently selecting the first. Editing the text invalidates the old pin and quote; pending/debounced results cannot replace a newer choice. Manual map clicks, dragging, and device geolocation work with an empty address field. Each manual selection immediately fills decimal latitude/longitude in the address field, then optionally retrieves a nearby address in the background. That description includes the selected coordinates and never moves the pin. Missing, distant, or failed reverse results keep the coordinate text and do not block quoting or ordering. Reverse responses cannot overwrite later pin moves, typed text, pickup selection, or an order being submitted. Moving the pin invalidates the fee; press “Xác nhận điểm nhận” to quote the new point. The same coordinates are sent to quote and order APIs and persisted on the order. Browser geolocation uses a fresh high-accuracy request where supported; manual map selection also works on HTTP origins.
+`AddressGeocoder` dùng Photon theo [API GeoJSON chính thức](https://github.com/komoot/photon/blob/master/docs/api-v1.md):
+`/api/` cho tìm kiếm và `/reverse` cho tra ngược. `CRAVE_GEOCODER_URL` mặc định
+là `https://photon.komoot.io/api/`; URL tùy chỉnh phải hỗ trợ cùng giao thức.
+JSON được xử lý trong gateway tích hợp Map, không tạo lớp mapper nghiệp vụ.
 
-Address search uses the [Photon API](https://github.com/komoot/photon/blob/master/docs/api-v1.md) with Vietnamese results and a focus around the configured store. It handles roads, numbered addresses, place names, omitted commas, diacritics/case, house suffixes/slashes, common administrative abbreviations and Hồ Chí Minh aliases. Exact house numbers and requested administrative context are checked; missing ward/district metadata marks a suggestion as approximate. A second bounded request for street results can supply an explicit road suggestion when the house is absent; it is never auto-quoted as an exact house. Distinct candidates remain available for customer selection. There are no hardcoded destination examples. Public map data can lack buildings or use changed administrative names, so suggestions require visual checking.
+Tìm tên đường giới hạn trong hộp ±0,2 độ quanh cửa hàng và ưu tiên điểm gần cửa hàng,
+tránh đường trùng tên ở tỉnh khác. Hộp tìm kiếm rộng hơn bán kính giao hàng 10 km;
+phí và điều kiện giao hàng vẫn được kiểm tra riêng. Dịch vụ trả nhãn tiếng Việt.
+Nếu địa chỉ có số nhà không có kết quả, thử lại tên đường và giữ nguyên phần
+phường/thành phố. Kết quả này ghi rõ “chưa xác định số nhà”; khách cần kéo ghim
+đến đúng cửa nhận hàng và xác nhận, hệ thống không tự coi tâm đường là số nhà.
 
-`CoordinateParser` accepts decimal latitude/longitude separated by comma, semicolon, or whitespace; optional parentheses, labels or `geo:`; decimal commas when separated by a semicolon; and an unambiguous longitude-first pair when its first number exceeds the latitude range. It also recognizes the parenthesized coordinates appended by reverse lookup. Invalid numeric pairs are rejected before requesting the provider. Values retain full precision for quotes/orders; labels use six decimal places. Coordinate inputs bypass external search.
+Có cache tối đa 128 mục trong sáu giờ (kết quả rỗng hai phút), timeout kết nối/đọc và giới hạn một yêu cầu
+tra địa chỉ mỗi 1,1 giây trong một ứng dụng. Photon hỗ trợ tìm trong lúc nhập;
+debounce và cache giảm số yêu cầu. GeoJSON nhận tọa độ theo thứ tự kinh độ,
+vĩ độ; backend kiểm tra kiểu dữ liệu, giới hạn kích thước phản hồi và vùng Việt Nam.
+Tra ngược lấy tên gần ghim nhưng luôn giữ đúng tọa độ khách chọn; kết quả xa hơn
+75 m hoặc lỗi mạng dùng nhãn tọa độ thay thế.
 
-Reverse lookup uses Photon's `/reverse` within 50 m and rejects descriptions from results more than 75 m away. Returned coordinates always echo the requested point, even when reusing a cached description. Search and reverse results share a bounded cache of 128 entries for six hours. Network calls have timeouts and do not hold the cache lock, so a slow name search does not serialize other users' queries. The [public demo server](https://github.com/komoot/photon#demo-server) permits reasonable volumes and has no availability guarantee; `CRAVE_GEOCODER_URL` can point to a compatible hosted/private instance.
-Leaflet 1.9.4 and its license are vendored locally. Tiles use the [OpenStreetMap tile service](https://operations.osmfoundation.org/policies/tiles/) with visible attribution, normal browser caching, and no prefetch/download feature. Tile availability is best-effort; manual pins remain the fallback when external address lookup is unavailable.
+`CoordinateParser` nhận tọa độ thập phân và nhãn tọa độ trong ngoặc;
+tọa độ hợp lệ bỏ qua dịch vụ tìm kiếm. Leaflet và giấy phép được lưu tại
+`frontend/assets/vendor/leaflet/`. Ảnh nền vẫn là ảnh OpenStreetMap gốc, không
+đổi kiểu bản đồ, CSS, font hoặc kích thước. Browser tải PNG qua `MapTileServlet`
+để DNS của browser không làm nền bản đồ xám; upstream vẫn dùng URL chuẩn
+`https://tile.openstreetmap.org/{z}/{x}/{y}.png`.
 
-## APIs
+Servlet ảnh yêu cầu tài khoản khách hàng, kiểm tra z/x/y và chuyển tiếp Referer
+thật, User-Agent của ứng dụng cùng điều kiện cache. Apache HTTP cache xử lý
+Cache-Control/Expires/ETag và revalidation theo [chính sách OSM](https://operations.osmfoundation.org/policies/tiles/).
+Cache giới hạn 128 mục; không tải trước vùng bản đồ hoặc cung cấp tải offline.
 
-All endpoints use the authenticated customer session, existing origin checks, and the common `{success,data,error}` envelope.
+| Servlet | Tham số form | Kết quả |
+|---|---|---|
+| `POST /delivery/search` | `address` | Các nút HTML kết quả địa chỉ |
+| `POST /delivery/reverse` | `latitude`, `longitude` | HTML mô tả gần điểm ghim |
+| `POST /delivery/quote` | `latitude`, `longitude` | HTML phí và thông báo |
+| `GET /map/tiles/{z}/{x}/{y}.png` | Chỉ z/x/y hợp lệ | PNG gốc và header cache |
+| `POST /orders/create` | Các trường checkout | Lưu đơn trong transaction rồi redirect |
 
-- `GET /api/delivery/policy`: `{store,configured}` for initializing the map.
-- `POST /api/delivery/search`: `{address}`; returns a list of `{latitude,longitude,label,approximate}` candidates, including direct coordinate input.
-- `POST /api/delivery/reverse`: `{latitude,longitude}`; returns a nearby description or coordinate fallback without moving the selected point.
-- `POST /api/delivery/resolve`: `{address}`; returns `{latitude,longitude,label,approximate}`. Does not return pricing rules.
-- `POST /api/delivery/quote`: body `{latitude,longitude}`; returns `{deliveryFee,deliverable,message}`. An outside-radius quote has `deliverable:false`, `deliveryFee:null`, and a general unsupported-area message.
-- `POST /api/orders`: delivery requests require `deliveryLatitude` and `deliveryLongitude`. The server recalculates the fee and rejects invalid/outside-radius coordinates, regardless of a previous quote. Pickup clears the address and coordinates and costs 0 VND. The customer-selected pin is the authoritative drop-off point.
-- `POST /api/cart/items/update`: `{cartItemId,quantity,note,optionIds}`. Omitted/null `optionIds` preserves current options; `[]` clears them. The server validates ownership, availability, option-to-food membership, active status, duplicates, and singleton groups. Quantity, note, and option changes save in one transaction, locking the cart before the item to coordinate with checkout. Unchanged option rows remain intact. Edited items retain their IDs and remain separate from other cart lines even if selections become identical.
+Lỗi của các Servlet vị trí trả HTML `data-delivery-error` cùng HTTP status tương ứng;
+JS hiển thị thông báo này để phân biệt không tìm thấy địa chỉ với không kết nối
+được dịch vụ. JSP escape nội dung bằng `c:out`. Yêu cầu trình duyệt có timeout 15 giây.
 
-Clicking the dish name, image/card content, or “Chỉnh sửa món” opens the cart editor. Cancel writes nothing. Successful edits reload server totals and revalidate any applied voucher. Cart shows the food total after discounts; shipping is quoted only at checkout.
+Nếu nhập tọa độ tìm được nhưng tên đường luôn báo không kết nối, kiểm tra DNS
+và HTTPS của `photon.komoot.io`; nền bản đồ dùng `tile.openstreetmap.org`.
+Ví dụ Windows: `Resolve-DnsName photon.komoot.io` và đối chiếu
+`Resolve-DnsName photon.komoot.io -Server 1.1.1.1`.
 
-## Database and release
+HTTP client thử DNS hệ thống trước. Khi không tìm thấy một hostname dịch vụ Map
+trong allowlist cố định, `MapDnsResolver` mới tra bản ghi A qua JNDI tới
+`1.1.1.1`, với thời gian chờ DNS ngắn. Cơ chế này chỉ áp dụng trong HTTP client
+Map; không thay DNS Wi-Fi, hosts hay thiết lập DNS JVM toàn cục.
+Endpoint tùy chỉnh và các hostname khác vẫn dùng DNS hệ thống, không tự gửi
+tên miền nội bộ sang DNS công cộng.
 
-Apply `database/migrations/2026-10-15-delivery-location.sql` **before** starting the new WAR. It adds nullable `delivery_latitude`, `delivery_longitude`, and `delivery_distance_km` to `customer_order`, preserves historical orders, and supports repeated execution. New databases use the updated `schema.sql`. The existing EC2 deploy script includes this migration. Historical orders retain their existing delivery fees; new orders use the distance bands.
+Apache HttpClient5 giữ URI/hostname HTTPS gốc và xác thực TLS mặc định. Không
+lưu IP dịch vụ cố định, không tắt xác thực chứng chỉ. Giữ định dạng dịch vụ yêu cầu:
+Photon GeoJSON và tile PNG. Client giới hạn kích thước phản hồi, tắt redirect/retry tự động và được
+đóng khi Servlet dừng. Nếu cả DNS dự phòng hoặc HTTPS đều không kết nối được,
+ứng dụng vẫn hiển thị thông báo lỗi, không tự tạo kết quả địa chỉ.
 
-## Verification
+## Sửa món trong giỏ
 
-- Backend unit/API tests: `DeliveryFeeServiceTest`, `DeliveryApiServletTest`, `CartCustomizationServiceTest`, `CartItemCustomizationRepositoryTest`, plus existing cart/order/authorization tests.
-- Browser smoke: `node tests/frontend/cart-checkout-browser-smoke.cjs` runs the actual JSP markup/scripts in Chrome with controlled API responses. It checks option editing, cancellation, double submission, failures/retries, voucher recalculation, quote races, address changes, outside-radius blocking, and pickup.
-- Real MySQL coverage is in `CartPromotionIntegrationTest` and `CartCheckoutIntegrationTest`; it requires the migration and working local DB credentials. Local runtime testing uses an isolated `crave_local_test` database. These tests also cover reading detached cart items for option validation, so food/cart relations must be loaded before closing the repository EntityManager.
+`GET /cart?edit=ID` tải chi tiết từ server và mở dialog hiện tại.
+Form `POST /cart/action` nhận `action=update`, `cartItemId`, `quantity`,
+`note`, `updateOptions=true` và các `optionIds`. Không có cờ thay tùy chọn
+thì giữ nguyên lựa chọn; có cờ mà không có option thì xóa các lựa chọn.
+
+Service kiểm tra quyền sở hữu, trạng thái món/option, option thuộc đúng món,
+trùng lặp và nhóm chỉ cho chọn một. Khóa giỏ trước mục giỏ để đồng bộ với
+checkout; quantity, note và option cập nhật trong một transaction.
+Giá hiện hành và voucher được tính lại ở server sau khi lưu.
+
+Kiểm thử tập trung ở `AddressGeocoderTest`, `DeliveryServletTest`,
+`DeliveryFeeServiceTest`, `CartCustomizationServiceTest`,
+`CartPromotionIntegrationTest`, `CartCheckoutIntegrationTest` và browser smoke
+form thật. `node tests/frontend/delivery-map-browser-smoke.cjs` chạy riêng các
+tình huống tìm địa chỉ, kết quả đến muộn và đồng bộ ghim bằng Chrome/Edge với
+fixture form/HTML local, không cần database hay dịch vụ bản đồ ngoài mạng.

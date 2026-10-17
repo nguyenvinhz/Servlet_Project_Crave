@@ -8,37 +8,28 @@ import com.foodordering.entity.Promotion;
 import com.foodordering.enums.DiscountType;
 import com.foodordering.enums.ErrorCode;
 import com.foodordering.exception.PromotionValidationException;
-import com.foodordering.mapper.PromotionMapper;
-import com.foodordering.repository.PromotionRepository;
+import com.foodordering.dao.PromotionDAO;
 import com.foodordering.validator.PromotionValidator;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 public class PromotionService {
 
-    private final PromotionRepository promotionRepository;
+    private final PromotionDAO promotionRepository;
     private final CartService cartService;
-    private final PromotionMapper promotionMapper;
 
     public PromotionService() {
-        this.promotionRepository = new PromotionRepository();
+        this.promotionRepository = new PromotionDAO();
         this.cartService = new CartService();
-        this.promotionMapper = new PromotionMapper();
     }
 
-    public PromotionService(PromotionRepository promotionRepository, CartService cartService) {
+    public PromotionService(PromotionDAO promotionRepository, CartService cartService) {
         this.promotionRepository = promotionRepository;
         this.cartService = cartService;
-        this.promotionMapper = new PromotionMapper();
-    }
-
-    public PromotionService(PromotionRepository promotionRepository, CartService cartService, PromotionMapper promotionMapper) {
-        this.promotionRepository = promotionRepository;
-        this.cartService = cartService;
-        this.promotionMapper = promotionMapper != null ? promotionMapper : new PromotionMapper();
     }
 
     /**
@@ -109,8 +100,7 @@ public class PromotionService {
         BigDecimal discountAmount = calculateDiscount(promotion, subtotal, effectiveOrderTime);
         BigDecimal finalSubtotal = subtotal.subtract(discountAmount).max(BigDecimal.ZERO);
 
-        // Chuyển đổi Entity sang DTO qua mapper thủ công
-        PromotionDto dto = promotionMapper.toDto(promotion);
+        PromotionDto dto = createPromotionDto(promotion);
         return new PromotionValidationResultDto(true, "Áp dụng mã khuyến mãi thành công", dto, subtotal, discountAmount, finalSubtotal);
     }
 
@@ -151,7 +141,15 @@ public class PromotionService {
      */
     public List<PromotionDto> getActivePromotions() {
         List<Promotion> promotions = promotionRepository.findAllActive(LocalDateTime.now());
-        return promotionMapper.toDtoList(promotions);
+        List<PromotionDto> results = new ArrayList<>();
+        if (promotions != null) {
+            for (Promotion promotion : promotions) {
+                if (promotion != null) {
+                    results.add(createPromotionDto(promotion));
+                }
+            }
+        }
+        return results;
     }
 
     /**
@@ -159,13 +157,38 @@ public class PromotionService {
      */
     public PromotionDto getPromotionByCode(String code) {
         Promotion p = promotionRepository.findByCode(code);
-        return p != null ? promotionMapper.toDto(p) : null;
+        return createPromotionDto(p);
     }
 
-    /**
-     * Phương thức tiện ích chuyển đổi Entity sang DTO (delegate cho PromotionMapper).
-     */
-    public PromotionDto mapToDto(Promotion p) {
-        return promotionMapper.toDto(p);
+    private PromotionDto createPromotionDto(Promotion promotion) {
+        if (promotion == null) {
+            return null;
+        }
+        PromotionDto dto = new PromotionDto();
+        dto.setPromotionId(promotion.getPromotionId());
+        dto.setCode(promotion.getCode());
+        dto.setName(promotion.getName());
+        dto.setDiscountType(promotion.getDiscountType());
+        dto.setDiscountValue(promotion.getDiscountValue());
+        dto.setMinimumOrderValue(promotion.getMinimumOrderValue());
+        dto.setMaximumDiscount(promotion.getMaximumDiscount());
+        dto.setStartAt(promotion.getStartAt());
+        dto.setEndAt(promotion.getEndAt());
+        dto.setStatus(promotion.getStatus());
+
+        if (promotion.getDiscountType() == DiscountType.PERCENT) {
+            String maximumDiscount = (promotion.getMaximumDiscount() != null && promotion.getMaximumDiscount().doubleValue() > 0)
+                    ? String.format(", tối đa %,.0f đ", promotion.getMaximumDiscount().doubleValue())
+                    : "";
+            dto.setDescription(String.format("Giảm %s%% cho đơn từ %,.0f đ%s",
+                    promotion.getDiscountValue() != null ? promotion.getDiscountValue().toPlainString() : "0",
+                    promotion.getMinimumOrderValue() != null ? promotion.getMinimumOrderValue().doubleValue() : 0,
+                    maximumDiscount));
+        } else {
+            dto.setDescription(String.format("Giảm %,.0f đ cho đơn từ %,.0f đ",
+                    promotion.getDiscountValue() != null ? promotion.getDiscountValue().doubleValue() : 0,
+                    promotion.getMinimumOrderValue() != null ? promotion.getMinimumOrderValue().doubleValue() : 0));
+        }
+        return dto;
     }
 }

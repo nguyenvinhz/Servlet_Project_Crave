@@ -7,7 +7,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.foodordering.utils.JsonProvider;
+import com.foodordering.gateway.PayosJson;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -76,7 +76,7 @@ public class PayosClient {
             throw new IllegalArgumentException("Invalid payment request timeout.");
         }
         this.timeout = timeout;
-        this.mapper = JsonProvider.objectMapper().copy()
+        this.mapper = PayosJson.objectMapper().copy()
                 .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
                 .enable(DeserializationFeature.FAIL_ON_READING_DUP_TREE_KEY);
         mapper.getFactory().enable(JsonParser.Feature.STRICT_DUPLICATE_DETECTION);

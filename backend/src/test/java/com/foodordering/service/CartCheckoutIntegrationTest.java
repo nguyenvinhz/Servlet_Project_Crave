@@ -29,9 +29,9 @@ import com.foodordering.enums.PaymentStatus;
 import com.foodordering.enums.PromotionStatus;
 import com.foodordering.exception.BadRequestException;
 import com.foodordering.exception.PromotionValidationException;
-import com.foodordering.repository.CustomerOrderRepositoryImpl;
-import com.foodordering.repository.JpaAccountRepository;
-import com.foodordering.repository.PaymentRepositoryImpl;
+import com.foodordering.dao.CustomerOrderDAO;
+import com.foodordering.dao.AccountDAO;
+import com.foodordering.dao.PaymentDAO;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import org.junit.jupiter.api.AfterAll;
@@ -72,8 +72,8 @@ class CartCheckoutIntegrationTest {
     private final String email = "checkout-it-" + token + "@example.com";
     private final CartService carts = new CartService();
     private final PromotionService promotions = new PromotionService();
-    private final CustomerOrderService orders = new CustomerOrderServiceImpl(
-            new CustomerOrderRepositoryImpl(), new PaymentRepositoryImpl(), null,
+    private final CustomerOrderService orders = new CustomerOrderService(
+            new CustomerOrderDAO(), new PaymentDAO(), null,
             new DeliveryFeeService(new DeliveryFeeService.Store("Fixture store", 10.89, 106.76)));
     private ProfileResponse owner;
 
@@ -90,7 +90,7 @@ class CartCheckoutIntegrationTest {
 
     @BeforeEach
     void createFixtures() {
-        AccountService accounts = new AccountService(new JpaAccountRepository(emf));
+        AccountService accounts = new AccountService(new AccountDAO(emf));
         String phone = "09" + String.format("%08d", ThreadLocalRandom.current().nextInt(100_000_000));
         owner = accounts.register(new RegisterRequest(
                 fixtureName, email, phone, "Integration#123", "Integration#123"));
@@ -245,7 +245,7 @@ class CartCheckoutIntegrationTest {
     void paymentAndRefundKeepOriginalPaidAtAndRejectInvalidReversal() {
         addCart();
         OrderResponse order = orders.createOrder(owner.id(), checkout(FulfillmentType.PICKUP));
-        PaymentService payments = new PaymentServiceImpl(new PaymentRepositoryImpl(), emf);
+        PaymentService payments = new PaymentService(new PaymentDAO(), emf);
         String paymentId = order.getPayment().getPaymentId();
         String transactionRef = "IT-" + token;
         payments.updatePaymentStatus(paymentId, PaymentStatus.SUCCESS, transactionRef);

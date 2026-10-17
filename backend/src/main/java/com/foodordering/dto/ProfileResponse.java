@@ -1,14 +1,11 @@
 package com.foodordering.dto;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.foodordering.enums.AccountType;
 import com.foodordering.enums.EmployeeRole;
 
 public record ProfileResponse(String id, AccountType accountType, String fullName,
                               String email, String phone,
-                              @JsonInclude(JsonInclude.Include.NON_NULL) EmployeeRole role,
-                              @JsonIgnore long credentialVersion)
+                              EmployeeRole role, long credentialVersion)
         implements java.io.Serializable {
 
     public ProfileResponse(String id, AccountType accountType, String fullName,
@@ -16,7 +13,7 @@ public record ProfileResponse(String id, AccountType accountType, String fullNam
         this(id, accountType, fullName, email, phone, role, 0L);
     }
 
-    // JSP EL resolves bean accessors; record components remain the JSON/API contract.
+    // JSP EL resolves JavaBean accessors.
     public String getId() {
         return id;
     }
@@ -37,7 +34,6 @@ public record ProfileResponse(String id, AccountType accountType, String fullNam
         return phone;
     }
 
-    @JsonInclude(JsonInclude.Include.NON_NULL)
     public EmployeeRole getRole() {
         return role;
     }

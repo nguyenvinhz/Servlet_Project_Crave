@@ -8,19 +8,19 @@ import com.foodordering.enums.FoodStatus;
 import com.foodordering.enums.OptionType;
 import com.foodordering.enums.PromotionStatus;
 import com.foodordering.exception.PromotionValidationException;
-import com.foodordering.mapper.CartItemMapper;
-import com.foodordering.mapper.CartItemOptionMapper;
-import com.foodordering.mapper.CartMapper;
-import com.foodordering.mapper.PromotionMapper;
-import com.foodordering.repository.PromotionRepository;
+import com.foodordering.dao.CartItemDAO;
+import com.foodordering.dao.CartDAO;
+import com.foodordering.dao.PromotionDAO;
 import com.foodordering.service.CartService;
 import com.foodordering.service.PromotionService;
-import com.foodordering.utils.JsonUtils;
 import com.foodordering.validator.PromotionValidator;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * Kiểm thử đơn vị các hàm nghiệp vụ trọng tâm của Cart và Promotion (Ung Văn Trí).
@@ -36,10 +36,8 @@ public class CartPromotionServiceTest {
         testFixedAmountDiscountCalculation();
         testPromotionMinimumOrderValidation();
         testPromotionExpiredValidation();
-        testJsonUtilsApiResponse();
-        testJsonUtilsJacksonDeserialization();
-        testManualCartAndItemMappers();
-        testManualPromotionMapper();
+        testCartDisplayData();
+        testPromotionDisplayData();
         testCustomerOrderOrderTimeValidation();
 
         System.out.println("=== TẤT CẢ KIỂM THỬ ĐÃ CHẠY THÀNH CÔNG (PASSED) ===");
@@ -164,35 +162,8 @@ public class CartPromotionServiceTest {
         System.out.println("   [PASSED] Chặn chính xác mã khuyến mãi đã hết hạn");
     }
 
-    private static void testJsonUtilsApiResponse() {
-        System.out.println("-> Test 7: Định dạng chuẩn JSON ApiResponse");
-        ApiResponse<String> resp = ApiResponse.success("OK");
-        String json = JsonUtils.toJson(resp);
-        assert json.contains("\"success\":true") : "JSON thiếu trường success";
-        assert json.contains("\"data\":\"OK\"") : "JSON sai data";
-        System.out.println("   [PASSED] JSON ApiResponse sinh ra chuẩn xác: " + json);
-    }
-
-    private static void testJsonUtilsJacksonDeserialization() {
-        System.out.println("-> Test 8: Jackson Deserialization từ JSON body sang DTO (toDTO)");
-        String addJson = "{\"foodId\":\"FOOD_001\",\"quantity\":2,\"note\":\"Ít cay\",\"optionIds\":[\"OPT_1\",\"OPT_2\"]}";
-        AddToCartRequest addReq = JsonUtils.toDTO(addJson, AddToCartRequest.class);
-        assert addReq != null : "AddToCartRequest null";
-        assert "FOOD_001".equals(addReq.getFoodId()) : "Sai foodId";
-        assert addReq.getQuantity() == 2 : "Sai quantity";
-        assert "Ít cay".equals(addReq.getNote()) : "Sai note";
-        assert addReq.getOptionIds().size() == 2 : "Sai optionIds size";
-
-        String promoJson = "{\"code\":\"DISCOUNT10\",\"subtotal\":120000}";
-        ValidatePromotionRequest promoReq = JsonUtils.toDTO(promoJson, ValidatePromotionRequest.class);
-        assert promoReq != null : "ValidatePromotionRequest null";
-        assert "DISCOUNT10".equals(promoReq.getCode()) : "Sai promo code";
-        assert new BigDecimal("120000").compareTo(promoReq.getSubtotal()) == 0 : "Sai subtotal";
-        System.out.println("   [PASSED] Jackson parse JSON body sang DTO (toDTO) chính xác tuyệt đối");
-    }
-
-    private static void testManualCartAndItemMappers() {
-        System.out.println("-> Test 9: Mapper thủ công Cart & CartItem (không dùng MapStruct)");
+    private static void testCartDisplayData() {
+        System.out.println("-> Test 9: Dữ liệu hiển thị giỏ hàng từ CartService");
         Customer customer = new Customer("KH01");
         Cart cart = new Cart("GH01", customer);
 
@@ -205,17 +176,18 @@ public class CartPromotionServiceTest {
         CartItemOption itemOption = new CartItemOption(item, option);
         item.setItemOptions(List.of(itemOption));
 
-        // Test CartItemOptionMapper
-        CartItemOptionMapper optionMapper = new CartItemOptionMapper();
-        CartItemOptionDto optDto = optionMapper.toDto(itemOption);
+        CartDAO carts = mock(CartDAO.class);
+        CartItemDAO items = mock(CartItemDAO.class);
+        when(carts.findByCustomerId("KH01")).thenReturn(cart);
+        when(items.findItemsByCartId("GH01")).thenReturn(List.of(item));
+        CartDto cartDto = new CartService(carts, items).getOrCreateCart("KH01");
+        CartItemDto itemDto = cartDto.getItems().get(0);
+        CartItemOptionDto optDto = itemDto.getOptions().get(0);
         assert optDto != null : "CartItemOptionDto null";
         assert "OPT01".equals(optDto.getOptionId()) : "Sai optionId";
         assert "Thêm trứng".equals(optDto.getName()) : "Sai option name";
         assert new BigDecimal("7000").compareTo(optDto.getExtraPrice()) == 0 : "Sai extraPrice";
 
-        // Test CartItemMapper
-        CartItemMapper itemMapper = new CartItemMapper(optionMapper);
-        CartItemDto itemDto = itemMapper.toDto(item);
         assert itemDto != null : "CartItemDto null";
         assert "CTGH01".equals(itemDto.getCartItemId()) : "Sai cartItemId";
         assert "GH01".equals(itemDto.getCartId()) : "Sai cartId";
@@ -224,9 +196,6 @@ public class CartPromotionServiceTest {
         assert new BigDecimal("40000").compareTo(itemDto.getBasePrice()) == 0 : "Sai basePrice";
         assert itemDto.getOptions().size() == 1 : "Sai số lượng options";
 
-        // Test CartMapper
-        CartMapper cartMapper = new CartMapper(itemMapper);
-        CartDto cartDto = cartMapper.toDto(cart, List.of(item));
         assert cartDto != null : "CartDto null";
         assert "GH01".equals(cartDto.getCartId()) : "Sai cartId";
         assert "KH01".equals(cartDto.getCustomerId()) : "Sai customerId";
@@ -234,8 +203,8 @@ public class CartPromotionServiceTest {
         System.out.println("   [PASSED] Chuyển đổi Cart/CartItem Entity -> DTO thủ công hoàn toàn chính xác");
     }
 
-    private static void testManualPromotionMapper() {
-        System.out.println("-> Test 10: Mapper thủ công Promotion (không dùng MapStruct)");
+    private static void testPromotionDisplayData() {
+        System.out.println("-> Test 10: Dữ liệu hiển thị khuyến mãi từ PromotionService");
         Promotion promo = new Promotion();
         promo.setPromotionId("KM01");
         promo.setCode("WELCOME10");
@@ -246,21 +215,24 @@ public class CartPromotionServiceTest {
         promo.setMaximumDiscount(new BigDecimal("20000"));
         promo.setStatus(PromotionStatus.ACTIVE);
 
-        PromotionMapper mapper = new PromotionMapper();
-        PromotionDto dto = mapper.toDto(promo);
+        PromotionDAO repository = mock(PromotionDAO.class);
+        when(repository.findByCode("WELCOME10")).thenReturn(promo);
+        when(repository.findAllActive(org.mockito.ArgumentMatchers.any(LocalDateTime.class))).thenReturn(List.of(promo));
+        PromotionService service = new PromotionService(repository, new CartService());
+        PromotionDto dto = service.getPromotionByCode("WELCOME10");
         assert dto != null : "PromotionDto null";
         assert "KM01".equals(dto.getPromotionId()) : "Sai promotionId";
         assert "WELCOME10".equals(dto.getCode()) : "Sai code";
         assert "Giảm giá chào bạn mới".equals(dto.getName()) : "Sai name";
         assert dto.getDescription().contains("Giảm 10% cho đơn từ 50,000 đ, tối đa 20,000 đ") : "Sai description: " + dto.getDescription();
 
-        List<PromotionDto> dtoList = mapper.toDtoList(List.of(promo));
+        List<PromotionDto> dtoList = service.getActivePromotions();
         assert dtoList.size() == 1 : "Sai dtoList size";
         System.out.println("   [PASSED] Chuyển đổi Promotion Entity -> DTO thủ công hoàn toàn chính xác");
     }
 
     private static PromotionService offlinePromotionService() {
-        PromotionRepository repository = new PromotionRepository() {
+        PromotionDAO repository = new PromotionDAO() {
             @Override
             public BigDecimal calculateDiscountViaDatabase(String promotionId, BigDecimal subtotal, LocalDateTime orderTime) {
                 return null;
