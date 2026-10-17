@@ -1,125 +1,124 @@
-# CI/CD từ main lên EC2
+# CI/CD deploy WAR lên AWS EC2
 
-Push hoặc merge vào `main` sẽ tự chạy CI, rồi deploy WAR lên EC2 khi CI thành công.
-Pull request vào `main` chỉ chạy CI trên GitHub-hosted runner. Trong thời gian
-chờ review hoặc đã Approve nhưng chưa merge, website giữ nguyên phiên bản hiện tại.
-Ứng dụng chạy trên EC2 Ubuntu 24.04 tại `/home/ubuntu/crave`, bằng Docker Compose
-với hai service `app` (Tomcat) và `mysql`.
+Luồng triển khai dùng GitHub Actions và runner chạy trên EC2. Backend vẫn là
+Servlet/JSP/JPA/HikariCP, đóng gói WAR cho Tomcat; không có Spring Boot hoặc
+dịch vụ build mới trên production.
 
-## Luồng chạy
+## Luồng tự động và thủ công
 
 ```text
-Tạo/cập nhật PR vào main ──> CI trên GitHub runner
-                             │
-                             v
-                       Chờ review / Approve ──> Chưa deploy
-
-Merge PR / push main ──> CI thành công ──> artifact crave-war
-                                           │
-                                           v
-                           Runner crave-ec2: backup WAR, thay WAR,
-                           recreate app, kiểm tra /crave/api/health
-                                           │
-                              thất bại ──> khôi phục WAR cũ
+PR vào main ──> CI trên GitHub-hosted runner
+push/merge main hoặc Run workflow (main)
+  ──> cùng bộ CI
+  ──> WAR + SHA-256 sau khi tất cả kiểm tra đạt
+  ──> runner crave-ec2 kiểm tra SHA-256
+  ──> migration bổ sung, backup, thay WAR, recreate app
+  ──> /crave/health đạt ──> đăng ký webhook payOS
+                    lỗi ──> khôi phục WAR/cấu hình trước
 ```
 
-- [ci.yml](../../.github/workflows/ci.yml): JDK 17, MySQL 8.4 tạm thời, Maven
-  `clean verify`, assertion giỏ hàng/voucher, kiểm tra cú pháp JavaScript,
-  kiểm thử trình duyệt và kiểm thử script deploy/rollback. Schema/seed chỉ được
-  chạy trong database CI tạm thời.
-- [deploy.yml](../../.github/workflows/deploy.yml): chỉ nhận sự kiện `push` vào
-  `main`, bao gồm commit tạo khi merge PR và push trực tiếp. Gọi CI, chỉ khi CI
-  thành công mới tải artifact của cùng lần chạy rồi gọi
-  [deploy-ec2.sh](../../scripts/deploy-ec2.sh) trên EC2.
-- CD không nhận `pull_request`, `pull_request_target`, `pull_request_review`
-  hoặc `workflow_dispatch`. Approve PR không kích hoạt deploy. Code của PR chưa
-  merge chỉ chạy trong CI trên GitHub-hosted runner.
-- Job CD dùng environment `production` và các label
-  `self-hosted`, `linux`, `x64`, `crave-production`; kiểm tra runner có tên
-  `crave-ec2` trước khi checkout code từ commit mới trên `main`.
-- CD chỉ recreate service ứng dụng. `.env` và compose gốc trên EC2 được giữ nguyên;
-  cấu hình payOS được bổ sung qua `.payos.compose.json` có quyền đọc hạn chế.
-  Trước khi thay WAR, CD chạy migration bổ sung payOS, email verification và tọa độ
-  giao hàng trong service MySQL hiện có; không chạy lại schema/seed hoặc recreate database.
-- Các lần deploy được tuần tự hóa và có khóa trên server. Lần đang deploy được
-  chạy đến hết; GitHub có thể thay lần đang chờ bằng push mới nhất.
+- [ci.yml](../../.github/workflows/ci.yml) chạy JDK 17, MySQL 8.4 tạm thời,
+  Maven `-Pdev clean verify`, các assertion service, kiểm tra JavaScript,
+  deploy/rollback fixture, HTTP và browser smoke dùng form thật.
+  Ba migration production được áp lại hai lần trong database CI để kiểm tra
+  khả năng chạy lặp. Schema/seed chỉ tạo database CI tạm thời.
+- Chỉ sau các bước trên, CI tính SHA-256 của WAR và xuất artifact `crave-war`
+  gồm `crave.war` và `crave.war.sha256`.
+- [deploy.yml](../../.github/workflows/deploy.yml) nhận push/merge `main`
+  hoặc `workflow_dispatch`. Chạy thủ công trên nhánh khác `main` sẽ không deploy.
+  PR/review không chạy job production.
+- CD tải artifact của cùng lần CI và so hash với output tin cậy của job CI.
+  Sai hash hoặc CI lỗi thì không gọi script deploy.
+- Production dùng runner `[self-hosted, linux, x64, crave-production]`,
+  tên `crave-ec2`, environment `production`. Các lần deploy được tuần tự hóa;
+  lần đang chạy không bị hủy giữa chừng.
 
-## Thiết lập một lần trên EC2
+Cấu hình và kiểm thử trong repository không xác nhận runner/secrets trên tài khoản
+GitHub đã sẵn sàng. Cần kiểm tra trạng thái trong Settings/Actions của repository
+khi triển khai thật.
 
-Runner `crave-ec2`, label `crave-production` và environment `production` đã được
-cấu hình theo hệ thống hiện tại. Các bước dưới đây là tài liệu đối chiếu hoặc
-thiết lập lại; không cần thực hiện lại mỗi lần cập nhật ứng dụng.
+## EC2 đang chạy
 
-Runner EC2 nhận job từ GitHub qua HTTPS outbound 443. Giữ cấu hình SSH hiện có;
-không cần thêm SSH key vào GitHub Secrets. Xem [kết nối self-hosted runner](https://docs.github.com/en/actions/reference/runners/self-hosted-runners).
+Không ghi đè `.env`, compose hoặc volume database đang dùng. Script
+[deploy-ec2.sh](../../scripts/deploy-ec2.sh) đọc compose ở `DEPLOY_PATH`,
+bổ sung biến payOS/SMTP/giao hàng qua `.payos.compose.json` riêng và chỉ recreate
+service ứng dụng.
 
-### 1. Kiểm tra môi trường đang deploy
-
-SSH vào EC2 bằng tài khoản `ubuntu`:
+Kiểm tra trên EC2:
 
 ```bash
 cd /home/ubuntu/crave
-sudo docker compose config --services
-sudo docker compose ps
-curl --fail http://127.0.0.1:8080/crave/api/health
+docker compose --profile production config --services
+docker compose --profile production ps
+curl --fail http://127.0.0.1:8080/crave/health
 ```
 
-Cần có service `app`, `.env`, `backend/target/crave.war` và volume của `app`:
+Compose cần có `app`, `mysql` và bind mount WAR:
 
 ```yaml
 volumes:
   - ./backend/target/crave.war:/usr/local/tomcat/webapps/crave.war:ro
 ```
 
-Đây là cấu hình đang dùng từ bước deploy trước. Nếu cần sửa volume, thêm vào
-service `app` của compose trên EC2. Compose trong repo phục vụ MySQL môi trường
-phát triển, nên không copy đè compose production.
+Cần có WAR đang chạy, `.env` và thư mục `backend/target/` để lưu bản rollback.
+Deploy directory phải nằm ngoài checkout của GitHub runner.
 
-Cài các công cụ mà script cần:
+Runner cần Docker Compose v2, `curl`, `unzip`, `python3`, `flock` và
+các công cụ coreutils. Trên Ubuntu có thể cài các tiện ích:
 
 ```bash
 sudo apt-get update
 sudo apt-get install -y curl unzip python3 util-linux coreutils
 ```
 
-Runner cần quyền ghi trong `/home/ubuntu/crave/backend/target` và tạo file trong
-`/home/ubuntu/crave`. Nếu WAR đã được chép bằng `sudo` và các thư mục này đang
-thuộc `root`, sửa quyền sở hữu của riêng thư mục deploy/target:
+Kiểm tra `docker info` hoặc `sudo -n docker info` bằng tài khoản runner.
+Script dùng Docker trực tiếp nếu được phép, hoặc `sudo -n docker`.
+Compose cần hỗ trợ `config --format json`, profiles và `up --pull never`.
+Runner cần quyền ghi vào riêng thư mục deploy và `backend/target/`.
 
-```bash
-sudo chown ubuntu:ubuntu /home/ubuntu/crave /home/ubuntu/crave/backend/target
-```
+## EC2 mới, chưa có ứng dụng/database
 
-Script dùng `docker` trực tiếp nếu truy cập được daemon, hoặc `sudo -n docker`
-nếu tài khoản runner có quyền sudo không cần nhập mật khẩu. Kiểm tra bằng
-`docker info` hoặc `sudo -n docker info`. Docker Compose v2 cần hỗ trợ
-`config --format json` và `up --pull never`.
+[compose.yaml](../../compose.yaml) nay có MySQL và Tomcat với profile
+`production`:
 
-### 2. Thêm GitHub Actions runner
+- `docker compose up -d` tiếp tục chỉ chạy MySQL cho phát triển local.
+- `docker compose --profile production up -d` chạy MySQL và WAR trên Tomcat 10.1/JDK 17.
+- WAR phải có sẵn; mount không tự tạo thư mục nếu thiếu file.
+- MySQL chỉ bind `127.0.0.1:3306`; ứng dụng kết nối MySQL qua mạng Compose.
+- `CRAVE_HTTP_PORT` mặc định `8080`; `CRAVE_TOMCAT_IMAGE` có thể chọn image Tomcat phù hợp.
 
-Mở repository → **Settings → Actions → Runners → New self-hosted runner**.
-Chọn **Linux / x64** tương ứng với EC2 đã deploy.
+Chỉ thực hiện bootstrap dưới đây với EC2 mới và database trống:
 
-Trên EC2, tạo thư mục runner riêng, bên ngoài thư mục ứng dụng:
+1. Đặt source phát hành trong `/home/ubuntu/crave`, bên ngoài thư mục runner.
+2. Tạo `.env` từ `.env.example`, đặt mật khẩu database riêng và thông tin cửa hàng.
+   Không đưa `.env` hoặc khóa thật lên Git.
+3. Lấy WAR đã qua CI từ artifact `crave-war`, xác minh file SHA-256 rồi đặt vào
+   `backend/target/crave.war`.
+4. Khởi động:
 
-```bash
-mkdir -p /home/ubuntu/actions-runner
-cd /home/ubuntu/actions-runner
-```
+   ```bash
+   cd /home/ubuntu/crave
+   docker compose --profile production pull
+   docker compose --profile production up -d
+   curl --fail http://127.0.0.1:8080/crave/health
+   ```
 
-Chạy các lệnh tải, giải nén và `./config.sh` do trang GitHub cung cấp, bằng
-tài khoản `ubuntu`. Khi cấu hình:
+Schema/seed trong Compose chỉ dùng khi MySQL tạo volume trống. Không dùng bước
+bootstrap để thay database production. Các lần cập nhật sau dùng CD; script
+không chạy lại schema/seed và không recreate service MySQL.
 
-- Runner name: `crave-ec2`.
-- Additional labels: `crave-production` (giữ các label mặc định).
-- Work folder: dùng `_work` mặc định.
+Cho phép cổng web đang sử dụng trong EC2 Security Group, hoặc dùng reverse proxy
+80/443. Runner kết nối GitHub qua HTTPS outbound; luồng CD này không yêu cầu
+chép SSH private key vào repository.
 
-Token đăng ký runner chỉ dùng trong lệnh cấu hình, không đưa vào repo.
-Dùng bản runner mới nhất trên trang GitHub; các action hiện tại yêu cầu runner
-hỗ trợ Node.js 24. Nếu EC2 là ARM64, chọn ARM64 trong trang cài đặt và đổi label
-`x64` thành `arm64` trong `deploy.yml`.
+## Runner GitHub Actions
 
-Cài runner thành service để hoạt động sau khi đóng SSH hoặc reboot:
+Vào repository → **Settings → Actions → Runners → New self-hosted runner**,
+chọn Linux/x64. Đặt runner ngoài thư mục ứng dụng, ví dụ
+`/home/ubuntu/actions-runner`. Dùng các lệnh tải/cấu hình do GitHub cung cấp,
+với runner name `crave-ec2` và additional label `crave-production`.
+
+Cài thành service bằng tài khoản vận hành, ví dụ:
 
 ```bash
 cd /home/ubuntu/actions-runner
@@ -128,128 +127,102 @@ sudo ./svc.sh start
 sudo ./svc.sh status
 ```
 
-GitHub phải hiển thị runner `crave-ec2` **Idle** với label `crave-production`.
-Label này cần dành cho runner EC2 production; workflow kiểm tra tên runner trước
-khi tải code và artifact để tránh deploy trên máy khác có cùng label.
-Tham khảo [thêm runner](https://docs.github.com/en/actions/how-tos/manage-runners/self-hosted-runners/add-runners)
+Settings phải hiển thị runner online với đúng tên/labels. Dùng runner hỗ trợ
+các action Node.js 24 đã pin trong workflow. Với EC2 ARM64, chọn runner ARM64
+và đổi label `x64` của job deploy thành `arm64`.
+
+PR chạy trên runner GitHub-hosted; runner production chỉ dành cho code đã vào
+`main`. Nếu dùng repository public hoặc nhận PR ngoài nhóm, giữ chính sách
+approval cho workflow không tin cậy và giới hạn runner group phù hợp.
+
+Tham khảo [self-hosted runner](https://docs.github.com/en/actions/reference/runners/self-hosted-runners)
 và [cài runner thành service](https://docs.github.com/en/actions/how-tos/manage-runners/self-hosted-runners/configure-the-application).
 
-Runner này có quyền deploy production: chỉ dùng label `crave-production` trong
-job CD của `main`. Các job pull request/fork chạy trên `ubuntu-24.04` của GitHub.
-Với repository public, GitHub giải thích rủi ro chạy code không tin cậy trên
-runner riêng trong [hướng dẫn bảo mật runner](https://docs.github.com/en/actions/reference/security/secure-use).
-Trong **Settings → Actions → General → Approval for running fork pull request
-workflows from contributors**, chọn yêu cầu approval cho **all outside
-collaborators**. Đọc thay đổi workflow trước khi duyệt: một PR có thể thêm job
-khác dùng runner production, nên điều kiện `main` của CD chỉ bảo vệ workflow
-hiện có. Nếu dùng runner group của organization, giới hạn quyền sử dụng vào
-workflow deploy trên `main`.
+## Environment production
 
-### 3. Environment production
+Tạo **Settings → Environments → production**, chỉ cho deploy nhánh `main`.
+Nếu environment có required reviewers/wait timer, job sẽ chờ chính sách đó;
+nếu muốn tự deploy ngay sau merge, cấu hình chính sách tương ứng.
 
-Vào **Settings → Environments → New environment**, tạo `production`.
-Trong **Deployment branches and tags**, chọn **Selected branches and tags**,
-thêm branch `main`.
+Bắt buộc đặt 5 **Environment secrets**:
 
-Để CD tự chạy sau mỗi push vào `main`, environment này không được yêu cầu
-required reviewers hoặc wait timer. Approval của PR thuộc bước review trước
-khi merge; không phải approval deploy. Branch protection có thể yêu cầu CI
-thành công trước khi merge.
-
-Environment `production` cần ba **Environment secrets**: `PAYOS_CLIENT_ID`,
-`PAYOS_API_KEY`, `PAYOS_CHECKSUM_KEY`. Workflow chỉ truyền chúng cho bước deploy
-và đăng ký webhook; không đưa khóa vào WAR hoặc file cấu hình trong Git.
-
-Email xác thực cần thêm hai **Environment secrets**: `EMAIL_SMTP_PASSWORD`
-(Google app password) và `EMAIL_OTP_SECRET` (ít nhất 32 ký tự ngẫu nhiên).
-Chỉ bước deploy nhận hai secret này. Các variables `EMAIL_SMTP_HOST`,
-`EMAIL_SMTP_PORT`, `EMAIL_SMTP_USERNAME`, `EMAIL_FROM` mặc định lần lượt là
-`smtp.gmail.com`, `587`, `craveshopvn@gmail.com`, `craveshopvn@gmail.com`.
-Production luôn yêu cầu STARTTLS; không đặt app password trong repository,
-WAR, command line hoặc log. Xem [email xác thực](email-verification.md).
-
-Đặt **Environment variable** `PAYOS_PUBLIC_BASE_URL` thành
-`http://15.134.39.86:8080/crave`. Giá trị mặc định trong workflow hiện cũng dùng
-đúng URL này. Nếu thay đổi server, cập nhật các variables:
-
-Các variables `CRAVE_STORE_ADDRESS`, `CRAVE_STORE_LATITUDE`, `CRAVE_STORE_LONGITUDE`
-và `CRAVE_GEOCODER_URL` là tùy chọn cho giao hàng. Nếu không cấu hình, ứng dụng dùng
-địa chỉ/ghim demo và Photon mặc định đã mô tả trong
-[thiết kế giao hàng](../architecture/delivery-and-cart-editing.md). Khi đổi ghim
-cửa hàng, phải đặt cả latitude và longitude. Workflow truyền các giá trị này vào
-container ứng dụng; không thay cấu hình payOS hoặc database hiện có.
-
-| Variable | Mặc định | Ý nghĩa |
-|---|---|---|
-| `EC2_DEPLOY_PATH` | `/home/ubuntu/crave` | Thư mục ứng dụng trên EC2, nằm ngoài checkout runner |
-| `EC2_COMPOSE_FILE` | `compose.yaml` | File compose, đường dẫn tương đối trong thư mục ứng dụng |
-| `EC2_APP_SERVICE` | `app` | Tên service Tomcat |
-| `EC2_DB_SERVICE` | `mysql` | Service MySQL đang chạy, có `MYSQL_ROOT_PASSWORD` trong container để áp migration |
-| `EC2_HEALTH_URL` | `http://127.0.0.1:8080/crave/api/health` | Endpoint health trên máy EC2 |
-| `PAYOS_PUBLIC_BASE_URL` | `http://15.134.39.86:8080/crave` | URL public dùng cho return/cancel và webhook, gồm `/crave` |
-
-Không copy `.env` local lên EC2. Compose override bổ sung bốn biến payOS và bảy biến email
-cho service `app`; các biến kết nối MySQL, volume và port của compose production
-được giữ. Script lưu file secret và bản backup với quyền `0600`.
-
-Migration `database/migrations/2026-10-13-payos-payment.sql` được lấy từ commit
-đang deploy và chạy bằng MySQL client trong container. Mật khẩu quản trị được
-đọc bên trong container; không ghi vào command line hoặc log của runner.
-Migration `database/migrations/2026-10-13-email-verification.sql` chạy cùng lúc,
-thêm bảng mã xác thực và phiên bản mật khẩu trước khi cài WAR. Cả hai migration
-đều có thể chạy lại và không thay đổi mật khẩu hoặc tài khoản hiện có.
-Nếu migration thất bại, script dừng trước khi thay WAR hoặc recreate app.
-
-## Luồng cập nhật ứng dụng
-
-Đưa thay đổi CI/CD qua pull request vào `main`. Khi tạo hoặc cập nhật PR, chỉ
-workflow CI chạy; review và Approve không đổi website trên EC2. Sau khi merge,
-commit mới trên `main` tạo sự kiện `push`, workflow **CI/CD - main to EC2** tự
-chạy. Push trực tiếp vào `main` cũng dùng đúng luồng này. Xem tab **Actions**:
-
-1. `CI / Build and test` phải thành công và tạo artifact `crave-war`.
-2. `Deploy EC2` kiểm tra secrets và cấu hình, áp migration thanh toán/email, rồi lưu WAR
-   cùng cấu hình hiện tại vào `.deploy-backups/`, thay WAR và recreate `app`.
-3. Endpoint health phải trả HTTP 200 với `success: true`,
-   `data.application: "UP"`, `data.database: "UP"` trong 180 giây.
-4. Workflow đăng ký `http://15.134.39.86:8080/crave/api/payos/webhook` với payOS
-   bằng API `confirm-webhook`, rồi summary ghi commit đã deploy.
-   [Tài liệu payOS](https://payos.vn/docs/api/) mô tả bước xác minh endpoint này.
-   Mở website để kiểm tra chức năng.
-
-Không cần nhấn **Run workflow** hoặc SSH vào EC2 để deploy mỗi lần cập nhật.
-Nếu CI thất bại, CD không chạy và website tiếp tục dùng WAR hiện tại.
-
-Nếu recreate hoặc health check thất bại, script tự khôi phục WAR cũ và recreate
-`app` lần nữa cùng cấu hình payOS cũ (hoặc không có override nếu trước đó chưa
-cấu hình). Bảng migration bổ sung được giữ khi rollback để không mất dữ liệu
-thanh toán. Workflow vẫn báo lỗi để người triển khai kiểm tra. Mỗi deploy
-recreate Tomcat nên có khoảng gián đoạn ngắn và session đang đăng nhập sẽ mất.
-Rollback khi force kill, hủy job hoặc EC2 crash có thể chưa hoàn tất; dùng backup
-trên server để khôi phục thủ công khi cần.
-Health endpoint xác nhận trạng thái database lúc khởi động, không thay thế
-giám sát database liên tục.
-
-Nếu đăng ký webhook thất bại sau khi app đã khỏe, job CD báo lỗi ở đúng bước
-webhook; bản WAR mới vẫn chạy. Trang đơn hàng vẫn đồng bộ thanh toán qua API
-payOS khi đang mở. Kiểm tra URL public, Security Group và keys, sau đó chạy lại
-job CD; migration có thể áp lại an toàn và không đổi các mã thanh toán đã lưu.
-
-## Khi job không chạy được
-
-| Hiện tượng | Cách kiểm tra |
+| Secret | Nội dung |
 |---|---|
-| `Deploy EC2` đang chờ runner | Runner `crave-ec2` phải online, đúng label `self-hosted`, `linux`, `x64`, `crave-production`; xem `sudo ./svc.sh status` |
-| Job báo sai tên runner | Kiểm tra tên runner là `crave-ec2` và label `crave-production` chỉ dành cho đúng máy production |
-| Job chờ approval | Kiểm tra required reviewers của environment `production` |
-| Không truy cập Docker | Thử `sudo -n docker info` dưới tài khoản `ubuntu` của service runner |
-| Báo thiếu app bind mount | Kiểm tra service `app` trong compose production và đường dẫn WAR ở bước 1 |
-| Permission denied khi backup/thay WAR | Kiểm tra quyền thư mục deploy và `backend/target`; WAR được thay bằng rename nên cần quyền ghi thư mục |
-| Health check thất bại | Trên EC2: `cd /home/ubuntu/crave`, `sudo docker compose ps`, `sudo docker compose logs --tail=100 app` |
-| Thiếu cấu hình payOS | Kiểm tra ba secrets và variable `PAYOS_PUBLIC_BASE_URL` của environment `production` |
-| Migration thất bại | Kiểm tra `EC2_DB_SERVICE`, container MySQL đang chạy và `MYSQL_ROOT_PASSWORD` trong container; app chưa bị thay WAR |
-| Đăng ký webhook thất bại | Kiểm tra endpoint public và Security Group cho cổng 8080; xem bước đăng ký webhook trong Actions |
+| `PAYOS_CLIENT_ID` | Client ID payOS |
+| `PAYOS_API_KEY` | API key payOS |
+| `PAYOS_CHECKSUM_KEY` | Checksum key payOS |
+| `EMAIL_SMTP_PASSWORD` | App password SMTP |
+| `EMAIL_OTP_SECRET` | Secret OTP ổn định, ít nhất 32 ký tự ngẫu nhiên |
 
-Không chạy `database/schema.sql` trên database production để sửa lỗi deploy:
-script này có `DROP DATABASE`. CD chỉ tự áp dụng migration payOS bổ sung đã chỉ
-định, không chạy schema/seed hay xóa bảng khi rollback.
+Bắt buộc đặt **Environment variable** `PAYOS_PUBLIC_BASE_URL`, ví dụ
+`https://your-domain.example/crave`. Workflow không mặc định một IP public cũ.
+Giá trị gồm context path và được dùng cho return/cancel cũng như webhook.
+
+Các variable còn lại:
+
+| Variable | Mặc định/ý nghĩa |
+|---|---|
+| `EC2_DEPLOY_PATH` | `/home/ubuntu/crave` |
+| `EC2_COMPOSE_FILE` | `compose.yaml`, tương đối trong thư mục deploy |
+| `EC2_APP_SERVICE` | `app` |
+| `EC2_DB_SERVICE` | `mysql`; container có `MYSQL_ROOT_PASSWORD` để áp migration |
+| `EC2_HEALTH_URL` | `http://127.0.0.1:8080/crave/health` |
+| `EMAIL_SMTP_HOST`, `EMAIL_SMTP_PORT` | `smtp.gmail.com`, `587` |
+| `EMAIL_SMTP_USERNAME`, `EMAIL_FROM` | Mặc định địa chỉ dự án trong workflow; phải khớp app password |
+| `CRAVE_STORE_ADDRESS` | Địa chỉ cửa hàng; tùy chọn nếu compose/.env đã có |
+| `CRAVE_STORE_LATITUDE`, `CRAVE_STORE_LONGITUDE` | Đặt cùng nhau khi đổi ghim cửa hàng |
+| `CRAVE_GEOCODER_URL` | `https://photon.komoot.io/api/`, hỗ trợ Photon GeoJSON |
+
+Trước lần phát hành này, nếu GitHub environment/repository đang có
+`CRAVE_GEOCODER_URL` trỏ tới Nominatim (`.../search`), xóa variable đó để dùng
+mặc định Photon hoặc đổi sang endpoint Photon tương thích. Variable GitHub
+được ưu tiên hơn giá trị mặc định; WAR hiện tại đọc Photon GeoJSON. Không đổi
+DNS hệ điều hành. `.env` cũ trên EC2 vẫn được giữ nguyên, còn workflow truyền
+endpoint Photon qua override riêng khi deploy.
+
+Production dùng STARTTLS. Secrets chỉ truyền vào bước cần dùng, không đưa vào
+WAR hoặc command line. File override và bản backup chứa cấu hình có quyền `0600`.
+Biến của workflow không thay đổi cách compose gốc nội suy database từ `.env`;
+override chỉ áp các setting tích hợp đã kiểm tra.
+
+## Cập nhật và rollback
+
+Push/merge vào `main` để chạy tự động. Để triển khai lại thủ công, vào
+**Actions → CI/CD - main to EC2 → Run workflow**, chọn `main`.
+Cả hai cách đều chạy lại CI, không bỏ qua kiểm thử.
+
+Script thực hiện:
+
+1. Xác minh WAR là ZIP hợp lệ, kiểm tra đường dẫn và khóa deploy.
+2. Kiểm tra cấu hình, áp các migration bổ sung payOS, OTP và tọa độ giao hàng
+   bằng MySQL client trong container. Mật khẩu lấy bên trong container.
+3. Lưu WAR cùng trạng thái cấu hình hiện tại vào `.deploy-backups/`.
+4. Thay WAR bằng rename, kích hoạt override rồi recreate chỉ `app`.
+5. Health phải trả HTTP 200 và `application=UP`/`database=UP`. Nếu lỗi,
+   khôi phục WAR/cấu hình cũ; chỉ khi rollback mới thử thêm alias `/api/health`
+   cho phiên bản JSON trước.
+6. Khi ứng dụng khỏe, workflow đăng ký
+   `PAYOS_PUBLIC_BASE_URL/api/payos/webhook` và ghi commit + SHA-256 trong summary.
+
+Recreate Tomcat có gián đoạn ngắn và session hiện tại kết thúc. Migration bổ sung
+được giữ khi rollback; không xóa dữ liệu hoặc database. Nếu webhook đăng ký lỗi,
+workflow báo lỗi ở bước đó nhưng WAR đã khỏe vẫn chạy; sửa URL/keys rồi chạy lại.
+
+## Chẩn đoán nhanh
+
+| Hiện tượng | Kiểm tra |
+|---|---|
+| Job chờ runner | Tên `crave-ec2`, labels đúng, service runner online |
+| Job chờ approval | Chính sách environment `production` |
+| Thiếu public URL/secrets | Variables/secrets của environment, không chỉ repository local |
+| Sai SHA-256 | Artifact phải thuộc cùng CI; không thay file WAR sau CI |
+| Thiếu WAR/service/mount | Compose production và `backend/target/crave.war` |
+| Image chưa có ở EC2 | Pull image trong bootstrap; deploy không tự pull khi thay WAR |
+| Permission denied | Quyền ghi thư mục deploy/target của tài khoản runner |
+| Migration lỗi | Service MySQL đang chạy, quyền root container; WAR cũ chưa bị thay |
+| Health lỗi | `docker compose --profile production logs --tail=100 app` |
+| Webhook lỗi | Public URL, cổng web/HTTPS và keys payOS |
+
+Không chạy `database/schema.sql` trên database đang có dữ liệu để sửa lỗi CD.
+Kiểm thử deploy/rollback nằm tại `tests/scripts/deploy-ec2-test.sh`; tất cả dữ liệu
+của fixture tách khỏi production.

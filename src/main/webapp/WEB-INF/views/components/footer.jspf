@@ -1,0 +1,16 @@
+<%@ page pageEncoding="UTF-8" %>
+<footer class="site-footer">
+    <div class="site-footer-inner">
+        <div>
+            <strong class="footer-brand">crave<span>.</span></strong>
+            <span class="footer-tagline">Món ngon mỗi ngày, giao tận tay.</span>
+        </div>
+        <div class="footer-copy">
+            &copy; 2026 Crave · Đặt món trực tuyến
+        </div>
+    </div>
+</footer>
+<script src="<c:url value='/assets/js/account.js?v=20261017-forms1'/>"></script>
+<script src="<c:url value='/assets/js/customer.js?v=20261017-forms1'/>"></script>
+</body>
+</html>

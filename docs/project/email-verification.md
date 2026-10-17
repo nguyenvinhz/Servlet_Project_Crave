@@ -6,19 +6,19 @@ khi tạo tài khoản. Khách hàng, nhân viên và quản trị viên có th�
 bằng email; tài khoản đã đăng nhập có thể đổi mật khẩu sau khi xác nhận mật khẩu
 hiện tại và mã gửi đến email của chính tài khoản đó.
 
-| API | JSON yêu cầu |
+| Servlet (form POST) | Tham số form |
 |---|---|
-| `POST /api/auth/register/code` | `email` |
-| `POST /api/auth/register` | Các trường đăng ký và `verificationCode` |
-| `POST /api/auth/password/reset/code` | `email` |
-| `POST /api/auth/password/reset` | `email`, `verificationCode`, `password`, `confirmPassword` |
-| `POST /api/auth/password/change/code` | `currentPassword`; cần đăng nhập |
-| `POST /api/auth/password/change` | `verificationCode`, `password`, `confirmPassword`; cần đăng nhập |
+| `POST /auth/register/code` | `email` |
+| `POST /auth/register/submit` | Các trường đăng ký và `verificationCode` |
+| `POST /auth/password/reset/code` | `email` |
+| `POST /auth/password/reset/submit` | `email`, `verificationCode`, `password`, `confirmPassword` |
+| `POST /auth/password/change/code` | `currentPassword`; cần đăng nhập |
+| `POST /auth/password/change/submit` | `verificationCode`, `password`, `confirmPassword`; cần đăng nhập |
 
 Mã có hiệu lực 10 phút, chỉ dùng một lần, gắn với email và mục đích. Mỗi mã
 cho phép tối đa năm lần nhập sai. Gửi lại cách nhau ít nhất 60 giây và tối đa
 năm lần trong cửa sổ một giờ. Database lưu digest HMAC với salt và secret riêng,
-không lưu mã thô; API và log không trả mã. Luồng quên mật khẩu trả phản hồi chung
+không lưu mã thô; JSP và log không trả mã. Luồng quên mật khẩu trả phản hồi chung
 cho email không tồn tại hoặc tài khoản không hoạt động. Đặt lại/đổi thành công
 thu hồi các phiên đăng nhập cũ bằng phiên bản mật khẩu; người dùng đăng nhập lại.
 
@@ -61,6 +61,7 @@ hoặc đưa vào API production. Plaintext SMTP chỉ được phép với đ�
 
 CI thiết lập riêng `EMAIL_SMTP_HOST=127.0.0.1`, `EMAIL_SMTP_PORT=2525`,
 `EMAIL_SMTP_STARTTLS=false`, username/password rỗng, địa chỉ gửi test và một
-OTP secret giả lập. Script HTTP lấy mã từ inbox local để kiểm tra đăng ký,
-reset/change, mã sai/tái sử dụng/sai mục đích và thu hồi phiên cho khách hàng,
-nhân viên và admin. Không chạy smoke này với database hoặc Gmail production.
+OTP secret giả lập. Browser smoke `tests/frontend/servlet-form-browser-smoke.cjs`
+lấy mã từ inbox local và gửi các form thật để kiểm tra đăng ký, reset/change và
+thu hồi phiên. Backend test kiểm tra mã sai/tái sử dụng/sai mục đích cho các loại
+tài khoản. Không chạy smoke này với database hoặc Gmail production.

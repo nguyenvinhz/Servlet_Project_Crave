@@ -5,6 +5,10 @@ tạo link, kiểm tra trạng thái và ảnh QR; `PayosWebhookServlet` nhận 
 payOS. Client gọi API bằng `java.net.http.HttpClient`, ảnh QR được tạo cục bộ
 bằng ZXing. Không gửi khóa API hoặc checksum key ra trình duyệt.
 
+Tích hợp payOS giữ JSON và chữ ký theo API chính thức; có thể dùng SDK của
+nhà cung cấp khi cần. Quy tắc này cũng áp dụng cho SMTP, CI/CD và Map, trong
+khi nghiệp vụ chính vẫn dùng Servlet/JSP/JPA/HikariCP, không dùng Spring.
+
 ## Cấu hình và chạy local
 
 Thêm các biến vào `.env` ở gốc repository hoặc môi trường của Tomcat:
@@ -40,16 +44,17 @@ thanh toán, nhưng cần mở lại trang để đồng bộ nếu chưa cấu 
 
 ## Khi có URL public
 
-Ứng dụng AWS hiện dùng `http://15.134.39.86:8080/crave`. CI/CD lấy ba khóa từ
-GitHub environment `production` và `PAYOS_PUBLIC_BASE_URL` từ environment variable
-cùng tên. Script deploy truyền chúng vào container Tomcat qua Compose override
+Đặt GitHub variable `PAYOS_PUBLIC_BASE_URL` trong environment `production`
+thành URL public thực tế của ứng dụng, gồm context path `/crave`.
+CI/CD lấy ba khóa từ secrets của environment này. Script deploy truyền chúng
+vào container Tomcat qua Compose override
 có quyền `0600`, chạy migration bổ sung trước khi thay WAR và khôi phục cấu hình
 cũ nếu app không khởi động được.
 
 Sau khi health check đạt, workflow tự đăng ký endpoint sau với payOS:
 
 ```text
-POST http://15.134.39.86:8080/crave/api/payos/webhook
+POST ${PAYOS_PUBLIC_BASE_URL}/api/payos/webhook
 ```
 
 Webhook yêu cầu chữ ký HMAC-SHA256 đúng checksum key. Servlet xác thực dữ liệu
@@ -61,13 +66,13 @@ Khi đổi IP hoặc tên miền, cập nhật GitHub variable `PAYOS_PUBLIC_BAS
 deploy lại qua `main`. Không cần đổi URL trong Java hoặc chép `.env` local lên AWS.
 Xem [hướng dẫn CI/CD EC2](ci-cd-ec2.md) về secrets, migration và rollback.
 
-## API của ứng dụng
+## Servlet của ứng dụng
 
 | Endpoint | Hành vi |
 |---|---|
-| `POST /api/payos/orders/{orderId}` | Khách hàng tạo hoặc lấy lại link của đơn mình; không nhận số tiền từ client |
-| `GET /api/payos/orders/{orderId}` | Đồng bộ trạng thái từ payOS, trả thông tin link và thanh toán |
-| `GET /api/payos/orders/{orderId}/qr` | Ảnh PNG của dữ liệu QR đã lưu; yêu cầu đăng nhập và quyền sở hữu đơn |
+| `POST /payos/create` | Form có `orderId`; tạo hoặc lấy lại link của đơn mình rồi redirect về chi tiết đơn; không nhận số tiền từ client |
+| `GET /payos/status?orderId=...` | Đồng bộ trạng thái từ payOS và forward đoạn HTML JSP cho thẻ thanh toán |
+| `GET /payos/qr?orderId=...` | Ảnh PNG của dữ liệu QR đã lưu; yêu cầu đăng nhập và quyền sở hữu đơn |
 | `POST /api/payos/webhook` | Callback có chữ ký, không yêu cầu session trình duyệt |
 
 Một thanh toán có một mã payOS được lưu bền vững trước khi gọi mạng. Request
@@ -85,7 +90,7 @@ thực nhận để nhà hàng xử lý hoàn tiền, đồng thời giữ đơn
 
 ```powershell
 mvn -f backend/pom.xml -Pdev verify
-node tests/frontend/payos-payment-browser-smoke.cjs
+node tests/frontend/servlet-form-browser-smoke.cjs
 ```
 
 Gateway tests dùng HTTP fixture có chữ ký; service tests kiểm tra quyền, số tiền,

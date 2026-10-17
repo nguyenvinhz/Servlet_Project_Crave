@@ -41,6 +41,8 @@ Báo cáo được nhóm theo chức năng; ngày trong tên file là ngày tạ
 | 2026-10-09 | Bản tiến độ Đơn hàng và thanh toán Ngày 2 trước khi tích hợp Auth | [Order/payment Day 2 — tiến độ 2026-10-09](order-payment/2026-10-09-nguyen-duc-phat-order-payment.md) |
 | 2026-10-10 | Đơn hàng và thanh toán Ngày 2 | [Order/payment Day 2](order-payment/2026-10-10-nguyen-duc-phat-order-payment-day2.md) |
 | 2026-10-12 | Tích hợp, kiểm thử và hoàn thiện Đơn hàng Ngày 3 | [Order/payment Day 3](order-payment/2026-10-12-nguyen-duc-phat-order-payment-day3.md) |
+| 2026-10-17 | Sửa tìm địa chỉ, đồng bộ ghim/báo phí và kiểm tra lỗi DNS local | [Tìm địa chỉ giao hàng](order-payment/2026-10-17-delivery-address-search.md) |
+| 2026-10-17 | Khôi phục Photon/ảnh nền OSM và trải nghiệm Map, áp dụng đúng ngoại lệ dịch vụ ngoài | [Khôi phục Map](order-payment/2026-10-17-native-map-restoration.md) |
 
 ## Tài liệu dự án
 
@@ -49,5 +51,7 @@ Báo cáo được nhóm theo chức năng; ngày trong tên file là ngày tạ
 | 2026-10-10 | Nguyễn Quang Vinh | Sắp xếp thư mục tài liệu và cập nhật liên kết | [Bố cục docs](documentation/2026-10-10-nguyen-quang-vinh-docs-layout.md) |
 | 2026-10-12 | Nguyễn Quang Vinh | CI/CD: kiểm thử và tự deploy main lên EC2 | [CI/CD EC2](documentation/2026-10-12-nguyen-quang-vinh-ci-cd-ec2.md) |
 | 2026-10-12 | Nguyễn Quang Vinh | Hoàn thiện giao diện, admin, kiến trúc và kiểm tra chạy thật | [UI/admin/runtime](documentation/2026-10-12-nguyen-quang-vinh-ui-admin-runtime.md) |
+| 2026-10-17 | Codex | Đơn giản hóa backend Servlet/JSP, bỏ mapper và JSON nghiệp vụ, giữ giao diện | [Báo cáo Servlet/JSP](documentation/2026-10-17-servlet-jsp-simplification.md) |
+| 2026-10-17 | Codex | Dọn file không dùng và hoàn thiện CI/CD triển khai WAR lên AWS EC2 | [Cleanup và CI/CD AWS](documentation/2026-10-17-cleanup-aws-cicd.md) |
 
 Khi tạo báo cáo mới, dùng `docs/reports/<scope>/YYYY-MM-DD-<ho-ten-thanh-vien>-<task>.md` và thêm liên kết vào nhóm tương ứng ở trên. Xem [quy tắc báo cáo](../project/quy-tac-git-github.md#91-vị-trí-và-tên-file) để giữ một báo cáo cho mỗi task/branch.
