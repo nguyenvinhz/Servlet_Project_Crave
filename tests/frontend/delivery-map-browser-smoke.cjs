@@ -41,7 +41,7 @@ async function waitFor(expression, reason) {
 }
 function pass(message) { checks++; process.stdout.write('PASS ' + message + '\n'); }
 function checkoutHtml(saved = false) {
-    let source = fs.readFileSync(path.join(project, 'frontend/WEB-INF/views/order/checkout.jsp'), 'utf8');
+    let source = fs.readFileSync(path.join(project, 'src/main/webapp/WEB-INF/views/order/checkout.jsp'), 'utf8');
     source = source.replace(/<%@[^]*?%>/g, '')
         .replace(/<c:url value='([^']*)'\s*\/>/g, '$1')
         .replace(/<c:forEach\b[^]*?<\/c:forEach>/g, '')
@@ -67,8 +67,8 @@ const server = http.createServer(async (request, response) => {
         response.end(checkoutHtml(new URL(request.url, 'http://localhost').searchParams.has('saved'))); return;
     }
     if (route.startsWith('/assets/')) {
-        const file = path.resolve(project, 'frontend', '.' + route);
-        if (!file.startsWith(path.resolve(project, 'frontend/assets') + path.sep) || !fs.existsSync(file)) {
+        const file = path.resolve(project, 'src/main/webapp', '.' + route);
+        if (!file.startsWith(path.resolve(project, 'src/main/webapp/assets') + path.sep) || !fs.existsSync(file)) {
             response.writeHead(404); response.end(); return;
         }
         response.setHeader('Content-Type', file.endsWith('.js') ? 'application/javascript' : file.endsWith('.css') ? 'text/css' : 'application/octet-stream');

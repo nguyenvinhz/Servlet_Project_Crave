@@ -45,10 +45,10 @@ db_service=${DB_SERVICE:-mysql}
 [[ $service =~ ^[a-zA-Z0-9][a-zA-Z0-9_.-]*$ ]] || fail 'Invalid APP_SERVICE.'
 [[ $db_service =~ ^[a-zA-Z0-9][a-zA-Z0-9_.-]*$ && $db_service != "$service" ]] || fail 'Invalid DB_SERVICE.'
 
-war_directory=$(realpath -e -- "$deploy_root/backend/target")
+war_directory=$(realpath -e -- "$deploy_root/target" 2>/dev/null || realpath -e -- "$deploy_root/backend/target")
 [[ $war_directory == "$deploy_root/"* ]] || fail 'WAR directory must be inside DEPLOY_PATH.'
 war_path=$war_directory/crave.war
-[[ -f $war_path && -s $war_path && ! -L $war_path ]] || fail 'Existing deployed backend/target/crave.war is required for rollback.'
+[[ -f $war_path && -s $war_path && ! -L $war_path ]] || fail 'Existing deployed crave.war is required for rollback.'
 [[ $artifact != "$war_path" ]] || fail 'Stage the incoming WAR outside the deployed WAR path.'
 
 health_url=${HEALTH_URL:-http://127.0.0.1:8080/crave/health}
@@ -298,7 +298,7 @@ try:
         for volume in service.get("volumes", [])
     )
     if not valid:
-        sys.exit("App service must bind backend/target/crave.war to /usr/local/tomcat/webapps/crave.war.")
+        sys.exit("App service must bind crave.war to /usr/local/tomcat/webapps/crave.war.")
     if not services.get(sys.argv[3]):
         sys.exit("The existing database service is missing from Compose.")
     with open(sys.argv[4], encoding="utf-8") as source:

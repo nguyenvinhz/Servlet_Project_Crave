@@ -111,7 +111,7 @@ async function screenshot(name) {
     for (const css of ['styles.css', 'account.css']) {
         const response = await fetch(base + '/assets/css/' + css);
         assert.equal(response.status, 200, 'CSS asset unavailable.');
-        assert.deepEqual(Buffer.from(await response.arrayBuffer()), fs.readFileSync(path.join(project, 'frontend/assets/css', css)), 'Packaged CSS differs from the project.');
+        assert.deepEqual(Buffer.from(await response.arrayBuffer()), fs.readFileSync(path.join(project, 'src/main/webapp/assets/css', css)), 'Packaged CSS differs from the project.');
     }
     const debuggingUrl = await new Promise((resolve, reject) => {
         browser = spawn(chrome, ['--headless=new', '--no-sandbox', '--disable-gpu', '--disable-extensions',

@@ -61,7 +61,7 @@ jobs:
           distribution: temurin
           java-version: '17'
           cache: maven
-          cache-dependency-path: backend/pom.xml
+          cache-dependency-path: pom.xml
           overwrite-settings: false
 
       - name: Set up Node.js 24
@@ -95,19 +95,19 @@ jobs:
           done
 
       - name: Build WAR and run all backend tests
-        run: mvn --batch-mode --no-transfer-progress --file backend/pom.xml -Pdev clean verify
+        run: mvn --batch-mode --no-transfer-progress -Pdev clean verify
 
       - name: Run cart and promotion assertions
         run: |
-          mvn --batch-mode --no-transfer-progress --file backend/pom.xml -Pdev \
+          mvn --batch-mode --no-transfer-progress -Pdev \
             org.apache.maven.plugins:maven-dependency-plugin:3.10.0:build-classpath \
             -DincludeScope=test -Dmdep.outputFile=target/test-classpath.txt
-          java -ea -cp "backend/target/test-classes:backend/target/classes:$(cat backend/target/test-classpath.txt)" \
-            com.foodordering.CartPromotionServiceTest
+          java -ea -cp "target/test-classes:target/classes:$(cat target/test-classpath.txt)" \
+            vn.edu.crave.model.service.CartPromotionServiceTest
 
       - name: Check frontend JavaScript syntax
         run: |
-          find frontend/assets/js -type f -name '*.js' -print0 | xargs -0 -r -n 1 node --check
+          find src/main/webapp/assets/js -type f -name '*.js' -print0 | xargs -0 -r -n 1 node --check
           node --check tests/frontend/servlet-form-browser-smoke.cjs
           node --check tests/frontend/delivery-map-browser-smoke.cjs
           node --check tests/runtime/http-smoke.cjs
@@ -133,7 +133,7 @@ jobs:
           EMAIL_OTP_SECRET: ci-only-disposable-otp-secret-at-least-32-characters
         run: |
           set -euo pipefail
-          mvn --batch-mode --no-transfer-progress --file backend/pom.xml -Pdev \
+          mvn --batch-mode --no-transfer-progress -Pdev \
             org.apache.maven.plugins:maven-dependency-plugin:3.10.0:build-classpath \
             -DincludeScope=test \
             -DincludeGroupIds=org.apache.tomcat.embed,org.apache.tomcat,org.eclipse.jdt \
@@ -144,19 +144,19 @@ jobs:
           printf '::add-mask::%s\n' "$CRAVE_ADMIN_PASSWORD"
           export CRAVE_SMOKE_ADMIN_PASSWORD="$CRAVE_ADMIN_PASSWORD"
           java -Dfile.encoding=UTF-8 \
-            -cp "backend/target/test-classes:backend/target/classes:$(cat backend/target/test-classpath.txt)" \
-            com.foodordering.dev.CreateEmployee "$CRAVE_SMOKE_ADMIN_EMAIL" "CI Runtime Admin" "0999285721" ADMIN
+            -cp "target/test-classes:target/classes:$(cat target/test-classpath.txt)" \
+            vn.edu.crave.util.CreateEmployee "$CRAVE_SMOKE_ADMIN_EMAIL" "CI Runtime Admin" "0999285721" ADMIN
 
-          jar tf backend/target/crave.war > backend/target/war-entries.txt
-          if grep -Eq '^WEB-INF/(classes/com/foodordering/dev/|lib/tomcat-embed-)' backend/target/war-entries.txt; then
+          jar tf target/crave.war > target/war-entries.txt
+          if grep -Eq '^WEB-INF/(classes/vn/edu/crave/util/DevServer|lib/tomcat-embed-)' target/war-entries.txt; then
             echo 'Development launcher or embedded Tomcat leaked into the production WAR.' >&2
             exit 1
           fi
 
           server_pid=''
           smtp_pid=''
-          runtime_log='backend/target/runtime-smoke-tomcat.log'
-          health_file='backend/target/runtime-health.txt'
+          runtime_log='target/runtime-smoke-tomcat.log'
+          health_file='target/runtime-health.txt'
           cleanup() {
             if [[ -n "$server_pid" ]] && kill -0 "$server_pid" 2>/dev/null; then
               kill "$server_pid" || true
@@ -168,7 +168,7 @@ jobs:
             fi
           }
           trap cleanup EXIT
-          node tests/runtime/smtp-fixture.cjs > backend/target/runtime-smoke-smtp.log 2>&1 &
+          node tests/runtime/smtp-fixture.cjs > target/runtime-smoke-smtp.log 2>&1 &
           smtp_pid=$!
           inbox_ready=0
           for attempt in $(seq 1 20); do
@@ -180,8 +180,8 @@ jobs:
           done
           [[ "$inbox_ready" == 1 ]] || { echo 'The local SMTP fixture did not become ready.' >&2; exit 1; }
           java -Dfile.encoding=UTF-8 \
-            -cp "backend/target/test-classes:$(cat backend/target/dev-classpath.txt)" \
-            com.foodordering.dev.DevServer backend/target/crave.war 8081 > "$runtime_log" 2>&1 &
+            -cp "target/test-classes:$(cat target/dev-classpath.txt)" \
+            vn.edu.crave.util.DevServer target/crave.war 8081 > "$runtime_log" 2>&1 &
           server_pid=$!
 
           ready=0
@@ -210,7 +210,7 @@ jobs:
 
       - name: Record tested WAR checksum
         id: war-digest
-        working-directory: backend/target
+        working-directory: target
         run: |
           sha256sum crave.war > crave.war.sha256
           printf 'sha256=%s\n' "$(cut -d ' ' -f 1 crave.war.sha256)" >> "$GITHUB_OUTPUT"
@@ -220,8 +220,8 @@ jobs:
         with:
           name: crave-war
           path: |
-            backend/target/crave.war
-            backend/target/crave.war.sha256
+            target/crave.war
+            target/crave.war.sha256
           if-no-files-found: error
           retention-days: 7
 
@@ -230,7 +230,7 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: backend-test-reports
-          path: backend/target/surefire-reports/
+          path: target/surefire-reports/
           if-no-files-found: ignore
           retention-days: 7
 
@@ -240,9 +240,9 @@ jobs:
         with:
           name: runtime-smoke-diagnostics
           path: |
-            backend/target/runtime-smoke-tomcat.log
-            backend/target/runtime-smoke-smtp.log
-            backend/target/runtime-health.txt
+            target/runtime-smoke-tomcat.log
+            target/runtime-smoke-smtp.log
+            target/runtime-health.txt
             .runtime/form-browser/*.png
             .runtime/map-browser/*.png
           if-no-files-found: ignore

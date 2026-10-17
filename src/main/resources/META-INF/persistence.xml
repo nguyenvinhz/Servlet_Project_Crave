@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<persistence xmlns="https://jakarta.ee/xml/ns/persistence"
+             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             xsi:schemaLocation="https://jakarta.ee/xml/ns/persistence https://jakarta.ee/xml/ns/persistence/persistence_3_1.xsd"
+             version="3.1">
+    <persistence-unit name="cravePU" transaction-type="RESOURCE_LOCAL">
+        <provider>org.hibernate.jpa.HibernatePersistenceProvider</provider>
+        <class>vn.edu.crave.model.entity.User</class>
+        <class>vn.edu.crave.model.entity.Customer</class>
+        <class>vn.edu.crave.model.entity.Employee</class>
+        <class>vn.edu.crave.model.entity.EmailVerificationChallenge</class>
+        <class>vn.edu.crave.model.entity.Address</class>
+        <class>vn.edu.crave.model.entity.CustomerOrder</class>
+        <class>vn.edu.crave.model.entity.OrderDetail</class>
+        <class>vn.edu.crave.model.entity.OrderDetailOption</class>
+        <class>vn.edu.crave.model.entity.OrderStatusHistory</class>
+        <class>vn.edu.crave.model.entity.Payment</class>
+        <class>vn.edu.crave.model.entity.PayosPaymentLink</class>
+        <class>vn.edu.crave.model.entity.Category</class>
+        <class>vn.edu.crave.model.entity.Food</class>
+        <class>vn.edu.crave.model.entity.FoodOption</class>
+        <class>vn.edu.crave.model.entity.Cart</class>
+        <class>vn.edu.crave.model.entity.CartItem</class>
+        <class>vn.edu.crave.model.entity.CartItemOption</class>
+        <class>vn.edu.crave.model.entity.Promotion</class>
+        <exclude-unlisted-classes>false</exclude-unlisted-classes>
+        <properties>
+            <property name="hibernate.hbm2ddl.auto" value="validate"/>
+            <property name="hibernate.show_sql" value="false"/>
+            <property name="hibernate.format_sql" value="true"/>
+            <property name="hibernate.jdbc.time_zone" value="Asia/Ho_Chi_Minh"/>
+        </properties>
+    </persistence-unit>
+</persistence>

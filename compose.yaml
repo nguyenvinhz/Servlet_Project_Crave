@@ -33,7 +33,7 @@ services:
       - "${CRAVE_HTTP_PORT:-8080}:8080"
     volumes:
       - type: bind
-        source: ./backend/target/crave.war
+        source: ./target/crave.war
         target: /usr/local/tomcat/webapps/crave.war
         read_only: true
         bind:

@@ -13,35 +13,40 @@ cung cấp; được dùng JSON hoặc SDK khi cần. Các tích hợp này vẫ
 ## Cấu trúc
 
 ```text
-backend/
-  pom.xml
-  src/main/java/com/foodordering/
-    servlet/       Servlet hiển thị JSP và xử lý form
-    dao/           Các lớp JPA cụ thể, không tách interface/Impl
-    service/       Nghiệp vụ và transaction
-    entity/        Entity JPA
-    dto/           Bean dữ liệu form và hiển thị JSP
-    filter/        UTF-8, session, phân quyền và kiểm tra nguồn gửi form
-    config/        JPA/HikariCP và cấu hình tích hợp
-    security/      Tài khoản trong HttpSession
-    mail/          Gửi mã OTP qua SMTP
-    gateway/       payOS, Photon GeoJSON và HTTP ảnh bản đồ
-    validator/, enums/, exception/, utils/
-  src/main/resources/META-INF/persistence.xml
-  src/test/java/
-  src/dev/java/    Launcher Tomcat và công cụ tạo quản trị viên
-frontend/
-  WEB-INF/views/  JSP và các thành phần giao diện dùng chung
-  WEB-INF/web.xml
-  assets/         CSS, JavaScript, font, ảnh và Leaflet
-  index.jsp
-database/         Schema, seed và migration
-scripts/dev/      Chạy local, chọn JDK và tạo tài khoản quản trị
-tests/            Kiểm thử trình duyệt, HTTP và deploy
-docs/             Kiến trúc, cấu hình và báo cáo
+pom.xml               File cấu hình Maven WAR duy nhất (packaging: war)
+src/main/
+  java/vn/edu/crave/
+    controller/       Controller: Servlet hiển thị JSP và xử lý form (account, menu, cart, order, payment, admin)
+    model/
+      entity/         Entity JPA (Customer, Cart, CustomerOrder, Payment, Food, ...)
+      dao/            Các lớp DAO thao tác database (AccountDAO, CartDAO, OrderDAO, ...)
+      service/        Nghiệp vụ và transaction (AccountService, CartService, OrderService, ...)
+      form/           Bean dữ liệu form request đầu vào
+      viewmodel/      Bean dữ liệu chuẩn bị cho JSP
+      validator/      Kiểm tra hợp lệ dữ liệu
+      enums/          Enum trạng thái, vai trò
+    filter/           UTF-8, session, phân quyền và kiểm tra nguồn gửi form
+    config/           JPA/HikariCP và cấu hình tích hợp
+    security/         Tài khoản trong HttpSession, băm mật khẩu
+    integration/      payOS, Photon GeoJSON và HTTP ảnh bản đồ
+    exception/, util/
+  resources/
+    META-INF/persistence.xml
+    simplelogger.properties
+  webapp/             Toàn bộ nguồn webapp (web root của WAR)
+    WEB-INF/views/    JSP và các thành phần giao diện dùng chung
+    WEB-INF/web.xml
+    assets/           CSS, JavaScript, font, ảnh và Leaflet
+    index.jsp
+src/test/java/        Kiểm thử đơn vị và tích hợp (vn.edu.crave.*)
+src/dev/java/         Launcher Tomcat và công cụ tạo quản trị viên (profile dev)
+database/             Schema, seed và migration
+scripts/dev/          Chạy local, chọn JDK và tạo tài khoản quản trị
+tests/                Kiểm thử trình duyệt, HTTP và deploy
+docs/                 Kiến trúc, cấu hình và báo cáo
 ```
 
-Maven lấy `frontend/` làm web root của WAR. CSS, font, ảnh và kiểu giao diện hiện tại
+Maven đóng gói toàn bộ `src/main/webapp/` làm web root của file WAR `target/crave.war`. CSS, font, ảnh và kiểu giao diện hiện tại
 được giữ nguyên; JS/JSP chuyển cách tải dữ liệu sang form và HTML từ Servlet.
 Bản đồ giao hàng và kiểm tra trạng thái QR nhận các đoạn HTML do JSP render.
 
@@ -57,7 +62,7 @@ Cần JDK 17 hoặc 21, Maven, MySQL 8+ và Tomcat 10.1+.
 3. Build và kiểm thử:
 
    ```powershell
-   mvn -f backend/pom.xml -Pdev verify
+   mvn -Pdev verify
    ```
 
 4. Chạy Tomcat local:
@@ -67,7 +72,7 @@ Cần JDK 17 hoặc 21, Maven, MySQL 8+ và Tomcat 10.1+.
    ```
 
    Linux/macOS: `bash scripts/dev/run.sh 8081`.
-   Hoặc deploy `backend/target/crave.war` lên Tomcat của bạn.
+   Hoặc deploy `target/crave.war` lên Tomcat của bạn.
 
    Có thể chạy WAR bằng Docker với `docker compose --profile production up -d`
    sau khi file WAR đã tồn tại. Compose mặc định tiếp tục chỉ chạy MySQL.
@@ -76,7 +81,7 @@ Mở `http://localhost:8081/crave/menu`.
 `GET /crave/health` trả `text/plain` với `application=UP` và `database=UP`
 khi database hoạt động; còn giữ alias `/api/health` cho cấu hình deploy cũ.
 Dừng máy chủ local trước khi chạy `mvn clean`, vì dữ liệu Tomcat phát triển nằm
-trong `backend/target/`.
+trong `target/`.
 
 Các biến database: `DB_URL`, `DB_USER`, `DB_PASSWORD`,
 `DB_POOL_MAX_SIZE`, `DB_POOL_MIN_IDLE`, `DB_CONNECTION_TIMEOUT_MS`,
