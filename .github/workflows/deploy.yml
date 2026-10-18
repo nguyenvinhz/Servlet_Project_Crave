@@ -3,24 +3,29 @@ name: CI/CD - main to EC2
 on:
   push:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
 
-# Chạy tuần tự các lần build/deploy, giữ lần deploy đang chạy đến hết.
+defaults:
+  run:
+    shell: bash
+
+# Serialize production releases, including manual runs from main.
 concurrency:
-  group: crave-production-${{ github.ref }}
+  group: crave-production
   cancel-in-progress: false
 
 jobs:
   ci:
     name: CI
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main'
     uses: ./.github/workflows/ci.yml
 
   deploy:
     name: Deploy EC2
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.ci.result == 'success'
+    if: github.ref == 'refs/heads/main' && needs.ci.result == 'success'
     needs: ci
     # Only trusted main deployments use the production runner. PR CI is hosted.
     runs-on: [self-hosted, linux, x64, crave-production]
@@ -31,8 +36,8 @@ jobs:
       COMPOSE_FILE: ${{ vars.EC2_COMPOSE_FILE || 'compose.yaml' }}
       APP_SERVICE: ${{ vars.EC2_APP_SERVICE || 'app' }}
       DB_SERVICE: ${{ vars.EC2_DB_SERVICE || 'mysql' }}
-      HEALTH_URL: ${{ vars.EC2_HEALTH_URL || 'http://127.0.0.1:8080/crave/api/health' }}
-      PAYOS_PUBLIC_BASE_URL: ${{ vars.PAYOS_PUBLIC_BASE_URL || 'http://15.134.39.86:8080/crave' }}
+      HEALTH_URL: ${{ vars.EC2_HEALTH_URL || 'http://127.0.0.1:8080/crave/health' }}
+      PAYOS_PUBLIC_BASE_URL: ${{ vars.PAYOS_PUBLIC_BASE_URL }}
       EMAIL_SMTP_HOST: ${{ vars.EMAIL_SMTP_HOST || 'smtp.gmail.com' }}
       EMAIL_SMTP_PORT: ${{ vars.EMAIL_SMTP_PORT || '587' }}
       EMAIL_SMTP_USERNAME: ${{ vars.EMAIL_SMTP_USERNAME || 'craveshopvn@gmail.com' }}
@@ -41,7 +46,7 @@ jobs:
       CRAVE_STORE_ADDRESS: ${{ vars.CRAVE_STORE_ADDRESS }}
       CRAVE_STORE_LATITUDE: ${{ vars.CRAVE_STORE_LATITUDE }}
       CRAVE_STORE_LONGITUDE: ${{ vars.CRAVE_STORE_LONGITUDE }}
-      CRAVE_GEOCODER_URL: ${{ vars.CRAVE_GEOCODER_URL }}
+      CRAVE_GEOCODER_URL: ${{ vars.CRAVE_GEOCODER_URL || 'https://photon.komoot.io/api/' }}
 
     steps:
       - name: Kiểm tra runner production
@@ -66,12 +71,18 @@ jobs:
       - name: Deploy and check application health
         env:
           WAR_SOURCE: ${{ runner.temp }}/crave-release-${{ github.run_id }}-${{ github.run_attempt }}/crave.war
+          EXPECTED_WAR_SHA256: ${{ needs.ci.outputs.war-sha256 }}
           PAYOS_CLIENT_ID: ${{ secrets.PAYOS_CLIENT_ID }}
           PAYOS_API_KEY: ${{ secrets.PAYOS_API_KEY }}
           PAYOS_CHECKSUM_KEY: ${{ secrets.PAYOS_CHECKSUM_KEY }}
           EMAIL_SMTP_PASSWORD: ${{ secrets.EMAIL_SMTP_PASSWORD }}
           EMAIL_OTP_SECRET: ${{ secrets.EMAIL_OTP_SECRET }}
-        run: bash scripts/deploy-ec2.sh "$WAR_SOURCE"
+        run: |
+          set -euo pipefail
+          [[ "$EXPECTED_WAR_SHA256" =~ ^[a-f0-9]{64}$ ]] || { echo 'CI did not provide a valid WAR checksum.' >&2; exit 1; }
+          actual_sha256=$(sha256sum "$WAR_SOURCE")
+          [[ "${actual_sha256%% *}" == "$EXPECTED_WAR_SHA256" ]] || { echo 'Downloaded WAR does not match the tested artifact.' >&2; exit 1; }
+          bash scripts/deploy-ec2.sh "$WAR_SOURCE"
 
       - name: Register payOS webhook for the public application
         env:
@@ -82,5 +93,7 @@ jobs:
       - name: Record deployment
         env:
           DEPLOY_COMMIT: ${{ github.sha }}
+          DEPLOY_WAR_SHA256: ${{ needs.ci.outputs.war-sha256 }}
         run: |
           printf 'Deployed commit `%s` to EC2. Health check passed; payOS webhook configured.\n' "$DEPLOY_COMMIT" >> "$GITHUB_STEP_SUMMARY"
+          printf 'Tested WAR SHA-256: `%s`\n' "$DEPLOY_WAR_SHA256" >> "$GITHUB_STEP_SUMMARY"

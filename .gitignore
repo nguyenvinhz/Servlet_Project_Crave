@@ -4,6 +4,12 @@ backend/target/
 .vscode/
 *.iml
 .env
+.env.*
+!.env.example
+# Live database dump is kept only for local development.
+/database/seed_live.sql
+# Generated IDE migration hooks are not application or deployment source.
+/.github/modernize/
 *.log
 node_modules/
 .runtime/

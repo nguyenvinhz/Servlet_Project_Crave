@@ -1,0 +1,19 @@
+<%@ page pageEncoding="UTF-8" %>
+<section class="card payos-payment" id="payosPayment" aria-labelledby="payosTitle" data-order-id="<c:out value='${order.orderId}'/>" data-pending="${not empty payos && (payos.status() == 'PENDING' || payos.status() == 'PROCESSING')}" data-paid="${not empty payos && payos.paymentStatus() == 'SUCCESS'}">
+    <h2 id="payosTitle">Thanh toán bằng mã QR</h2>
+    <p id="payosHint" class="payos-hint">Quét mã bằng ứng dụng ngân hàng hoặc ví hỗ trợ VietQR. Kiểm tra số tiền và nội dung trước khi xác nhận.</p>
+    <p id="payosStatus" class="payos-status" role="status" aria-live="polite"><c:choose><c:when test="${not empty payos}"><c:out value="${payos.paymentStatus() == 'SUCCESS' ? 'Đã thanh toán.' : payos.status() == 'PENDING' ? 'Đang chờ thanh toán.' : payos.status()}"/></c:when><c:otherwise><c:out value="${empty payosError ? 'Chưa tạo mã thanh toán.' : payosError}"/></c:otherwise></c:choose></p>
+    <div id="payosDetails" class="payos-details" ${empty payos ? 'hidden' : ''}>
+        <div class="payos-qr-wrap"><img id="payosQr" class="payos-qr" width="240" height="240" alt="Mã QR chuyển khoản cho đơn hàng" ${empty payos || empty payos.qrCode() ? 'hidden' : ''} <c:if test="${not empty payos && not empty payos.qrCode()}">src="<c:url value='/payos/qr'><c:param name='orderId' value='${order.orderId}'/></c:url>"</c:if>><p id="payosQrError" class="payos-hint" hidden></p></div>
+        <dl class="payos-bank-details">
+            <div><dt>Số tiền</dt><dd id="payosAmount" class="payos-amount"><c:if test="${not empty payos}"><fmt:formatNumber value="${payos.amount()}" maxFractionDigits="0"/> đ</c:if></dd></div>
+            <div><dt>Số tài khoản</dt><dd id="payosAccountNumber"><c:if test="${not empty payos}"><c:out value="${payos.accountNumber()}"/></c:if></dd></div>
+            <div><dt>Chủ tài khoản</dt><dd id="payosAccountName"><c:if test="${not empty payos}"><c:out value="${payos.accountName()}"/></c:if></dd></div>
+            <div><dt>Nội dung chuyển khoản</dt><dd id="payosDescription"><c:if test="${not empty payos}"><c:out value="${payos.description()}"/></c:if></dd></div>
+        </dl>
+    </div>
+    <div id="payosActions" class="payos-actions">
+        <c:if test="${not empty payos && not empty payos.checkoutUrl()}"><a id="payosCheckoutLink" class="button primary" href="<c:out value='${payos.checkoutUrl()}'/>" target="_blank" rel="noopener noreferrer">Mở trang thanh toán</a></c:if>
+        <c:if test="${empty payos}"><form action="<c:url value='/payos/create'/>" method="post" style="margin:0"><input type="hidden" name="orderId" value="<c:out value='${order.orderId}'/>"><button id="payosRetry" class="button outline" type="submit">Thử lại</button></form></c:if>
+    </div>
+</section>
