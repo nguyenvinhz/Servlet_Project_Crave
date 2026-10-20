@@ -159,7 +159,7 @@ docker compose up -d mysql
 docker compose ps
 ```
 
-Chờ MySQL chuyển sang trạng thái `healthy`. Khi khởi động lần đầu với volume trống, Compose tự động chạy `database/schema.sql` và `database/seed.sql`.
+Chờ MySQL chuyển sang trạng thái `healthy`. Khi khởi động lần đầu với volume trống, Compose tự động chạy `database/schema.sql` và bộ dữ liệu mẫu `database/seed-ci.sql`. CI dùng cùng bộ dữ liệu này để các bản dump trong `database/seed.sql` không làm thay đổi dữ liệu kiểm thử.
 
 > `schema.sql` xóa và tạo lại cơ sở dữ liệu `crave`. Chỉ dùng để khởi tạo môi trường mới hoặc môi trường thử nghiệm có thể xóa dữ liệu. Với cơ sở dữ liệu đang có dữ liệu cần giữ, hãy xem và áp dụng các script phù hợp trong [`database/migrations/`](database/migrations/).
 

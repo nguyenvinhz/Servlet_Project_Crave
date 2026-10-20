@@ -77,8 +77,9 @@ jobs:
         run: |
           docker exec -i -e MYSQL_PWD="$DB_PASSWORD" "$MYSQL_CONTAINER_ID" \
             mysql --user=root --default-character-set=utf8mb4 < database/schema.sql
+          # Keep fixture data compatible with schema.sql when database exports change.
           docker exec -i -e MYSQL_PWD="$DB_PASSWORD" "$MYSQL_CONTAINER_ID" \
-            mysql --user=root --default-character-set=utf8mb4 < database/seed.sql
+            mysql --user=root --default-character-set=utf8mb4 --database=crave < database/seed-ci.sql
           printf 'DB_URL=jdbc:mysql://127.0.0.1:%s/crave?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Ho_Chi_Minh&characterEncoding=UTF-8\n' \
             "$MYSQL_PORT" >> "$GITHUB_ENV"
 

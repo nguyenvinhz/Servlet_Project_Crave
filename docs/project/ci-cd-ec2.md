@@ -20,6 +20,8 @@ push/merge main hoặc Run workflow (main)
 - [ci.yml](../../.github/workflows/ci.yml) chạy JDK 17, MySQL 8.4 tạm thời,
   Maven `-Pdev clean verify`, các assertion service, kiểm tra JavaScript,
   deploy/rollback fixture, HTTP và browser smoke dùng form thật.
+  Database CI được nạp từ `database/schema.sql` và `database/seed-ci.sql`,
+  bộ dữ liệu mẫu tương thích với schema và độc lập với các bản dump local.
   Ba migration production được áp lại hai lần trong database CI để kiểm tra
   khả năng chạy lặp. Schema/seed chỉ tạo database CI tạm thời.
 - Chỉ sau các bước trên, CI tính SHA-256 của WAR và xuất artifact `crave-war`
