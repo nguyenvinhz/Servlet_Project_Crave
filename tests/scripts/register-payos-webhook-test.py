@@ -252,7 +252,7 @@ class WebhookRegistrationTest(unittest.TestCase):
 
     def test_invalid_base_urls_fail_before_network_and_are_not_printed(self):
         urls = [
-            "", "http://", "//example.com/crave", "ftp://example.com/crave", "http://example.com",
+            "", "http://", "//example.com/crave", "ftp://example.com/crave", "http://example.com//",
             "http://example.com/not-crave", "http://example.com/crave?token=fake-api-key", "http://example.com/crave#private-response",
             "http://secret-user:secret-pass@example.com/crave", "http://@example.com/crave", "http://localhost:8080/crave",
             "http://localhost.:8080/crave", "http://app.localhost/crave", "http://127.0.0.1/crave", "http://[::1]/crave",
@@ -269,9 +269,21 @@ class WebhookRegistrationTest(unittest.TestCase):
                 self.assert_sanitized(str(error.exception))
 
     def test_accepts_public_http_and_https_base_urls(self):
-        for base in ("http://15.134.39.86:8080/crave", "http://15.134.39.86:8080/crave/", "https://crave.example.com/crave"):
+        for base in ("http://15.134.39.86:8080/crave", "http://15.134.39.86:8080/crave/", "https://crave.example.com/crave",
+                     "https://craveshop.duckdns.org", "https://craveshop.duckdns.org/", "http://15.134.39.86:8080"):
             with self.subTest(base=base):
                 self.assertEqual(MODULE.webhook_url(base), base.rstrip("/") + "/api/payos/webhook")
+
+    def test_registers_root_context_callback_without_crave_prefix(self):
+        callback = "https://craveshop.duckdns.org/api/payos/webhook"
+        for base in ("https://craveshop.duckdns.org", "https://craveshop.duckdns.org/"):
+            with self.subTest(base=base):
+                opener = FixtureOpener(Response(json.dumps({"code": "00", "data": {"webhookUrl": callback}}).encode()))
+                actual, delays = self.register(opener, {**FAKE_ENVIRONMENT, "PAYOS_PUBLIC_BASE_URL": base})
+                self.assertEqual(actual, callback)
+                self.assertEqual(delays, [])
+                self.assertEqual(len(opener.requests), 1)
+                self.assertEqual(json.loads(opener.requests[0][0].data), {"webhookUrl": callback})
 
     def test_cli_failure_and_success_output_are_sanitized(self):
         for error, expected in ((MODULE.RegistrationError("payOS rejected webhook registration."), 1), (None, 0)):

@@ -51,8 +51,8 @@ def webhook_url(public_base_url):
         raise RegistrationError("PAYOS_PUBLIC_BASE_URL is invalid.") from None
     if (parsed.scheme not in ("http", "https") or not hostname
             or parsed.username is not None or parsed.password is not None
-            or parsed.path not in ("/crave", "/crave/") or port == 0):
-        raise RegistrationError("PAYOS_PUBLIC_BASE_URL must be a public HTTP(S) URL with context path /crave and no userinfo.")
+            or parsed.path not in ("", "/", "/crave", "/crave/") or port == 0):
+        raise RegistrationError("PAYOS_PUBLIC_BASE_URL must be a public HTTP(S) URL for root or /crave with no userinfo.")
     hostname = hostname.rstrip(".").lower()
     if hostname == "localhost" or hostname.endswith((".localhost", ".local")):
         raise RegistrationError("PAYOS_PUBLIC_BASE_URL must be publicly reachable.")

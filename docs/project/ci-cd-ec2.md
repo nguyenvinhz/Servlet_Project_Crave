@@ -39,6 +39,11 @@ khi triển khai thật.
 
 ## EC2 đang chạy
 
+Để dùng `https://craveshop.duckdns.org` và bỏ tiền tố `/crave`, xem
+[hướng dẫn tên miền và HTTPS](domain-https.md). Script deploy hỗ trợ `ROOT.war`
+với health `/health` và URL payOS ở gốc; cách triển khai `/crave` dưới đây vẫn
+được giữ làm mặc định.
+
 Không ghi đè `.env`, compose hoặc volume database đang dùng. Script
 [deploy-ec2.sh](../../scripts/deploy-ec2.sh) đọc compose ở `DEPLOY_PATH`,
 bổ sung biến payOS/SMTP/giao hàng qua `.payos.compose.json` riêng và chỉ recreate

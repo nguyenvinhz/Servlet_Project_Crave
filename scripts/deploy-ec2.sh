@@ -52,7 +52,12 @@ war_path=$war_directory/crave.war
 [[ $artifact != "$war_path" ]] || fail 'Stage the incoming WAR outside the deployed WAR path.'
 
 health_url=${HEALTH_URL:-http://127.0.0.1:8080/crave/health}
-[[ $health_url =~ ^http://(127\.0\.0\.1|localhost):[0-9]+/crave/(api/)?health$ ]] || fail 'HEALTH_URL must address the local /crave/health endpoint or its legacy alias.'
+[[ $health_url =~ ^http://(127\.0\.0\.1|localhost):[0-9]+(/crave)?/(api/)?health$ ]] || fail 'HEALTH_URL must address a local root or /crave health endpoint.'
+application_context=${BASH_REMATCH[2]}
+war_target=/usr/local/tomcat/webapps/crave.war
+if [[ -z $application_context ]]; then
+  war_target=/usr/local/tomcat/webapps/ROOT.war
+fi
 health_timeout=${HEALTH_TIMEOUT_SECONDS:-180}
 health_interval=${HEALTH_INTERVAL_SECONDS:-5}
 [[ $health_timeout =~ ^[1-9][0-9]*$ && $health_interval =~ ^[1-9][0-9]*$ ]] || fail 'Health timeout and interval must be positive integers.'
@@ -116,7 +121,7 @@ recreate_app() {
 wait_for_health() {
   local rollback=${1:-false} deadline=$((SECONDS + health_timeout)) response endpoint
   local endpoints=("$health_url")
-  if [[ $rollback == true && $health_url == */crave/health ]]; then
+  if [[ $rollback == true && $health_url != */api/health ]]; then
     endpoints+=("${health_url%/health}/api/health")
   fi
   while (( SECONDS < deadline )); do
@@ -181,7 +186,7 @@ trap 'exit 143' TERM
 candidate_file=$(mktemp "$deploy_root/.payos-candidate.XXXXXX")
 # JSON is a valid Compose YAML document. Escape dollar signs to disable interpolation;
 # no credential ever appears in a command argument, generated log, or base .env.
-python3 - "$service" "$candidate_file" <<'PY'
+python3 - "$service" "$candidate_file" "$application_context" <<'PY'
 import ipaddress, json, os, re, sys
 from urllib.parse import urlsplit
 
@@ -205,12 +210,14 @@ try:
     valid = (
         bool(raw_url) and len(raw_url) <= 2048 and parsed.scheme in ("http", "https")
         and bool(host) and parsed.username is None and parsed.password is None
-        and not parsed.query and not parsed.fragment and parsed.path in ("/crave", "/crave/")
+        and not parsed.query and not parsed.fragment and parsed.path in ("", "/", "/crave", "/crave/")
         and host not in ("localhost", "localhost.localdomain") and not host.endswith(".localhost")
         and not host.endswith(".local") and (port is None or 1 <= port <= 65535)
     )
     if not valid:
-        fail("PAYOS_PUBLIC_BASE_URL must be a public HTTP(S) URL for /crave.")
+        fail("PAYOS_PUBLIC_BASE_URL must be a public HTTP(S) URL for root or /crave.")
+    if parsed.path.rstrip("/") != sys.argv[3]:
+        fail("PAYOS_PUBLIC_BASE_URL context must match HEALTH_URL.")
     try:
         address = ipaddress.ip_address(host)
     except ValueError:
@@ -294,11 +301,11 @@ try:
     valid = any(
         volume.get("type") == "bind"
         and os.path.realpath(volume.get("source", "")) == os.path.realpath(sys.argv[2])
-        and volume.get("target") == "/usr/local/tomcat/webapps/crave.war"
+        and volume.get("target") == sys.argv[5]
         for volume in service.get("volumes", [])
     )
     if not valid:
-        sys.exit("App service must bind crave.war to /usr/local/tomcat/webapps/crave.war.")
+        sys.exit("App service must bind crave.war to " + sys.argv[5] + " to match HEALTH_URL.")
     if not services.get(sys.argv[3]):
         sys.exit("The existing database service is missing from Compose.")
     with open(sys.argv[4], encoding="utf-8") as source:
@@ -309,7 +316,7 @@ try:
         sys.exit("Compose must pass all production payment and email settings to the app.")
 except (ValueError, KeyError, TypeError, AttributeError, OSError):
     sys.exit("Cannot validate production Compose configuration.")
-' "$service" "$war_path" "$db_service" "$candidate_file"
+' "$service" "$war_path" "$db_service" "$candidate_file" "$war_target"
 
 # The old WAR keeps serving while this idempotent, additive migration runs.
 # The password is read inside the existing DB container, not passed in argv or runner logs.

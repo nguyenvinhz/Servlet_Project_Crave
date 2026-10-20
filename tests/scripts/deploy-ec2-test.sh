@@ -172,7 +172,9 @@ cat > "$test_root/bin/curl" <<'SH'
 set -Eeuo pipefail
 printf '%s\n' "$*" >> "$TEST_CASE_DIRECTORY/curl.calls"
 [[ "$*" == '--fail --silent --show-error --connect-timeout 2 --max-time 5 http://127.0.0.1:8080/crave/health' ||
-   "$*" == '--fail --silent --show-error --connect-timeout 2 --max-time 5 http://127.0.0.1:8080/crave/api/health' ]] || exit 95
+   "$*" == '--fail --silent --show-error --connect-timeout 2 --max-time 5 http://127.0.0.1:8080/crave/api/health' ||
+   "$*" == '--fail --silent --show-error --connect-timeout 2 --max-time 5 http://127.0.0.1:8080/health' ||
+   "$*" == '--fail --silent --show-error --connect-timeout 2 --max-time 5 http://127.0.0.1:8080/api/health' ]] || exit 95
 count=0
 [[ ! -f $TEST_CASE_DIRECTORY/recreate.count ]] || read -r count < "$TEST_CASE_DIRECTORY/recreate.count"
 if [[ $TEST_LEGACY_ROLLBACK == 1 && $count != 1 && ${@: -1} != */api/health ]]; then
@@ -280,6 +282,20 @@ PY
   export HEALTH_URL=http://127.0.0.1:8080/crave/health HEALTH_TIMEOUT_SECONDS=1 HEALTH_INTERVAL_SECONDS=1
   export GITHUB_WORKSPACE="$test_root/workspace"
   incoming_war=$case_directory/incoming.war
+}
+
+use_root_context() {
+  python3 - "$deploy_directory/compose.yaml" <<'PY'
+import json, sys
+with open(sys.argv[1], encoding="utf-8") as source:
+    config = json.load(source)
+config["services"]["app"]["volumes"][0]["target"] = "/usr/local/tomcat/webapps/ROOT.war"
+with open(sys.argv[1], "w", encoding="utf-8") as target:
+    json.dump(config, target)
+PY
+  cp -- "$deploy_directory/compose.yaml" "$case_directory/reference/compose.yaml"
+  export HEALTH_URL=http://127.0.0.1:8080/health
+  export PAYOS_PUBLIC_BASE_URL=https://crave-fixture.example
 }
 
 run_deploy() {
@@ -415,6 +431,75 @@ same_file "$incoming_war" "$deploy_directory/backend/target/crave.war"
 assert_recreates 1
 contains_log 'Deployment succeeded.'
 pass_case
+
+new_case root-context-success
+use_root_context
+run_deploy 0
+same_file "$incoming_war" "$deploy_directory/backend/target/crave.war"
+assert_backup
+assert_recreates 1
+assert_payos_overlay
+assert_migration_before_recreation
+grep -Fq 'http://127.0.0.1:8080/health' "$case_directory/curl.calls" || fail 'Root deployment did not check root health.'
+pass_case
+
+new_case root-context-health-alias
+use_root_context
+export HEALTH_URL=http://127.0.0.1:8080/api/health
+run_deploy 0
+assert_recreates 1
+assert_payos_overlay
+pass_case
+
+new_case root-context-trailing-slash-normalization
+use_root_context
+export PAYOS_PUBLIC_BASE_URL=https://crave-fixture.example/
+export TEST_EXPECTED_PUBLIC_BASE_URL=https://crave-fixture.example
+run_deploy 0
+assert_payos_overlay
+assert_migration_before_recreation
+pass_case
+
+new_case root-context-rollback
+use_root_context
+export TEST_HEALTH=database-down TEST_LEGACY_ROLLBACK=1
+run_deploy 1
+assert_old_war
+assert_backup
+assert_recreates 2
+assert_recreated_wars "$incoming_war" "$case_directory/reference/old.war"
+contains_log 'Rollback completed; the previous application is healthy.'
+[[ ! -e $deploy_directory/.payos.compose.json ]] || fail 'Root rollback retained a first-install payment override.'
+grep -Fq 'http://127.0.0.1:8080/api/health' "$case_directory/curl.calls" || fail 'Root rollback did not check the legacy root health alias.'
+assert_migration_before_recreation
+pass_case
+
+for mismatch in root-health-legacy-mount legacy-health-root-mount root-health-legacy-payment legacy-health-root-payment; do
+  new_case "context-mismatch-$mismatch"
+  case "$mismatch" in
+    root-health-legacy-mount)
+      export HEALTH_URL=http://127.0.0.1:8080/health PAYOS_PUBLIC_BASE_URL=https://crave-fixture.example ;;
+    legacy-health-root-mount)
+      use_root_context
+      export HEALTH_URL=http://127.0.0.1:8080/crave/health PAYOS_PUBLIC_BASE_URL=https://crave-fixture.example/crave ;;
+    root-health-legacy-payment)
+      use_root_context
+      export PAYOS_PUBLIC_BASE_URL=https://crave-fixture.example/crave ;;
+    legacy-health-root-payment)
+      export PAYOS_PUBLIC_BASE_URL=https://crave-fixture.example ;;
+  esac
+  run_deploy 1
+  assert_old_war
+  assert_recreates 0
+  [[ ! -e $case_directory/migration.sql ]] || fail 'Mismatched application contexts reached migration.'
+  [[ ! -e $case_directory/curl.calls ]] || fail 'Mismatched application contexts reached a health check.'
+  if [[ $mismatch == *mount ]]; then
+    contains_log 'to match HEALTH_URL.'
+  else
+    contains_log 'PAYOS_PUBLIC_BASE_URL context must match HEALTH_URL.'
+  fi
+  pass_case
+done
 
 new_case default-servlet-health-endpoint
 unset HEALTH_URL
@@ -810,7 +895,7 @@ for index in "${!invalid_base_urls[@]}"; do
   pass_case
 done
 
-new_case public-base-url-requires-application-context
+new_case public-base-url-must-match-legacy-application-context
 export PAYOS_PUBLIC_BASE_URL=https://payments-fixture.example
 run_deploy 1
 assert_old_war
