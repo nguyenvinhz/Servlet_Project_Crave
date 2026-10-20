@@ -206,7 +206,15 @@ Script thực hiện:
 
 Recreate Tomcat có gián đoạn ngắn và session hiện tại kết thúc. Migration bổ sung
 được giữ khi rollback; không xóa dữ liệu hoặc database. Nếu webhook đăng ký lỗi,
-workflow báo lỗi ở bước đó nhưng WAR đã khỏe vẫn chạy; sửa URL/keys rồi chạy lại.
+workflow báo lỗi ở bước đó nhưng WAR đã khỏe vẫn chạy. Summary ghi riêng trạng
+thái deploy và webhook kể cả khi bước webhook lỗi. Log đăng ký webhook phân loại
+lỗi mạng theo từng lần thử, không in khóa hay nội dung phản hồi. Dựa vào loại lỗi
+để sửa kết nối/cấu hình rồi chạy lại; không kết luận sai keys chỉ từ lỗi mạng.
+
+Script đăng ký webhook cho phép timeout 60 giây mỗi lần gọi và thử tối đa ba lần.
+payOS còn gửi callback mẫu tới ứng dụng trong bước xác minh URL; mức 60 giây
+phù hợp timeout mặc định của [SDK Python chính thức](https://github.com/payOSHQ/payos-lib-python/blob/main/src/payos/_client.py#L64-L66).
+Timeout này chỉ áp dụng cho script đăng ký webhook của CD.
 
 ## Chẩn đoán nhanh
 
@@ -221,8 +229,20 @@ workflow báo lỗi ở bước đó nhưng WAR đã khỏe vẫn chạy; sửa 
 | Permission denied | Quyền ghi thư mục deploy/target của tài khoản runner |
 | Migration lỗi | Service MySQL đang chạy, quyền root container; WAR cũ chưa bị thay |
 | Health lỗi | `docker compose --profile production logs --tail=100 app` |
-| Webhook lỗi | Public URL, cổng web/HTTPS và keys payOS |
+| Webhook lỗi HTTP hoặc bị từ chối | Public URL, cổng web/HTTPS và keys payOS |
+| Webhook lỗi timeout/DNS/TLS/kết nối | Kết nối HTTPS outbound từ runner EC2 tới `api-merchant.payos.vn:443`; xem loại lỗi từng lần thử |
 
 Không chạy `database/schema.sql` trên database đang có dữ liệu để sửa lỗi CD.
+Để kiểm tra kết nối từ chính runner mà không gửi khóa hoặc đổi webhook:
+
+```bash
+curl -I --connect-timeout 5 --max-time 15 -A 'CraveWebhookRegistrar/1.0' \
+  -w '\nHTTP=%{http_code} total=%{time_total}s\n' \
+  https://api-merchant.payos.vn/confirm-webhook
+```
+
+Lệnh HEAD này kiểm tra kết nối DNS/TCP/TLS/HTTP; phản hồi 4xx vẫn cho thấy đã
+kết nối tới máy chủ. Nó không xác nhận đăng ký webhook hoặc tính đúng của keys.
+
 Kiểm thử deploy/rollback nằm tại `tests/scripts/deploy-ec2-test.sh`; tất cả dữ liệu
 của fixture tách khỏi production.

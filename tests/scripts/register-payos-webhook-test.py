@@ -2,10 +2,13 @@
 """Exercise webhook registration with injected HTTP fixtures and fake keys only."""
 
 import contextlib
+import http.client
 import importlib.util
 import io
 import json
 from pathlib import Path
+import socket
+import ssl
 import unittest
 import unittest.mock
 import urllib.error
@@ -41,6 +44,20 @@ class Response(io.BytesIO):
 
 def confirmed():
     return Response(json.dumps({"code": "00", "data": {"webhookUrl": CALLBACK}}).encode())
+
+
+def network_failures():
+    private_message = "fake-client-id fake-api-key private-response https://secret-user:secret-pass@example.com"
+    return [
+        (TimeoutError(private_message), "timeout"),
+        (socket.gaierror(-2, private_message), "DNS lookup failed"),
+        (ssl.CertificateError(private_message), "TLS certificate verification failed"),
+        (ssl.SSLError(private_message), "TLS connection failed"),
+        (ConnectionError(private_message), "connection failed"),
+        (http.client.HTTPException(private_message), "HTTP protocol failure"),
+        (http.client.IncompleteRead(private_message.encode(), 100), "HTTP protocol failure"),
+        (OSError(private_message), "network failure"),
+    ]
 
 
 class FixtureOpener:
@@ -91,7 +108,7 @@ class WebhookRegistrationTest(unittest.TestCase):
             "user-agent": "CraveWebhookRegistrar/1.0",
         })
         self.assertEqual(json.loads(request.data), {"webhookUrl": CALLBACK})
-        self.assertEqual(timeout, 10)
+        self.assertEqual(timeout, 60)
         self.assertEqual(response.read_sizes, [MODULE.MAX_RESPONSE_BYTES + 1])
 
     def test_retries_429_then_500_only_three_attempts(self):
@@ -112,11 +129,67 @@ class WebhookRegistrationTest(unittest.TestCase):
     def test_network_failure_is_bounded_and_sanitized(self):
         opener = FixtureOpener(*[urllib.error.URLError("fake-api-key private-response") for _ in range(3)])
         delays = []
-        with self.assertRaises(MODULE.RegistrationError) as error:
+        stderr = io.StringIO()
+        with contextlib.redirect_stderr(stderr), self.assertRaises(MODULE.RegistrationError) as error:
             MODULE.register_webhook(FAKE_ENVIRONMENT, opener=opener, sleep=delays.append)
         self.assertEqual(len(opener.requests), 3)
         self.assertEqual(delays, [1, 2])
-        self.assert_sanitized(str(error.exception))
+        self.assertEqual(str(error.exception),
+            "Could not contact payOS after 3 attempts. Last failure: network failure.")
+        self.assertEqual(len(stderr.getvalue().splitlines()), 3)
+        self.assert_sanitized(stderr.getvalue() + str(error.exception))
+
+    def test_transport_categories_are_safe_for_direct_and_wrapped_errors(self):
+        for failure, category in network_failures():
+            for wrapped in (False, True):
+                with self.subTest(category=category, wrapped=wrapped):
+                    error = urllib.error.URLError(failure) if wrapped else failure
+                    opener = FixtureOpener(error, error, error)
+                    delays, stderr = [], io.StringIO()
+                    with contextlib.redirect_stderr(stderr), self.assertRaises(MODULE.RegistrationError) as raised:
+                        MODULE.register_webhook(FAKE_ENVIRONMENT, opener=opener, sleep=delays.append)
+                    self.assertEqual(len(opener.requests), 3)
+                    self.assertEqual(delays, [1, 2])
+                    self.assertEqual(stderr.getvalue().splitlines(), [
+                        "payOS request attempt " + str(attempt) + "/3 failed: " + category
+                        + " (request timeout: 60s)." for attempt in (1, 2, 3)
+                    ])
+                    self.assertEqual(str(raised.exception),
+                        "Could not contact payOS after 3 attempts. Last failure: " + category + ".")
+                    self.assert_sanitized(stderr.getvalue() + str(raised.exception))
+
+    def test_transport_failure_can_retry_successfully_without_leaking_details(self):
+        for failure, category in network_failures():
+            for wrapped in (False, True):
+                with self.subTest(category=category, wrapped=wrapped):
+                    error = urllib.error.URLError(failure) if wrapped else failure
+                    opener = FixtureOpener(error, confirmed())
+                    stderr = io.StringIO()
+                    with contextlib.redirect_stderr(stderr):
+                        callback, delays = self.register(opener)
+                    self.assertEqual(callback, CALLBACK)
+                    self.assertEqual(delays, [1])
+                    self.assertEqual(len(opener.requests), 2)
+                    self.assertIn("attempt 1/3 failed: " + category, stderr.getvalue())
+                    self.assertEqual(len(stderr.getvalue().splitlines()), 1)
+                    self.assert_sanitized(stderr.getvalue())
+
+    def test_mixed_http_and_transport_failures_report_the_final_category(self):
+        opener = FixtureOpener(Response(b"private-response", 503),
+            urllib.error.URLError(socket.gaierror(-2, "fake-api-key private-response")),
+            TimeoutError("https://secret-user:secret-pass@example.com"))
+        delays, stderr = [], io.StringIO()
+        with contextlib.redirect_stderr(stderr), self.assertRaises(MODULE.RegistrationError) as error:
+            MODULE.register_webhook(FAKE_ENVIRONMENT, opener=opener, sleep=delays.append)
+        self.assertEqual(len(opener.requests), 3)
+        self.assertEqual(delays, [1, 2])
+        self.assertEqual(stderr.getvalue().splitlines(), [
+            "payOS request attempt 2/3 failed: DNS lookup failed (request timeout: 60s).",
+            "payOS request attempt 3/3 failed: timeout (request timeout: 60s).",
+        ])
+        self.assertEqual(str(error.exception),
+            "Could not contact payOS after 3 attempts. Last failure: timeout.")
+        self.assert_sanitized(stderr.getvalue() + str(error.exception))
 
     def test_http_retry_failure_is_bounded_and_sanitized(self):
         opener = FixtureOpener(*[Response(b"fake-client-id private-response", 500) for _ in range(3)])

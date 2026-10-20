@@ -69,6 +69,7 @@ jobs:
           path: ${{ runner.temp }}/crave-release-${{ github.run_id }}-${{ github.run_attempt }}
 
       - name: Deploy and check application health
+        id: deploy_application
         env:
           WAR_SOURCE: ${{ runner.temp }}/crave-release-${{ github.run_id }}-${{ github.run_attempt }}/crave.war
           EXPECTED_WAR_SHA256: ${{ needs.ci.outputs.war-sha256 }}
@@ -85,15 +86,23 @@ jobs:
           bash scripts/deploy-ec2.sh "$WAR_SOURCE"
 
       - name: Register payOS webhook for the public application
+        id: payos_webhook
         env:
           PAYOS_CLIENT_ID: ${{ secrets.PAYOS_CLIENT_ID }}
           PAYOS_API_KEY: ${{ secrets.PAYOS_API_KEY }}
         run: python3 scripts/register-payos-webhook.py
 
       - name: Record deployment
+        if: ${{ !cancelled() && steps.deploy_application.outcome == 'success' }}
         env:
           DEPLOY_COMMIT: ${{ github.sha }}
           DEPLOY_WAR_SHA256: ${{ needs.ci.outputs.war-sha256 }}
+          PAYOS_WEBHOOK_OUTCOME: ${{ steps.payos_webhook.outcome }}
         run: |
-          printf 'Deployed commit `%s` to EC2. Health check passed; payOS webhook configured.\n' "$DEPLOY_COMMIT" >> "$GITHUB_STEP_SUMMARY"
+          printf 'Deployed commit `%s` to EC2. Application health check passed.\n' "$DEPLOY_COMMIT" >> "$GITHUB_STEP_SUMMARY"
           printf 'Tested WAR SHA-256: `%s`\n' "$DEPLOY_WAR_SHA256" >> "$GITHUB_STEP_SUMMARY"
+          if [[ "$PAYOS_WEBHOOK_OUTCOME" == 'success' ]]; then
+            printf 'payOS webhook configured.\n' >> "$GITHUB_STEP_SUMMARY"
+          else
+            printf 'payOS webhook was not confirmed. The deployed application is still running; check the webhook registration step for the failure category.\n' >> "$GITHUB_STEP_SUMMARY"
+          fi

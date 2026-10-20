@@ -6,6 +6,8 @@ import ipaddress
 import json
 import os
 import re
+import socket
+import ssl
 import sys
 import time
 import urllib.error
@@ -14,7 +16,9 @@ import urllib.request
 
 
 PROVIDER_ENDPOINT = "https://api-merchant.payos.vn/confirm-webhook"
-REQUEST_TIMEOUT = 10
+# Confirmation includes a verification callback to the deployed application.
+# Match the official payOS Python SDK's 60-second default for that roundtrip.
+REQUEST_TIMEOUT = 60
 MAX_ATTEMPTS = 3
 MAX_RESPONSE_BYTES = 64 * 1024
 
@@ -121,6 +125,24 @@ def _send(opener, request):
         raise _HttpStatusError(status) from None
 
 
+def _network_failure_category(error):
+    """Describe transport failures using only fixed labels, never exception text."""
+    reason = error.reason if isinstance(error, urllib.error.URLError) else error
+    if isinstance(reason, TimeoutError):
+        return "timeout"
+    if isinstance(reason, socket.gaierror):
+        return "DNS lookup failed"
+    if isinstance(reason, ssl.SSLCertVerificationError):
+        return "TLS certificate verification failed"
+    if isinstance(reason, ssl.SSLError):
+        return "TLS connection failed"
+    if isinstance(reason, ConnectionError):
+        return "connection failed"
+    if isinstance(reason, http.client.HTTPException):
+        return "HTTP protocol failure"
+    return "network failure"
+
+
 def register_webhook(environment=None, *, opener=None, sleep=time.sleep):
     """Confirm a callback URL; injected opener/sleep let tests avoid all live calls."""
     environment = os.environ if environment is None else environment
@@ -143,9 +165,14 @@ def register_webhook(environment=None, *, opener=None, sleep=time.sleep):
             retryable = error.status == 429 or 500 <= error.status <= 599
             if not retryable or attempt == MAX_ATTEMPTS:
                 raise RegistrationError("payOS webhook registration failed (HTTP " + str(error.status) + ").") from None
-        except (urllib.error.URLError, OSError, http.client.HTTPException):
+        except (urllib.error.URLError, OSError, http.client.HTTPException) as error:
+            category = _network_failure_category(error)
+            print("payOS request attempt " + str(attempt) + "/" + str(MAX_ATTEMPTS)
+                  + " failed: " + category + " (request timeout: " + str(REQUEST_TIMEOUT) + "s).",
+                  file=sys.stderr)
             if attempt == MAX_ATTEMPTS:
-                raise RegistrationError("Could not contact payOS after 3 attempts.") from None
+                raise RegistrationError("Could not contact payOS after " + str(MAX_ATTEMPTS)
+                                        + " attempts. Last failure: " + category + ".") from None
         else:
             _confirm_response(response, callback)
             return callback
