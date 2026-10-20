@@ -2,11 +2,11 @@ package vn.edu.crave.controller.account;
 
 import vn.edu.crave.model.form.LoginRequest;
 import vn.edu.crave.model.viewmodel.ProfileResponse;
-import vn.edu.crave.model.form.RegisterRequest;
 import vn.edu.crave.model.enums.AccountType;
 import vn.edu.crave.security.SessionAuth;
 import vn.edu.crave.model.service.AccountService;
 import vn.edu.crave.model.service.EmailVerificationService;
+import vn.edu.crave.model.service.EmailVerificationService.PendingRegistration;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServletRequest;
@@ -39,11 +39,11 @@ public class AuthServlet extends AccountBaseServlet {
         }
         try {
             if ("/auth/register/submit".equals(path)) {
+                PendingRegistration pending = RegistrationSession.require(request);
                 String code = request.getParameter("verificationCode");
                 EmailVerificationServlet.requireCode(code);
-                verification.register(new RegisterRequest(request.getParameter("fullName"),
-                        request.getParameter("email"), request.getParameter("phone"),
-                        request.getParameter("password"), request.getParameter("confirmPassword")), code);
+                verification.register(pending, code);
+                RegistrationSession.clearIfCurrent(request, pending);
                 response.sendRedirect(request.getContextPath() + "/auth/login?registered=1");
                 return;
             }
@@ -59,7 +59,6 @@ public class AuthServlet extends AccountBaseServlet {
             response.sendRedirect(destination == null ? request.getContextPath() + destination(user) : destination);
         } catch (Exception exception) {
             boolean registration = "/auth/register/submit".equals(path);
-            if (registration) request.setAttribute("otpRequested", true);
             if (!registration && exception instanceof vn.edu.crave.exception.AccountException account
                     && account.getStatusCode() == 401) {
                 response.setStatus(401);

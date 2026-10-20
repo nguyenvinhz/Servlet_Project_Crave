@@ -17,6 +17,8 @@ import vn.edu.crave.util.PasswordHasher;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
+import java.io.Serial;
+import java.io.Serializable;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
@@ -100,8 +102,28 @@ public class EmailVerificationService {
         }
     }
 
-    public ProfileResponse register(RegisterRequest request, String verificationCode) {
+    /** Validate and hash once, before the form moves to email verification. */
+    public PendingRegistration requestRegistrationCode(RegisterRequest request) {
         AccountService.Registration registration = accounts.prepareRegistration(request);
+        requestRegistrationCode(registration.email());
+        return new PendingRegistration(registration, clock.millis() + CODE_TTL_SECONDS * 1000L);
+    }
+
+    public PendingRegistration resendRegistrationCode(PendingRegistration pending) {
+        AccountService.Registration registration = requirePendingRegistration(pending);
+        requestRegistrationCode(registration.email());
+        return new PendingRegistration(registration, clock.millis() + CODE_TTL_SECONDS * 1000L);
+    }
+
+    public ProfileResponse register(PendingRegistration pending, String verificationCode) {
+        return registerPrepared(requirePendingRegistration(pending), verificationCode);
+    }
+
+    public ProfileResponse register(RegisterRequest request, String verificationCode) {
+        return registerPrepared(accounts.prepareRegistration(request), verificationCode);
+    }
+
+    private ProfileResponse registerPrepared(AccountService.Registration registration, String verificationCode) {
         byte[] key = key();
         try {
             VerificationResult<ProfileResponse> result = accountDAO.write(session -> {
@@ -117,6 +139,14 @@ public class EmailVerificationService {
         } finally {
             Arrays.fill(key, (byte) 0);
         }
+    }
+
+    private AccountService.Registration requirePendingRegistration(PendingRegistration pending) {
+        if (pending == null || clock.millis() >= pending.expiresAtMillis) {
+            throw new AccountException("REGISTRATION_EXPIRED",
+                    "Thông tin đăng ký đã hết hạn. Vui lòng nhập lại thông tin đăng ký và yêu cầu mã mới.", 400);
+        }
+        return pending.registration;
     }
 
     /** All valid email addresses receive the same acknowledgement and throttling, without account enumeration. */
@@ -369,6 +399,28 @@ public class EmailVerificationService {
     private static AccountException invalidCode() {
         return new AccountException("VERIFICATION_CODE_INVALID", "Mã xác thực không đúng, đã hết hạn hoặc đã sử dụng.", 400,
                 Map.of("verificationCode", "Vui lòng kiểm tra mã gồm 6 chữ số hoặc yêu cầu mã mới."));
+    }
+
+    /** Server-side session draft. Credentials stay inaccessible to form rendering and logging. */
+    public static final class PendingRegistration implements Serializable {
+        @Serial
+        private static final long serialVersionUID = 1L;
+
+        private final AccountService.Registration registration;
+        private final long expiresAtMillis;
+
+        private PendingRegistration(AccountService.Registration registration, long expiresAtMillis) {
+            this.registration = registration;
+            this.expiresAtMillis = expiresAtMillis;
+        }
+
+        public String getFullName() { return registration.fullName(); }
+        public String getEmail() { return registration.email(); }
+        public String getPhone() { return registration.phone(); }
+        public long getExpiresAtMillis() { return expiresAtMillis; }
+
+        @Override
+        public String toString() { return "PendingRegistration[credentials redacted]"; }
     }
 
     private record Delivery(String id, String email, String purpose, String code, String digest, boolean send) {

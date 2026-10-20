@@ -25,36 +25,47 @@
         <form id="registerForm" action="<c:url value='${otpRequested ? "/auth/register/submit" : "/auth/register/code"}'/>" method="post"
               data-code-url="<c:url value='/auth/register/code'/>">
             <input type="hidden" name="otpActive" value="${otpRequested ? 'true' : 'false'}">
-            <label for="fullName">Họ và tên</label>
-            <input id="fullName" name="fullName" type="text" value="<c:out value='${param.fullName}'/>" autocomplete="name"
-                   minlength="2" maxlength="100" placeholder="Nguyễn Văn An" required>
+            <c:choose>
+                <c:when test="${otpRequested}">
+                    <div class="registration-summary">
+                        <p class="field-hint">Họ và tên: <strong><c:out value="${registrationFullName}"/></strong></p>
+                        <p class="field-hint">Email: <strong><c:out value="${registrationEmail}"/></strong></p>
+                        <p class="field-hint">Số điện thoại: <strong><c:out value="${registrationPhone}"/></strong></p>
+                    </div>
+                </c:when>
+                <c:otherwise>
+                    <label for="fullName">Họ và tên</label>
+                    <input id="fullName" name="fullName" type="text" value="<c:out value='${not empty registrationFullName ? registrationFullName : param.fullName}'/>" autocomplete="name"
+                           minlength="2" maxlength="100" placeholder="Nguyễn Văn An" required>
 
-            <div class="field-grid">
-                <div>
-                    <label for="email">Email</label>
-                    <input id="email" name="email" type="email" value="<c:out value='${param.email}'/>" autocomplete="email"
-                           maxlength="100" placeholder="ban@example.com" required>
-                </div>
-                <div>
-                    <label for="phone">Số điện thoại</label>
-                    <input id="phone" name="phone" type="tel" value="<c:out value='${param.phone}'/>" autocomplete="tel"
-                           minlength="9" maxlength="15" pattern="\+?[0-9]{8,15}" inputmode="tel" placeholder="0901234567" required>
-                </div>
-            </div>
+                    <div class="field-grid">
+                        <div>
+                            <label for="email">Email</label>
+                            <input id="email" name="email" type="email" value="<c:out value='${not empty registrationEmail ? registrationEmail : param.email}'/>" autocomplete="email"
+                                   maxlength="100" placeholder="ban@example.com" required>
+                        </div>
+                        <div>
+                            <label for="phone">Số điện thoại</label>
+                            <input id="phone" name="phone" type="tel" value="<c:out value='${not empty registrationPhone ? registrationPhone : param.phone}'/>" autocomplete="tel"
+                                   minlength="9" maxlength="15" pattern="\+?[0-9]{8,15}" inputmode="tel" placeholder="0901234567" required>
+                        </div>
+                    </div>
 
-            <div class="field-grid">
-                <div>
-                    <label for="password">Mật khẩu</label>
-                    <input id="password" name="password" type="password" autocomplete="new-password"
-                           minlength="8" maxlength="72" aria-describedby="password-hint" required>
-                    <p id="password-hint" class="field-hint">Mật khẩu có từ 8 đến 72 ký tự.</p>
-                </div>
-                <div>
-                    <label for="confirmPassword">Nhập lại mật khẩu</label>
-                    <input id="confirmPassword" name="confirmPassword" type="password"
-                           autocomplete="new-password" minlength="8" maxlength="72" required>
-                </div>
-            </div>
+                    <div class="field-grid">
+                        <div>
+                            <label for="password">Mật khẩu</label>
+                            <input id="password" name="password" type="password" autocomplete="new-password"
+                                   minlength="8" maxlength="72" aria-describedby="password-hint" required>
+                            <p id="password-hint" class="field-hint">Mật khẩu có từ 8 đến 72 ký tự.</p>
+                        </div>
+                        <div>
+                            <label for="confirmPassword">Nhập lại mật khẩu</label>
+                            <input id="confirmPassword" name="confirmPassword" type="password"
+                                   autocomplete="new-password" minlength="8" maxlength="72" required>
+                        </div>
+                    </div>
+                </c:otherwise>
+            </c:choose>
 
             <fieldset id="otp-fields" class="otp-fields" data-otp-fields ${otpRequested ? '' : 'hidden disabled'}>
                 <legend>Xác nhận email</legend>
@@ -66,7 +77,7 @@
                 <p id="otp-hint" class="field-hint">Nhập 6 chữ số trong email. Mã có hiệu lực trong 10 phút.</p>
                 <div class="otp-actions">
                     <button id="otp-resend" class="button outline" type="submit" formaction="<c:url value='/auth/register/code'/>" formnovalidate>Gửi lại mã</button>
-                    <button id="otp-edit" class="button outline" type="button">Đổi email</button>
+                    <a class="button outline" href="<c:url value='/auth/register?restart=1'/>">Sửa thông tin đăng ký</a>
                 </div>
             </fieldset>
 

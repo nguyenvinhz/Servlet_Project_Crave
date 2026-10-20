@@ -8,12 +8,19 @@ hiện tại và mã gửi đến email của chính tài khoản đó.
 
 | Servlet (form POST) | Tham số form |
 |---|---|
-| `POST /auth/register/code` | `email` |
-| `POST /auth/register/submit` | Các trường đăng ký và `verificationCode` |
+| `POST /auth/register/code` | `fullName`, `email`, `phone`, `password`, `confirmPassword` lần đầu; `otpActive=true` khi gửi lại |
+| `POST /auth/register/submit` | `verificationCode`, `otpActive=true`; thông tin đăng ký lấy từ session |
 | `POST /auth/password/reset/code` | `email` |
 | `POST /auth/password/reset/submit` | `email`, `verificationCode`, `password`, `confirmPassword` |
 | `POST /auth/password/change/code` | `currentPassword`; cần đăng nhập |
 | `POST /auth/password/change/submit` | `verificationCode`, `password`, `confirmPassword`; cần đăng nhập |
+
+Đăng ký kiểm tra toàn bộ thông tin trước khi gửi mã lần đầu và lưu bản đăng ký
+tạm trong session với mật khẩu đã băm. Bước xác nhận chỉ hiển thị thông tin liên
+hệ và yêu cầu mã OTP; không trả mật khẩu hoặc bản băm về HTML. Gửi lại mã dùng
+bản đăng ký tạm. Liên kết `GET /auth/register?restart=1` xóa bản tạm và điền lại
+thông tin liên hệ để sửa; người dùng nhập lại mật khẩu khi bắt đầu đăng ký mới.
+Đăng ký thành công xóa bản tạm khỏi session.
 
 Mã có hiệu lực 10 phút, chỉ dùng một lần, gắn với email và mục đích. Mỗi mã
 cho phép tối đa năm lần nhập sai. Gửi lại cách nhau ít nhất 60 giây và tối đa

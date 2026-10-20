@@ -17,6 +17,7 @@ import vn.edu.crave.model.enums.EmployeeRole;
 import vn.edu.crave.exception.AccountException;
 import vn.edu.crave.model.service.AccountService;
 import vn.edu.crave.model.service.EmailVerificationService;
+import vn.edu.crave.model.service.EmailVerificationService.PendingRegistration;
 import jakarta.servlet.RequestDispatcher;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -101,38 +102,191 @@ class AccountBaseServletTest {
     }
 
     @Test
-    void registrationRequiresSixDigitCodeAndDoesNotCreateSession() throws Exception {
+    void registrationRequiresSixDigitCodeAndKeepsPendingRegistration() throws Exception {
         Exchange e = new Exchange("/auth/register/submit", null);
+        PendingRegistration pending = pendingRegistration();
+        e.sessionStarted = true;
+        e.sessionValues.put(RegistrationSession.ATTRIBUTE, pending);
         e.params.put("verificationCode", "123");
         new AuthServlet(accounts, verification).doPost(e.request, e.response);
         verifyNoInteractions(verification);
         verify(e.response).setStatus(400);
         assertEquals(true, e.requestValues.get("otpRequested"));
         e.assertForward("auth/register");
-        assertFalse(e.sessionStarted);
+        assertSame(pending, e.sessionValues.get(RegistrationSession.ATTRIBUTE));
     }
 
     @Test
-    void validRegistrationReadsPlainFormAndRedirectsToLogin() throws Exception {
+    void validRegistrationUsesSessionDraftAndIgnoresTamperedContactAndPassword() throws Exception {
         Exchange e = new Exchange("/auth/register/submit", null);
-        e.params.putAll(Map.of("fullName", "Nguyễn Văn An", "email", "an@example.com", "phone", "0901234567",
-                "password", "password123", "confirmPassword", "password123", "verificationCode", "012345"));
+        PendingRegistration pending = pendingRegistration();
+        e.sessionStarted = true;
+        e.sessionValues.put(RegistrationSession.ATTRIBUTE, pending);
+        e.params.putAll(Map.of("email", "other@example.com", "password", "different-password",
+                "verificationCode", "012345"));
         new AuthServlet(accounts, verification).doPost(e.request, e.response);
-        verify(verification).register(new RegisterRequest("Nguyễn Văn An", "an@example.com", "0901234567",
-                "password123", "password123"), "012345");
+        verify(verification).register(pending, "012345");
+        verify(verification, never()).register(any(RegisterRequest.class), anyString());
         verify(e.response).sendRedirect("/crave/auth/login?registered=1");
-        assertFalse(e.sessionStarted);
+        assertFalse(e.sessionValues.containsKey(RegistrationSession.ATTRIBUTE));
     }
 
     @Test
-    void requestingRegistrationCodeShowsExistingOtpFieldset() throws Exception {
+    void requestingRegistrationCodeStoresDraftAndRedirectsToAvoidPostingAgainOnRefresh() throws Exception {
+        Exchange e = new Exchange("/auth/register/code", null);
+        e.params.putAll(Map.of("fullName", "Nguyễn Văn An", "email", "an@example.com", "phone", "0901234567",
+                "password", "password123", "confirmPassword", "password123"));
+        RegisterRequest form = new RegisterRequest("Nguyễn Văn An", "an@example.com", "0901234567",
+                "password123", "password123");
+        PendingRegistration pending = pendingRegistration();
+        when(verification.requestRegistrationCode(form)).thenReturn(pending);
+        new EmailVerificationServlet(verification).doPost(e.request, e.response);
+        verify(verification).requestRegistrationCode(form);
+        assertSame(pending, e.sessionValues.get(RegistrationSession.ATTRIBUTE));
+        assertFalse(e.requestValues.containsKey("password"));
+        assertFalse(e.requestValues.containsKey("passwordHash"));
+        verify(e.response).sendRedirect("/crave/auth/register?codeSent=1");
+        verify(e.dispatcher, never()).forward(any(), any());
+    }
+
+    @Test
+    void registrationCanCompleteWithOnlyOtpInTheSubmittedForm() throws Exception {
+        Exchange e = new Exchange("/auth/register/submit", null);
+        PendingRegistration pending = pendingRegistration();
+        e.sessionStarted = true;
+        e.sessionValues.put(RegistrationSession.ATTRIBUTE, pending);
+        e.params.put("verificationCode", "012345");
+        new AuthServlet(accounts, verification).doPost(e.request, e.response);
+        verify(verification).register(pending, "012345");
+        verify(e.response).sendRedirect("/crave/auth/login?registered=1");
+        assertFalse(e.sessionValues.containsKey(RegistrationSession.ATTRIBUTE));
+    }
+
+    @Test
+    void resendingRegistrationCodeUsesStoredEmailWithoutPasswordFields() throws Exception {
+        Exchange e = new Exchange("/auth/register/code", null);
+        PendingRegistration pending = pendingRegistration();
+        PendingRegistration refreshed = pendingRegistration();
+        e.sessionStarted = true;
+        e.sessionValues.put(RegistrationSession.ATTRIBUTE, pending);
+        e.params.putAll(Map.of("otpActive", "true", "email", "other@example.com"));
+        when(verification.resendRegistrationCode(pending)).thenReturn(refreshed);
+        new EmailVerificationServlet(verification).doPost(e.request, e.response);
+        verify(verification).resendRegistrationCode(pending);
+        verify(verification, never()).requestRegistrationCode(any(RegisterRequest.class));
+        assertSame(refreshed, e.sessionValues.get(RegistrationSession.ATTRIBUTE));
+        verify(e.response).sendRedirect("/crave/auth/register?codeSent=1");
+    }
+
+    @Test
+    void rejectedRegistrationCodeKeepsDraftForRetry() throws Exception {
+        Exchange e = new Exchange("/auth/register/submit", null);
+        PendingRegistration pending = pendingRegistration();
+        e.sessionStarted = true;
+        e.sessionValues.put(RegistrationSession.ATTRIBUTE, pending);
+        e.params.put("verificationCode", "111111");
+        doThrow(new AccountException("VERIFICATION_INVALID", "Mã không đúng.", 400,
+                Map.of("verificationCode", "Kiểm tra mã trong email.")))
+                .when(verification).register(pending, "111111");
+        new AuthServlet(accounts, verification).doPost(e.request, e.response);
+        assertSame(pending, e.sessionValues.get(RegistrationSession.ATTRIBUTE));
+        assertEquals(true, e.requestValues.get("otpRequested"));
+        assertEquals("an@example.com", e.requestValues.get("registrationEmail"));
+        assertEquals(Map.of("verificationCode", "Kiểm tra mã trong email."), e.requestValues.get("fieldErrors"));
+        e.assertForward("auth/register");
+    }
+
+    @Test
+    void resendCooldownKeepsExistingDraftAndOtpForm() throws Exception {
+        Exchange e = new Exchange("/auth/register/code", null);
+        PendingRegistration pending = pendingRegistration();
+        e.sessionStarted = true;
+        e.sessionValues.put(RegistrationSession.ATTRIBUTE, pending);
+        e.params.put("otpActive", "true");
+        when(verification.resendRegistrationCode(pending))
+                .thenThrow(new AccountException("VERIFICATION_THROTTLED", "Vui lòng chờ để gửi lại mã.", 429));
+        new EmailVerificationServlet(verification).doPost(e.request, e.response);
+        assertSame(pending, e.sessionValues.get(RegistrationSession.ATTRIBUTE));
+        assertEquals(true, e.requestValues.get("otpRequested"));
+        verify(e.response).setStatus(429);
+        e.assertForward("auth/register");
+    }
+
+    @Test
+    void missingOrExpiredRegistrationReturnsToFirstStepWithoutCreatingSession() throws Exception {
+        for (boolean expired : List.of(false, true)) {
+            Exchange e = new Exchange("/auth/register/submit", null);
+            if (expired) {
+                PendingRegistration pending = pendingRegistration();
+                when(pending.getExpiresAtMillis()).thenReturn(System.currentTimeMillis() - 1);
+                e.sessionStarted = true;
+                e.sessionValues.put(RegistrationSession.ATTRIBUTE, pending);
+            }
+            e.params.put("verificationCode", "012345");
+            new AuthServlet(accounts, verification).doPost(e.request, e.response);
+            verifyNoInteractions(verification);
+            verify(e.response).setStatus(400);
+            assertEquals(false, e.requestValues.get("otpRequested"));
+            assertFalse(e.sessionValues.containsKey(RegistrationSession.ATTRIBUTE));
+            assertEquals(expired, e.sessionStarted);
+            e.assertForward("auth/register");
+        }
+    }
+
+    @Test
+    void refreshingRegistrationPageResumesOtpAndRestartClearsDraft() throws Exception {
+        for (boolean restart : List.of(false, true)) {
+            Exchange e = new Exchange("/auth/register", null);
+            PendingRegistration pending = pendingRegistration();
+            e.sessionStarted = true;
+            e.sessionValues.put(RegistrationSession.ATTRIBUTE, pending);
+            if (restart) e.params.put("restart", "1");
+            new AccountPageServlet(accounts).doGet(e.request, e.response);
+            assertEquals(!restart, e.requestValues.get("otpRequested"));
+            assertEquals("Nguyễn Văn An", e.requestValues.get("registrationFullName"));
+            assertEquals("an@example.com", e.requestValues.get("registrationEmail"));
+            assertEquals("0901234567", e.requestValues.get("registrationPhone"));
+            assertEquals(!restart, e.sessionValues.containsKey(RegistrationSession.ATTRIBUTE));
+            e.assertForward("auth/register");
+        }
+    }
+
+    @Test
+    void invalidInitialRegistrationDoesNotCreatePendingSession() throws Exception {
         Exchange e = new Exchange("/auth/register/code", null);
         e.params.put("email", "an@example.com");
+        when(verification.requestRegistrationCode(any(RegisterRequest.class)))
+                .thenThrow(new AccountException("VALIDATION_ERROR", "Vui lòng kiểm tra thông tin đăng ký.", 400));
         new EmailVerificationServlet(verification).doPost(e.request, e.response);
-        verify(verification).requestRegistrationCode("an@example.com");
-        assertEquals(true, e.requestValues.get("otpRequested"));
+        verify(e.response).setStatus(400);
+        assertEquals(false, e.requestValues.get("otpRequested"));
+        assertFalse(e.sessionStarted);
         e.assertForward("auth/register");
-        verify(e.response).setHeader("Cache-Control", "no-store");
+    }
+
+    @Test
+    void duplicateInitialCodeRequestDoesNotDiscardExistingDraftWhenThrottled() throws Exception {
+        Exchange e = new Exchange("/auth/register/code", null);
+        PendingRegistration pending = pendingRegistration();
+        e.sessionStarted = true;
+        e.sessionValues.put(RegistrationSession.ATTRIBUTE, pending);
+        e.params.put("email", "an@example.com");
+        when(verification.requestRegistrationCode(any(RegisterRequest.class)))
+                .thenThrow(new AccountException("VERIFICATION_RATE_LIMIT", "Vui lòng chờ để gửi lại mã.", 429));
+        new EmailVerificationServlet(verification).doPost(e.request, e.response);
+        assertSame(pending, e.sessionValues.get(RegistrationSession.ATTRIBUTE));
+        assertEquals(true, e.requestValues.get("otpRequested"));
+        assertEquals("an@example.com", e.requestValues.get("registrationEmail"));
+        e.assertForward("auth/register");
+    }
+
+    private static PendingRegistration pendingRegistration() {
+        PendingRegistration pending = mock(PendingRegistration.class);
+        when(pending.getFullName()).thenReturn("Nguyễn Văn An");
+        when(pending.getEmail()).thenReturn("an@example.com");
+        when(pending.getPhone()).thenReturn("0901234567");
+        when(pending.getExpiresAtMillis()).thenReturn(System.currentTimeMillis() + 600_000);
+        return pending;
     }
 
     @Test

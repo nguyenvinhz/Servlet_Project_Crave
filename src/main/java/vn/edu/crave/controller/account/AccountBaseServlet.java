@@ -12,6 +12,7 @@ import java.io.IOException;
 public abstract class AccountBaseServlet extends HttpServlet {
     protected void show(HttpServletRequest request, HttpServletResponse response, String page)
             throws ServletException, IOException {
+        if ("auth/register".equals(page)) RegistrationSession.prepareView(request);
         response.setHeader("Cache-Control", "no-store");
         request.setAttribute("pageTitle", switch (page) {
             case "auth/login" -> "Đăng nhập";

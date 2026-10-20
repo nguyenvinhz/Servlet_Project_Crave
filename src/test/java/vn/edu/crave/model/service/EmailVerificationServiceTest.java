@@ -14,6 +14,11 @@ import vn.edu.crave.model.dao.AccountDAO;
 import vn.edu.crave.util.PasswordHasher;
 import org.junit.jupiter.api.Test;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Instant;
@@ -71,6 +76,133 @@ class EmailVerificationServiceTest {
     private EmailVerificationService service() {
         return new EmailVerificationService(accountDAO, hasher,
                 (email, code, purpose) -> mail.add(new Mail(email, code, purpose)), clock, SECRET);
+    }
+
+    @Test
+    void pendingRegistrationHashesBeforeSendingAndSurvivesSessionSerializationWithoutPlaintextPassword() throws Exception {
+        PasswordHasher registrationHasher = mock(PasswordHasher.class);
+        String expectedHash = hasher.hash(PASSWORD);
+        when(registrationHasher.hash(PASSWORD)).thenReturn(expectedHash);
+        EmailVerificationService service = new EmailVerificationService(accountDAO, registrationHasher,
+                (email, code, purpose) -> {
+                    verify(registrationHasher).hash(PASSWORD);
+                    assertTrue(users.isEmpty(), "Registration must wait for email verification");
+                    mail.add(new Mail(email, code, purpose));
+                }, clock, SECRET);
+
+        EmailVerificationService.PendingRegistration pending = service.requestRegistrationCode(
+                new RegisterRequest("  New Customer  ", "  USER@Example.COM  ", " 0991234567 ", PASSWORD, PASSWORD));
+        assertEquals("New Customer", pending.getFullName());
+        assertEquals("user@example.com", pending.getEmail());
+        assertEquals("0991234567", pending.getPhone());
+        assertEquals(clock.millis() + 600_000, pending.getExpiresAtMillis());
+        assertFalse(pending.toString().contains(PASSWORD));
+        assertFalse(pending.toString().contains(expectedHash));
+        assertTrue(users.isEmpty());
+
+        ByteArrayOutputStream sessionBytes = new ByteArrayOutputStream();
+        try (ObjectOutputStream output = new ObjectOutputStream(sessionBytes)) {
+            output.writeObject(pending);
+        }
+        assertFalse(sessionBytes.toString(StandardCharsets.ISO_8859_1).contains(PASSWORD));
+        EmailVerificationService.PendingRegistration restored;
+        try (ObjectInputStream input = new ObjectInputStream(new ByteArrayInputStream(sessionBytes.toByteArray()))) {
+            restored = (EmailVerificationService.PendingRegistration) input.readObject();
+        }
+
+        assertEquals("user@example.com", service.register(restored, mail.get(0).code()).email());
+        User created = users.values().iterator().next();
+        assertEquals(expectedHash, created.getPasswordHash());
+        assertTrue(hasher.verify(PASSWORD, created.getPasswordHash()));
+        assertTrue(challenges.values().iterator().next().isConsumed());
+        assertInvalid(() -> service.register(restored, mail.get(0).code()));
+        verify(registrationHasher, times(1)).hash(PASSWORD);
+        verifyNoMoreInteractions(registrationHasher);
+        assertEquals(1, users.size());
+    }
+
+    @Test
+    void pendingRegistrationRejectsInvalidFieldsBeforeHashingOrSendingCode() {
+        PasswordHasher registrationHasher = mock(PasswordHasher.class);
+        EmailVerificationService service = new EmailVerificationService(accountDAO, registrationHasher,
+                (email, code, purpose) -> fail("Invalid registration must not send an OTP"), clock, SECRET);
+        List<RegisterRequest> invalidRequests = List.of(
+                new RegisterRequest("A", "new@example.com", "0991234567", PASSWORD, PASSWORD),
+                new RegisterRequest("New Customer", "invalid-email", "0991234567", PASSWORD, PASSWORD),
+                new RegisterRequest("New Customer", "new@example.com", "invalid-phone", PASSWORD, PASSWORD),
+                new RegisterRequest("New Customer", "new@example.com", "0991234567", "short", "short"),
+                new RegisterRequest("New Customer", "new@example.com", "0991234567", PASSWORD, NEW_PASSWORD));
+        for (RegisterRequest request : invalidRequests) {
+            assertEquals("VALIDATION_ERROR", assertThrows(AccountException.class,
+                    () -> service.requestRegistrationCode(request)).getErrorCode());
+        }
+        assertEquals("VALIDATION_ERROR", assertThrows(AccountException.class,
+                () -> service.requestRegistrationCode((RegisterRequest) null)).getErrorCode());
+        verifyNoInteractions(registrationHasher, accountDAO);
+        assertTrue(challenges.isEmpty());
+    }
+
+    @Test
+    void pendingRegistrationKeepsPreparedPasswordOnWrongCodeAndResendAndRefreshesExpiry() {
+        PasswordHasher registrationHasher = mock(PasswordHasher.class);
+        String expectedHash = hasher.hash(PASSWORD);
+        when(registrationHasher.hash(PASSWORD)).thenReturn(expectedHash);
+        SecureRandom random = mock(SecureRandom.class);
+        when(random.nextInt(1_000_000)).thenReturn(123456, 654321);
+        EmailVerificationService service = new EmailVerificationService(accountDAO, registrationHasher,
+                (email, code, purpose) -> mail.add(new Mail(email, code, purpose)), clock, () -> SECRET, random);
+        EmailVerificationService.PendingRegistration pending = service.requestRegistrationCode(registration("new@example.com"));
+        assertInvalid(() -> service.register(pending, "000000"));
+        assertEquals(1, challenges.values().iterator().next().getAttempts());
+        assertFalse(challenges.values().iterator().next().isConsumed());
+        assertRateLimited(() -> service.resendRegistrationCode(pending));
+
+        clock.advanceSeconds(60);
+        EmailVerificationService.PendingRegistration refreshed = service.resendRegistrationCode(pending);
+        assertNotSame(pending, refreshed);
+        assertEquals(pending.getEmail(), refreshed.getEmail());
+        assertEquals(pending.getExpiresAtMillis() + 60_000, refreshed.getExpiresAtMillis());
+        assertEquals(2, mail.size());
+        assertInvalid(() -> service.register(refreshed, mail.get(0).code()));
+
+        clock.advanceSeconds(540);
+        assertRegistrationExpired(() -> service.register(pending, mail.get(1).code()));
+        service.register(refreshed, mail.get(1).code());
+        assertEquals(expectedHash, users.values().iterator().next().getPasswordHash());
+        verify(registrationHasher, times(1)).hash(PASSWORD);
+        verifyNoMoreInteractions(registrationHasher);
+    }
+
+    @Test
+    void missingOrExpiredPendingRegistrationCannotRegisterOrResend() {
+        EmailVerificationService service = service();
+        EmailVerificationService.PendingRegistration pending = service.requestRegistrationCode(registration("new@example.com"));
+        clock.advanceSeconds(600);
+        clearInvocations(accountDAO);
+        assertRegistrationExpired(() -> service.register(pending, mail.get(0).code()));
+        assertRegistrationExpired(() -> service.resendRegistrationCode(pending));
+        assertRegistrationExpired(() -> service.register((EmailVerificationService.PendingRegistration) null, mail.get(0).code()));
+        assertRegistrationExpired(() -> service.resendRegistrationCode(null));
+        verifyNoInteractions(accountDAO);
+        assertEquals(1, mail.size());
+        assertTrue(users.isEmpty());
+        assertFalse(challenges.values().iterator().next().isConsumed());
+    }
+
+    @Test
+    void pendingRegistrationStillChecksContactConflictsAndPreservesCodeForRetry() {
+        EmailVerificationService service = service();
+        EmailVerificationService.PendingRegistration pending = service.requestRegistrationCode(registration("new@example.com"));
+        when(session.findContactConflicts(pending.getEmail(), pending.getPhone(), null))
+                .thenReturn(Map.of("phone", "Số điện thoại đã được sử dụng."));
+        assertEquals(409, assertThrows(AccountException.class,
+                () -> service.register(pending, mail.get(0).code())).getStatusCode());
+        assertFalse(challenges.values().iterator().next().isConsumed());
+        assertTrue(users.isEmpty());
+        when(session.findContactConflicts(pending.getEmail(), pending.getPhone(), null)).thenReturn(Map.of());
+        service.register(pending, mail.get(0).code());
+        assertTrue(challenges.values().iterator().next().isConsumed());
+        assertEquals(1, users.size());
     }
 
     @Test
@@ -315,6 +447,12 @@ class EmailVerificationServiceTest {
 
     private static void assertRateLimited(Runnable operation) {
         assertEquals(429, assertThrows(AccountException.class, operation::run).getStatusCode());
+    }
+
+    private static void assertRegistrationExpired(Runnable operation) {
+        AccountException failure = assertThrows(AccountException.class, operation::run);
+        assertEquals(400, failure.getStatusCode());
+        assertEquals("REGISTRATION_EXPIRED", failure.getErrorCode());
     }
 
     private record Mail(String email, String code, String purpose) { }

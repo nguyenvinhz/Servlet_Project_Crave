@@ -38,6 +38,9 @@ xóa địa chỉ đầy đủ là `/customer/addresses/delete`.
 - Tài khoản: `fullName`, `email`, `phone`, `password`, `confirmPassword`,
   `rememberMe`, `verificationCode`, `currentPassword` tùy form.
   Mật khẩu không được render lại trong HTML khi chuyển bước OTP.
+  Đăng ký lưu thông tin đã kiểm tra và mật khẩu đã băm trong session tối đa
+  10 phút; bước xác thực/gửi lại chỉ nhận mã hoặc dùng bản đăng ký tạm.
+  Gửi mã thành công redirect về GET `/auth/register` để tải lại trang an toàn.
 - Địa chỉ: `addressId`, `addressLine`, `note`, `isDefault`.
 - Giỏ hàng: `action`, `foodId` hoặc `cartItemId`, `quantity`, `note`,
   nhiều trường `optionIds`. `updateOptions=true` xác định thao tác thay tùy chọn;

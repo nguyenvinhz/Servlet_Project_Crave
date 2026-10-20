@@ -33,6 +33,13 @@ public class AccountPageServlet extends AccountBaseServlet {
         };
         if (page == null) { response.sendError(404); return; }
         try {
+            if ("auth/register".equals(page) && "1".equals(request.getParameter("restart"))) {
+                RegistrationSession.restart(request);
+            }
+            if ("auth/register".equals(page) && "1".equals(request.getParameter("codeSent"))
+                    && RegistrationSession.current(request) != null) {
+                request.setAttribute("message", "Mã xác minh đã được gửi đến email của bạn. Nhập mã để hoàn tất đăng ký.");
+            }
             if ("customer/profile".equals(page) || "auth/change-password".equals(page)) {
                 SessionAuth.Snapshot before = SessionAuth.capture(request);
                 ProfileResponse profile = accounts.getProfile(before.user().id());

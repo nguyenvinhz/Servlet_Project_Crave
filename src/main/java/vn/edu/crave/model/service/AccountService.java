@@ -18,6 +18,7 @@ import vn.edu.crave.model.dao.AccountDAO;
 import vn.edu.crave.model.dao.AccountDAO.Session;
 import vn.edu.crave.util.PasswordHasher;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -371,7 +372,7 @@ public class AccountService {
     private record Contact(String fullName, String email, String phone) {
     }
 
-    record Registration(String fullName, String email, String phone, String passwordHash) {
+    record Registration(String fullName, String email, String phone, String passwordHash) implements Serializable {
         @Override
         public String toString() { return "Registration[credentials redacted]"; }
     }

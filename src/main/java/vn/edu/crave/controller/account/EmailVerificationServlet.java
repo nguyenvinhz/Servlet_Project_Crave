@@ -2,7 +2,9 @@ package vn.edu.crave.controller.account;
 
 import vn.edu.crave.exception.AccountException;
 import vn.edu.crave.security.SessionAuth;
+import vn.edu.crave.model.form.RegisterRequest;
 import vn.edu.crave.model.service.EmailVerificationService;
+import vn.edu.crave.model.service.EmailVerificationService.PendingRegistration;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServletRequest;
@@ -31,8 +33,18 @@ public class EmailVerificationServlet extends AccountBaseServlet {
         try {
             switch (path) {
                 case "/auth/register/code" -> {
-                    verification.requestRegistrationCode(request.getParameter("email"));
-                    request.setAttribute("message", "Mã xác minh đã được gửi đến email của bạn. Nhập lại mật khẩu và mã để hoàn tất.");
+                    PendingRegistration pending;
+                    if ("true".equals(request.getParameter("otpActive"))) {
+                        pending = verification.resendRegistrationCode(RegistrationSession.require(request));
+                    } else {
+                        pending = verification.requestRegistrationCode(new RegisterRequest(
+                                request.getParameter("fullName"), request.getParameter("email"),
+                                request.getParameter("phone"), request.getParameter("password"),
+                                request.getParameter("confirmPassword")));
+                    }
+                    RegistrationSession.store(request, pending);
+                    response.sendRedirect(request.getContextPath() + "/auth/register?codeSent=1");
+                    return;
                 }
                 case "/auth/password/reset/code" -> {
                     verification.requestPasswordResetCode(request.getParameter("email"));
