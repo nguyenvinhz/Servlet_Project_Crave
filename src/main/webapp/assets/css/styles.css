@@ -671,7 +671,7 @@ a:hover {
    4. Promo Banner - Based on Mock Image 1
    ============================================================ */
 .crave-promo-banner {
-    background: linear-gradient(135deg, #ff5733 0%, #f04e23 100%);
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dark) 100%);
     border-radius: 24px;
     padding: clamp(2rem, 4vw, 3rem) clamp(2rem, 5vw, 4rem);
     display: flex;
@@ -689,7 +689,7 @@ a:hover {
     font-weight: 800;
     letter-spacing: 0.12em;
     text-transform: uppercase;
-    color: rgba(255, 255, 255, 0.85);
+    color: #ffffff;
     display: block;
     margin-bottom: 0.5rem;
 }
@@ -705,7 +705,7 @@ a:hover {
 .promo-subtext {
     margin: 0;
     font-size: 1rem;
-    color: rgba(255, 255, 255, 0.9);
+    color: #ffffff;
 }
 
 .promo-order-btn {
@@ -2289,11 +2289,12 @@ label {
     animation: cartBump 0.35s ease-out;
 }
 
-/* Toast Notifications */
+/* Shared customer toasts: keep foreground/background pairs together here. */
 .crave-toast-container {
     position: fixed;
     bottom: 24px;
     right: 24px;
+    max-width: min(380px, calc(100vw - 48px));
     z-index: 9999;
     display: flex;
     flex-direction: column;
@@ -2314,6 +2315,8 @@ label {
     pointer-events: auto;
     animation: toastSlideUp 0.25s ease-out;
     border: 1px solid var(--line);
+    min-width: 0;
+    overflow-wrap: anywhere;
 }
 .crave-toast.success {
     background: #edf8f1;
