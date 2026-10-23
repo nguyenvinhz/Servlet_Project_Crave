@@ -48,9 +48,9 @@ Báo cáo được nhóm theo chức năng; ngày trong tên file là ngày tạ
 
 | Ngày tạo | Người thực hiện | Công việc | Báo cáo |
 |---|---|---|---|
-| 2026-10-10 | Nguyễn Quang Vinh | Sắp xếp thư mục tài liệu và cập nhật liên kết | [Bố cục docs](documentation/2026-10-10-nguyen-quang-vinh-docs-layout.md) |
+| 2026-10-10 | Nguyễn Minh Huân | Sắp xếp thư mục tài liệu và cập nhật liên kết | [Bố cục docs](documentation/2026-10-10-nguyen-quang-vinh-docs-layout.md) |
 | 2026-10-12 | Nguyễn Quang Vinh | CI/CD: kiểm thử và tự deploy main lên EC2 | [CI/CD EC2](documentation/2026-10-12-nguyen-quang-vinh-ci-cd-ec2.md) |
-| 2026-10-12 | Nguyễn Quang Vinh | Hoàn thiện giao diện, admin, kiến trúc và kiểm tra chạy thật | [UI/admin/runtime](documentation/2026-10-12-nguyen-quang-vinh-ui-admin-runtime.md) |
+| 2026-10-12 | Nguyễn Đức PHát | Hoàn thiện giao diện, admin, kiến trúc và kiểm tra chạy thật | [UI/admin/runtime](documentation/2026-10-12-nguyen-quang-vinh-ui-admin-runtime.md) |
 | 2026-10-17 | Ung Văn Trí | Đơn giản hóa backend Servlet/JSP, bỏ mapper và JSON nghiệp vụ, giữ giao diện | [Báo cáo Servlet/JSP](documentation/2026-10-17-servlet-jsp-simplification.md) |
 | 2026-10-17 | Nguyễn Quang Vinh | Dọn file không dùng và hoàn thiện CI/CD triển khai WAR lên AWS EC2 | [Cleanup và CI/CD AWS](documentation/2026-10-17-cleanup-aws-cicd.md) |
 
