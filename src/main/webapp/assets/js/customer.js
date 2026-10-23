@@ -9,13 +9,19 @@ document.addEventListener("DOMContentLoaded", () => {
 function initHeaderCartBadge() {
     const countField = document.getElementById('pageCartCount');
     const count = Number(countField ? countField.value : document.querySelector('.cart-badge-count')?.textContent) || 0;
+    updateHeaderCartBadge(count);
+    const flash = document.getElementById('cartFlash');
+    if (flash?.dataset.message) showToast(flash.dataset.message, flash.dataset.type || 'success');
+}
+
+function updateHeaderCartBadge(count) {
+    const countField = document.getElementById('pageCartCount');
+    if (countField) countField.value = String(count);
     document.querySelectorAll('.cart-badge-count').forEach(badge => {
         badge.textContent = String(count);
         badge.style.display = count > 0 ? 'inline-flex' : 'none';
     });
     document.querySelector('.header-cart-icon-btn')?.setAttribute('aria-label', 'Giỏ hàng, ' + count + ' món');
-    const flash = document.getElementById('cartFlash');
-    if (flash?.dataset.message) showToast(flash.dataset.message, flash.dataset.type || 'success');
 }
 /**
  * Tự động chuyển đổi hình ảnh món ăn theo từng danh mục sau một khoảng thời gian
@@ -80,26 +86,48 @@ function initCategoryCarousels() {
  * Xử lý thêm nhanh món ăn (tùy chọn cơ bản) khi bấm dấu + trên thẻ món ăn
  */
 function initQuickAddToCart() {
-    document.addEventListener('click', event => {
+    document.addEventListener('click', async event => {
         const button = event.target.closest('[data-quick-add]');
         if (!button || button.disabled || !button.dataset.quickAdd) return;
         event.preventDefault();
         event.stopPropagation();
-        button.disabled = true;
-        const form = document.createElement('form');
-        form.method = 'post';
-        form.action = (document.body.dataset.contextPath || '') + '/cart/action';
-        const currentPath = window.location.pathname.slice((document.body.dataset.contextPath || '').length);
+        // Process one cart change at a time because the result is stored in the session flash.
+        const buttons = [...document.querySelectorAll('[data-quick-add]:not(:disabled)')];
+        buttons.forEach(item => { item.disabled = true; });
+        button.setAttribute('aria-busy', 'true');
+        const contextPath = document.body.dataset.contextPath || '';
+        const currentPath = window.location.pathname.slice(contextPath.length);
         const fields = { action: 'add', foodId: button.dataset.quickAdd, quantity: '1', note: '', returnTo: currentPath + window.location.search };
-        Object.entries(fields).forEach(([name, value]) => {
-            const input = document.createElement('input');
-            input.type = 'hidden';
-            input.name = name;
-            input.value = value;
-            form.append(input);
-        });
-        document.body.append(form);
-        form.submit();
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 15000);
+        try {
+            const response = await fetch(contextPath + '/cart/action', {
+                method: 'POST', credentials: 'same-origin', cache: 'no-store', signal: controller.signal,
+                headers: { 'Accept': 'text/html', 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+                body: new URLSearchParams(fields)
+            });
+            if (response.redirected && new URL(response.url).pathname === contextPath + '/auth/login') {
+                window.location.assign(response.url);
+                return;
+            }
+            if (!response.ok) throw new Error('Cart request failed');
+            const result = new DOMParser().parseFromString(await response.text(), 'text/html');
+            const countField = result.getElementById('pageCartCount');
+            const flash = result.getElementById('cartFlash');
+            const count = Number(countField?.value);
+            if (!countField || !Number.isInteger(count) || count < 0 || !flash?.dataset.message
+                    || !['success', 'error'].includes(flash.dataset.type)) {
+                throw new Error('Invalid cart response');
+            }
+            updateHeaderCartBadge(count);
+            showToast(flash.dataset.message, flash.dataset.type);
+        } catch {
+            showToast('Chưa xác nhận được kết quả thêm món. Vui lòng kiểm tra giỏ hàng rồi thử lại.', 'error');
+        } finally {
+            clearTimeout(timer);
+            buttons.forEach(item => { item.disabled = false; });
+            button.removeAttribute('aria-busy');
+        }
     });
 }
 function showToast(message, type = "info") {
